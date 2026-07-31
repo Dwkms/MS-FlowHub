@@ -1,0 +1,38 @@
+from functools import lru_cache
+
+from pydantic import Field
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+class Settings(BaseSettings):
+    app_name: str = "MS FlowHub"
+    database_url: str | None = None
+    migration_database_url: str | None = None
+    ai_provider: str = "mock"
+    ai_api_key: str | None = None
+    ai_model: str | None = None
+    discount_approval_threshold: float = Field(default=10, ge=0, le=100)
+    frontend_origin: str = "http://localhost:3000"
+
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
+
+    @property
+    def data_source(self) -> str:
+        return "supabase" if self.database_url else "local"
+
+    @property
+    def frontend_origins(self) -> list[str]:
+        origins = [self.frontend_origin]
+        local_origins = {"http://localhost:3000", "http://127.0.0.1:3000"}
+        if self.frontend_origin in local_origins:
+            origins.extend(local_origins - {self.frontend_origin})
+        return origins
+
+
+@lru_cache
+def get_settings() -> Settings:
+    return Settings()
