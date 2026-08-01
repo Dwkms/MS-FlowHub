@@ -5,6 +5,14 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app.domain.employee_status import (
+    CHECK_IN_WORK_STATUSES,
+    DAILY_WORK_STATUSES,
+    NORMAL_WORK_STATUSES,
+    requires_employment_reason,
+    requires_reason,
+    supports_daily_work_status,
+)
 from app.models.organization import Department, Employee, Team
 from app.repositories.organization_repository import OrganizationRepository
 from app.schemas.employee import (
@@ -15,24 +23,8 @@ from app.schemas.employee import (
     EmploymentStatusReasonUpdate,
     PaginatedEmployeeResponse,
 )
-
-_DAILY_WORK_STATUSES = {
-    "WORKING",
-    "REMOTE_WORK",
-    "OUT_OF_OFFICE",
-    "BUSINESS_TRIP",
-    "ANNUAL_LEAVE",
-    "MORNING_HALF",
-    "AFTERNOON_HALF",
-    "SICK_LEAVE",
-    "TRAINING",
-    "OFF_WORK",
-    "ABSENT",
-}
-_REASON_REQUIRED_WORK_STATUSES = {"SICK_LEAVE", "ABSENT"}
-_CHECK_IN_WORK_STATUSES = {"WORKING", "REMOTE_WORK", "OUT_OF_OFFICE", "BUSINESS_TRIP"}
-_NORMAL_WORK_STATUSES = {"WORKING", "OFF_WORK"}
-_PRIVATE_REASON_VIEWER_ROLES = {"ADMIN", "HR_MANAGER"}
+from app.security.authorization import can_view_private_status_reasons, require_self_or_admin
+from app.security.identity import ActorContext
 
 
 class EmployeeService:
@@ -43,11 +35,14 @@ class EmployeeService:
     def list(self, **filters: object) -> PaginatedEmployeeResponse:
         return self.repository.list_employee_page(**filters)
 
-    def detail(self, employee_id: str, viewer_id: str | None = None) -> EmployeeDetail:
+    def organization_tree(self):
+        return self.repository.organization_tree()
+
+    def detail(self, employee_id: str, viewer: ActorContext | None = None) -> EmployeeDetail:
         item = self.repository.get_employee_detail(employee_id)
         if item is None:
             raise HTTPException(status_code=404, detail="직원을 찾을 수 없습니다.")
-        if not self._can_view_private_status_reasons(viewer_id):
+        if not can_view_private_status_reasons(viewer):
             item = item.model_copy(
                 update={
                     "employment_status_reason": self._without_private_note(
@@ -105,20 +100,20 @@ class EmployeeService:
         self._commit()
 
     def update_attendance_status(
-        self, employee_id: str, actor_id: str, payload: AttendanceStatusUpdate
+        self, employee_id: str, actor: ActorContext, payload: AttendanceStatusUpdate
     ) -> EmployeeDetail:
         employee = self._require_employee(employee_id)
-        self._require_self_or_admin(actor_id, employee)
-        if employee.employment_status != "ACTIVE":
+        require_self_or_admin(actor, employee.id)
+        if not supports_daily_work_status(employee.employment_status):
             raise HTTPException(
                 status_code=409, detail="재직 중인 직원만 근무 상태를 변경할 수 있습니다."
             )
-        if payload.work_status not in _DAILY_WORK_STATUSES:
+        if payload.work_status not in DAILY_WORK_STATUSES:
             raise HTTPException(status_code=422, detail="지원하지 않는 근무 상태입니다.")
         reason_summary = self._clean_text(payload.reason_summary)
         private_note = self._clean_text(payload.private_note)
         reason_category = self._clean_text(payload.reason_category)
-        if payload.work_status in _REASON_REQUIRED_WORK_STATUSES and not reason_summary:
+        if requires_reason(payload.work_status) and not reason_summary:
             raise HTTPException(
                 status_code=422, detail="병가와 결근에는 공개 사유를 입력해야 합니다."
             )
@@ -130,7 +125,7 @@ class EmployeeService:
             )
         else:
             record.work_status = payload.work_status
-        if payload.work_status in _NORMAL_WORK_STATUSES:
+        if payload.work_status in NORMAL_WORK_STATUSES:
             record.note = None
             record.reason_category = None
             record.reason_summary = None
@@ -143,12 +138,12 @@ class EmployeeService:
             record.reason_summary = reason_summary
             record.private_note = private_note
             if reason_summary or private_note:
-                record.reason_registered_by_id = actor_id
+                record.reason_registered_by_id = actor.employee_id
                 record.reason_registered_at = datetime.now(UTC)
             else:
                 record.reason_registered_by_id = None
                 record.reason_registered_at = None
-        if payload.work_status in _CHECK_IN_WORK_STATUSES:
+        if payload.work_status in CHECK_IN_WORK_STATUSES:
             record.check_in_at = datetime.combine(work_date, time(9, 0), tzinfo=UTC)
             record.check_out_at = None
         elif payload.work_status == "OFF_WORK":
@@ -160,14 +155,14 @@ class EmployeeService:
             record.check_in_at = None
             record.check_out_at = None
         self._commit()
-        return self.detail(employee_id, actor_id)
+        return self.detail(employee_id, actor)
 
     def update_employment_status_reason(
-        self, employee_id: str, actor_id: str, payload: EmploymentStatusReasonUpdate
+        self, employee_id: str, actor: ActorContext, payload: EmploymentStatusReasonUpdate
     ) -> EmployeeDetail:
         employee = self._require_employee(employee_id)
-        self._require_self_or_admin(actor_id, employee)
-        if employee.employment_status != "ON_LEAVE":
+        require_self_or_admin(actor, employee.id)
+        if not requires_employment_reason(employee.employment_status):
             raise HTTPException(
                 status_code=409, detail="휴직 상태에서만 휴직 사유를 작성할 수 있습니다."
             )
@@ -175,11 +170,11 @@ class EmployeeService:
         employee.employment_status_reason_category = self._clean_text(payload.reason_category)
         employee.employment_status_reason_summary = payload.reason_summary.strip()
         employee.employment_status_private_note = self._clean_text(payload.private_note)
-        employee.employment_status_reason_registered_by_id = actor_id
+        employee.employment_status_reason_registered_by_id = actor.employee_id
         employee.employment_status_reason_registered_at = datetime.now(UTC)
         employee.employment_status_effective_from = payload.effective_from or date.today()
         self._commit()
-        return self.detail(employee_id, actor_id)
+        return self.detail(employee_id, actor)
 
     def _require_employee(self, employee_id: str) -> Employee:
         employee = self.repository.get_employee_model(employee_id)
@@ -196,7 +191,12 @@ class EmployeeService:
 
     def _can_view_private_status_reasons(self, viewer_id: str | None) -> bool:
         viewer = self.repository.get_employee_model(viewer_id) if viewer_id else None
-        return bool(viewer and viewer.role in _PRIVATE_REASON_VIEWER_ROLES)
+        return bool(
+            viewer
+            and can_view_private_status_reasons(
+                ActorContext(employee_id=viewer.id, role=viewer.role)
+            )
+        )
 
     @staticmethod
     def _clean_text(value: str | None) -> str | None:

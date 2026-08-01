@@ -28,6 +28,11 @@ class Settings(BaseSettings):
     ai_model: str | None = None
     discount_approval_threshold: float = Field(default=10, ge=0, le=100)
     frontend_origin: str = "http://localhost:3000"
+    supabase_url: str | None = None
+    supabase_publishable_key: str | None = None
+    supabase_secret_key: str | None = None
+    supabase_jwks_url: str | None = None
+    auth_seed_default_password: str | None = None
 
     model_config = SettingsConfigDict(
         env_file=".env",

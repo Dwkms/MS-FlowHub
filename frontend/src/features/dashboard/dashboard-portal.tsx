@@ -10,7 +10,7 @@ import { createFallbackDashboard } from "@/features/dashboard/mock-data";
 import type { DashboardData } from "@/types/dashboard";
 
 export function DashboardPortal() {
-  const { currentEmployee } = useCurrentUser();
+  const { apiConnected, currentEmployee, isLoadingCurrentUser } = useCurrentUser();
   const [dashboard, setDashboard] = useState<DashboardData>(
     createFallbackDashboard(currentEmployee),
   );
@@ -19,9 +19,21 @@ export function DashboardPortal() {
 
   useEffect(() => {
     let active = true;
+    if (isLoadingCurrentUser) {
+      return () => {
+        active = false;
+      };
+    }
+    if (!apiConnected) {
+      return () => {
+        active = false;
+      };
+    }
     void getDashboard(currentEmployee.id)
       .then((result) => {
-        if (active) setDashboard(result);
+        if (!active) return;
+        setDashboard(result);
+        setError(null);
       })
       .catch(() => {
         if (!active) return;
@@ -34,7 +46,9 @@ export function DashboardPortal() {
     return () => {
       active = false;
     };
-  }, [currentEmployee]);
+  }, [apiConnected, currentEmployee, isLoadingCurrentUser]);
+
+  const isDashboardLoading = isLoadingCurrentUser || (apiConnected && loading);
 
   return (
     <section className="content">
@@ -58,7 +72,7 @@ export function DashboardPortal() {
         </div>
       </div>
 
-      <div className={loading ? "metrics loading" : "metrics"}>
+      <div className={isDashboardLoading ? "metrics loading" : "metrics"}>
         {dashboard.metrics.map((metric) => (
           <article className={`metric ${metric.tone}`} key={metric.label}>
             <div className="metric-top">

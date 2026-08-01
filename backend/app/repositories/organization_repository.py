@@ -4,6 +4,11 @@ from math import ceil
 from sqlalchemy import Select, func, or_, select
 from sqlalchemy.orm import Session
 
+from app.domain.employee_status import (
+    DAILY_WORK_STATUSES,
+    NON_WORKING_EMPLOYMENT_STATUSES,
+    NORMAL_WORK_STATUSES,
+)
 from app.models.organization import AttendanceRecord, Department, Employee, Team
 from app.schemas.common import DepartmentResponse as LegacyDepartmentResponse
 from app.schemas.common import EmployeeResponse
@@ -25,22 +30,7 @@ _ROLE_LABELS = {
     "SALES_MANAGER": "영업팀장",
     "ADMIN": "관리자",
 }
-_NON_WORKING_EMPLOYMENT_STATUSES = {"ON_LEAVE", "SCHEDULED", "RESIGNED"}
 _SPECIAL_WORK_STATUSES = {"SICK_LEAVE", "MORNING_HALF", "AFTERNOON_HALF"}
-_NORMAL_WORK_STATUSES = {"WORKING", "OFF_WORK"}
-_DAILY_WORK_STATUSES = (
-    "WORKING",
-    "REMOTE_WORK",
-    "OUT_OF_OFFICE",
-    "BUSINESS_TRIP",
-    "ANNUAL_LEAVE",
-    "MORNING_HALF",
-    "AFTERNOON_HALF",
-    "SICK_LEAVE",
-    "TRAINING",
-    "OFF_WORK",
-    "ABSENT",
-)
 _EMPLOYMENT_STATUS_BY_NUMBER = {
     "MS0018": "ON_LEAVE",
     "MS0031": "SCHEDULED",
@@ -216,10 +206,10 @@ class OrganizationRepository:
                     id=f"attendance-{today.isoformat()}-{employee.id}",
                     employee_id=employee.id,
                     work_date=today,
-                    work_status=_DAILY_WORK_STATUSES[index % len(_DAILY_WORK_STATUSES)],
+                    work_status=DAILY_WORK_STATUSES[index % len(DAILY_WORK_STATUSES)],
                 )
                 self.session.add(record)
-            if record.work_status in _NORMAL_WORK_STATUSES:
+            if record.work_status in NORMAL_WORK_STATUSES:
                 record.note = None
                 record.reason_category = None
                 record.reason_summary = None
@@ -235,7 +225,7 @@ class OrganizationRepository:
                     record.note = record.reason_summary
                     record.reason_registered_by_id = employee.id
                     record.reason_registered_at = datetime.now(UTC)
-            if employee.employment_status in _NON_WORKING_EMPLOYMENT_STATUSES:
+            if employee.employment_status in NON_WORKING_EMPLOYMENT_STATUSES:
                 record.check_in_at = None
                 record.check_out_at = None
             elif record.work_status == "BEFORE_WORK":
@@ -277,7 +267,8 @@ class OrganizationRepository:
                 employee_no=e.employee_no,
                 name=e.name,
                 role=e.role,
-                role_label=_ROLE_LABELS[e.role],
+                role_label=self._role_label(e, d),
+                position=e.position,
                 department_id=e.department_id,
                 department_name=d.name,
             )
@@ -298,7 +289,8 @@ class OrganizationRepository:
                 employee_no=row[0].employee_no,
                 name=row[0].name,
                 role=row[0].role,
-                role_label=_ROLE_LABELS[row[0].role],
+                role_label=self._role_label(row[0], row[1]),
+                position=row[0].position,
                 department_id=row[0].department_id,
                 department_name=row[1].name,
             )
@@ -311,6 +303,15 @@ class OrganizationRepository:
             if item is None
             else LegacyDepartmentResponse(id=item.id, code=item.code, name=item.name)
         )
+
+    def get_department_model(self, department_id: str) -> Department | None:
+        return self.session.get(Department, department_id)
+
+    @staticmethod
+    def _role_label(employee: Employee, department: Department) -> str:
+        if employee.role == "DEPARTMENT_HEAD":
+            return f"{department.name}장"
+        return _ROLE_LABELS[employee.role]
 
     def list_employee_page(
         self,
@@ -353,7 +354,7 @@ class OrganizationRepository:
             statement = statement.where(Employee.employment_status == employment_status)
         if daily_work_status:
             statement = statement.where(
-                Employee.employment_status.not_in(_NON_WORKING_EMPLOYMENT_STATUSES),
+                Employee.employment_status.not_in(NON_WORKING_EMPLOYMENT_STATUSES),
                 AttendanceRecord.work_status == daily_work_status,
             )
         if position:
@@ -398,7 +399,7 @@ class OrganizationRepository:
             employment_status_reason=self._employment_status_reason(row[0]),
             daily_work_reason=(
                 self._attendance_reason(row[3])
-                if row[3] and row[3].work_status not in _NORMAL_WORK_STATUSES
+                if row[3] and row[3].work_status not in NORMAL_WORK_STATUSES
                 else None
             ),
         )
@@ -467,14 +468,14 @@ class OrganizationRepository:
             ),
             daily_work_status=(
                 None
-                if employee.employment_status in _NON_WORKING_EMPLOYMENT_STATUSES
+                if employee.employment_status in NON_WORKING_EMPLOYMENT_STATUSES
                 else attendance.work_status
                 if attendance
                 else None
             ),
             has_daily_work_reason=bool(
                 attendance
-                and attendance.work_status not in _NORMAL_WORK_STATUSES
+                and attendance.work_status not in NORMAL_WORK_STATUSES
                 and (attendance.reason_summary or attendance.private_note)
             ),
             check_in_at=attendance.check_in_at if attendance else None,

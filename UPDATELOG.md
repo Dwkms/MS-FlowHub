@@ -1,5 +1,150 @@
 # Update Log
 
+## 2026-08-01 오늘 작업 종합
+
+### 완료한 기능
+
+- Supabase PostgreSQL 단일 DB와 46명 직원·조직 Seed를 유지했습니다.
+- 날짜별 근무 상태, 재직 상태, 상태별 공개 사유와 비공개 상세 사유를
+  직원·조직 관리 화면과 API에 연결했습니다.
+- 조직도 이미지 보기, 상태 정보 아이콘·상세 모달, 필터 URL 유지 기능을
+  구현했습니다.
+- 직원관리 API 테스트 fixture를 운영 Supabase lifespan과 분리했습니다.
+  SQLite 테스트 세션과 health dependency를 override로 주입할 수 있습니다.
+- 채용 요청 결재자는 팀장급 이상으로 제한하고, 경영진 부서는 요청 부서
+  선택에서 제외했습니다. 부서장 표기는 실제 부서명 기반으로 변경했습니다.
+- 대시보드 새로고침 시 임시 사용자 ID로 먼저 요청하던 문제를 수정했습니다.
+- Supabase Auth 브라우저 환경변수, 로그인·로그아웃, 세션 보호, 로그인 성공 후
+  대시보드 이동, 현재 비밀번호 검증 방식의 비밀번호 변경 화면을 추가했습니다.
+- 상단 사용자 전환 UI를 제거하고 사이드바 하단 설정 메뉴에 비밀번호 변경과
+  로그아웃을 배치했습니다.
+
+### 오늘 검증한 결과
+
+- Backend Ruff check/format 통과
+- Backend API 테스트 34개 통과
+- Frontend `npm run lint` 통과
+- Frontend `npm run build` 통과
+
+### 아직 완료로 보지 않는 항목
+
+- `employee_accounts` migration과 Auth Seed는 코드가 준비되었지만 실제 Supabase
+  환경에서 migration 적용·46개 계정 생성·로그인 실동작 확인이 필요합니다.
+- 기존 전자결재·직원 API 전체가 아직 Supabase Auth JWT와 RBAC dependency로
+  완전히 전환된 상태는 아닙니다. 일부 API에는 기존 개발용 actor 파라미터가 남아
+  있으므로 운영 인증 완료로 표시하지 않습니다.
+
+### 내일 권장 순서
+
+1. Supabase에서 `employee_accounts` migration 적용 및 Auth Seed 실행
+2. 실제 계정 1개로 로그인·로그아웃·비밀번호 변경·새로고침 세션 유지 확인
+3. FastAPI의 모든 보호 Router에서 Bearer 토큰과 employee_accounts 역할을 검증
+4. SUPER_ADMIN/HR_ADMIN/TEAM_ADMIN/EMPLOYEE별 직원·결재 접근 테스트 추가
+5. 개발용 현재 사용자 전환·actor_id 경로 제거 후 프론트 API client에 access token 연결
+6. Auth 실패, 비활성 계정, 직원 연결 누락, 권한 부족 시나리오의 E2E 검증
+7. Jira에서 다음 작업 일정과 우선순위를 정리하고 개발 진행 상황을 연결
+8. 기본 대시보드의 마일스톤·현재 구현 범위·접근 가능 모듈·관리자 권한 안내 문구 점검
+9. 여유가 있으면 Workspace 내 직원 매뉴얼의 대상 사용자·목차·운영 방식을 기획
+
+## 2026-08-01 Authenticated password change
+
+- Replaced the recovery-email page with an authenticated password-change page.
+- The page verifies the current password, requires a matching new-password
+  confirmation, then updates the Supabase Auth password.
+- Added the entry point beside the logged-in user information in the top bar.
+
+### Verification
+
+- `npm run lint`: passed
+- `npm run build`: passed
+
+## 2026-08-01 Password recovery flow
+
+- Added a password-change link below the login button.
+- Added `/reset-password` for Supabase recovery-email delivery and new-password
+  submission after the recovery link opens the application.
+
+### Verification
+
+- `npm run lint`: passed
+- `npm run build`: passed
+
+## 2026-08-01 Supabase Auth login page and session gate
+
+- Added `/login` with email/password sign-in through Supabase Auth.
+- Added a session guard that redirects unauthenticated visitors from the portal
+  to `/login`, restores Supabase sessions, and sends a successful login to the
+  dashboard.
+- Replaced the top-bar development user switcher with authenticated-user
+  display and a Supabase logout action.
+
+### Verification
+
+- `npm run lint`: passed
+- `npm run build`: passed
+
+## 2026-08-01 Supabase Auth frontend environment setup
+
+- Added public Supabase URL and publishable-key placeholders to
+  `frontend/.env.local` and `frontend/.env.example`.
+- Added a guarded browser-client factory using only
+  `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`.
+  It reports missing configuration without exposing key values.
+- Added the official `@supabase/supabase-js` browser dependency.
+
+### Verification
+
+- `npm run lint`: passed
+- `npm run build`: passed
+
+## 2026-08-01 Dashboard refresh stability
+
+- Delayed dashboard loading until the current-user employee list is resolved.
+  This prevents the removed fallback ID (`emp-head`) from producing an
+  intermittent dashboard 404 during refresh.
+- The fallback dashboard is now used quietly when the employee-options API is
+  unavailable, while real dashboard failures still display their warning.
+- Cleared the dashboard warning after a successful dashboard response.
+
+### Verification
+
+- `npm run lint`: passed
+- `npm run build`: passed
+
+## 2026-08-01 Recruitment request approver scope
+
+- Restricted recruitment-request approvers to team-leader level and above in
+  both the form and backend Service validation.
+- Removed the executive department from the recruitment-request department
+  selector and reject it server-side while preserving CEO organization data.
+- Replaced generic department-head option labels with actual department labels
+  such as `개발팀장` and `마케팅팀장`.
+
+## 2026-08-01 Employee organization stabilization refactor
+
+### Changed
+
+- Added `create_app()` so tests create an application without the production
+  Supabase startup check; production `app` still verifies Supabase at startup.
+- Converted database session creation to lazy runtime initialization. Test
+  SQLite sessions and database health are injected with FastAPI dependency
+  overrides and never open a Supabase connection.
+- Added an `ActorContext` dependency bridge and centralized status rules and
+  employee-status authorization outside Routers and Services.
+- Moved organization-tree access behind `EmployeeService`; employee Router now
+  receives requests and returns service responses only.
+- Recovered the complete API suite with isolated workflow fixture identities,
+  and added coverage for combined status filters, mandatory sick-leave reasons,
+  private-note redaction, and administrator viewing.
+- Reviewed model boundaries for future `attendance_change_histories` and
+  `employee_leave_periods`; no tables or production data were changed.
+
+### Verification
+
+- `ruff check app tests`: passed
+- `ruff format --check app tests`: passed
+- `pytest -q`: 33 passed (one third-party TestClient deprecation warning)
+
 ## 2026-08-01 현재 구현 정리
 
 ### 완료한 작업

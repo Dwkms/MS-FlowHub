@@ -15,6 +15,7 @@ type RequestOptions = {
   method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
   body?: unknown;
   formData?: FormData;
+  headers?: HeadersInit;
 };
 
 export async function apiRequest<T>(
@@ -30,6 +31,7 @@ export async function apiRequest<T>(
       headers: {
         Accept: "application/json",
         ...(options.body === undefined || options.formData ? {} : { "Content-Type": "application/json" }),
+        ...options.headers,
       },
       body: options.formData ?? (options.body === undefined ? undefined : JSON.stringify(options.body)),
     });

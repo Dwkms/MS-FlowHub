@@ -14,6 +14,11 @@ import type { Department } from "@/types/dashboard";
 
 const MAX_POSTER_SIZE = 5 * 1024 * 1024;
 const POSTER_TYPES = ["image/jpeg", "image/png", "image/webp", "application/pdf"];
+const APPROVER_POSITION_KEYWORDS = ["팀장", "부장", "이사", "대표"];
+
+function isRecruitmentApprover(position: string | undefined) {
+  return APPROVER_POSITION_KEYWORDS.some((keyword) => position?.includes(keyword));
+}
 
 export function RecruitmentForm() {
   const router = useRouter();
@@ -35,7 +40,7 @@ export function RecruitmentForm() {
     preferredSkills: "",
     desiredStartDate: "",
   });
-  const availableDepartments = departments;
+  const availableDepartments = departments.filter((department) => department.code !== "EXEC");
   const canSelectDepartment = availableDepartments.length > 1;
   const selectedDepartmentId = availableDepartments.some(
     (department) => department.id === departmentId,
@@ -43,15 +48,27 @@ export function RecruitmentForm() {
     ? departmentId
     : (availableDepartments[0]?.id ?? currentEmployee.department_id);
   const approvers = useMemo(
-    () => employees.filter((item) => item.id !== currentEmployee.id),
+    () =>
+      employees.filter(
+        (item) => item.id !== currentEmployee.id && isRecruitmentApprover(item.position),
+      ),
     [employees, currentEmployee.id],
   );
+  const selectedApproverId = approvers.some((employee) => employee.id === approverId)
+    ? approverId
+    : (approvers[0]?.id ?? "");
 
   useEffect(() => {
     void getDepartments()
       .then((result) => setDepartments(result.length > 0 ? result : fallbackDepartments))
       .catch(() => setDepartments(fallbackDepartments));
   }, []);
+
+  useEffect(() => {
+    if (!approvers.some((employee) => employee.id === approverId)) {
+      queueMicrotask(() => setApproverId(approvers[0]?.id ?? ""));
+    }
+  }, [approverId, approvers]);
 
   function change(name: keyof typeof form, value: string) {
     setForm((previous) => ({ ...previous, [name]: value }));
@@ -74,7 +91,7 @@ export function RecruitmentForm() {
   async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError(null);
-    if (!form.positionTitle.trim() || !form.reason.trim() || !form.responsibilities.trim() || !approverId) {
+    if (!form.positionTitle.trim() || !form.reason.trim() || !form.responsibilities.trim() || !selectedApproverId) {
       setError("필수 항목을 모두 입력해 주세요.");
       return;
     }
@@ -83,7 +100,7 @@ export function RecruitmentForm() {
       const created = await createRecruitmentRequest({
         request_department_id: selectedDepartmentId,
         requester_id: currentEmployee.id,
-        approver_id: approverId,
+        approver_id: selectedApproverId,
         position_title: form.positionTitle.trim(),
         headcount: Number(form.headcount),
         employment_type: form.employmentType,

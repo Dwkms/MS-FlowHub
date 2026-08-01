@@ -23,7 +23,22 @@ When no attendance record exists, `daily_work_status` is `null` and the UI displ
   Employee list responses expose only reason-existence flags. Detail responses expose
   public summaries to all viewers and private notes only to administrators and HR managers.
 
+Employee status endpoints resolve `actor_id` through the API dependency layer.
+The service receives an `ActorContext` (employee ID and role), rather than
+querying request parameters or making authorization decisions in the Router.
+This is a transitional identity bridge until Supabase Auth supplies the actor.
+
 ## Recruitment Poster (v0.5.7)
+
+## Recruitment request selection rules
+
+- `POST /api/v1/recruitment-requests` accepts an approver only when the
+  employee position contains team leader, department head, director, or CEO
+  level (`팀장`, `부장`, `이사`, `대표`). The rule is enforced by the backend.
+- The executive department (`EXEC`) is retained for CEO organization ownership,
+  but cannot be selected as a recruitment request department.
+- Employee option labels use the real department name for department heads,
+  for example `개발팀장` and `마케팅팀장`, rather than the generic `부서장`.
 
 ### POST /api/v1/recruitment-requests/{request_id}/poster
 

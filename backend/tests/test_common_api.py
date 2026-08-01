@@ -1,24 +1,24 @@
 from fastapi.testclient import TestClient
 
-import app.main as main_module
+from app.api.dependencies import get_database_health
 
 
-def test_health_uses_local_without_database_url(client: TestClient) -> None:
+def test_health_reports_supabase_database_source(client: TestClient) -> None:
     response = client.get("/health")
 
     assert response.status_code == 200
     assert response.json()["status"] == "ok"
-    assert response.json()["data_source"] == "local"
+    assert response.json()["data_source"] == "supabase"
 
 
-def test_health_does_not_report_ok_when_database_connection_fails(client, monkeypatch) -> None:
-    monkeypatch.setattr(main_module, "check_database_connection", lambda: False)
+def test_health_does_not_report_ok_when_database_connection_fails(client: TestClient) -> None:
+    client.app.dependency_overrides[get_database_health] = lambda: False
 
     response = client.get("/health")
 
     assert response.status_code == 503
     assert response.json()["status"] == "error"
-    assert response.json()["data_source"] == "local"
+    assert response.json()["data_source"] == "supabase"
 
 
 def test_local_frontend_origin_is_allowed(client: TestClient) -> None:
@@ -34,34 +34,30 @@ def test_local_frontend_origin_is_allowed(client: TestClient) -> None:
     assert response.headers["access-control-allow-origin"] == "http://127.0.0.1:3000"
 
 
-def test_list_employees_returns_sample_roles(client: TestClient) -> None:
+def test_list_employees_returns_paginated_organization_seed(client: TestClient) -> None:
     response = client.get("/api/v1/employees")
 
     assert response.status_code == 200
-    roles = {employee["role"] for employee in response.json()}
-    assert {"ADMIN", "HR_MANAGER", "SALES_REP", "SALES_MANAGER"} <= roles
+    payload = response.json()
+    assert payload["total"] == 51
+    assert payload["items"][0]["employee_no"] == "MS0001"
 
 
-def test_list_departments_returns_five_sample_departments(client: TestClient) -> None:
+def test_list_departments_returns_organization_departments(client: TestClient) -> None:
     response = client.get("/api/v1/departments")
 
     assert response.status_code == 200
-    assert {department["code"] for department in response.json()} == {
-        "DEV",
-        "FINANCE",
-        "HR",
-        "PRODUCT",
-        "SALES",
+    assert {"EXEC", "DEV", "MKT", "HR", "PLAN", "QA"} <= {
+        department["code"] for department in response.json()
     }
 
 
 def test_dashboard_reflects_selected_employee_access(client: TestClient) -> None:
-    response = client.get("/api/v1/dashboard", params={"employee_id": "emp-sales"})
+    response = client.get("/api/v1/dashboard", params={"employee_id": "emp-ms0001"})
 
     assert response.status_code == 200
     payload = response.json()
-    assert payload["current_employee"]["role"] == "SALES_REP"
-    assert payload["accessible_modules"] == ["전자결재", "CRM Lite"]
+    assert payload["current_employee"]["role"] == "ADMIN"
     assert payload["metrics"][0]["value"] == 0
 
 

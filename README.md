@@ -1,5 +1,28 @@
 # MS FlowHub
 
+## 2026-08-01 현재 작업 상태
+
+오늘 직원·조직 관리 안정화와 Supabase Auth 로그인 화면을 정리했습니다.
+로그인 페이지(`/login`), 로그인 성공 후 대시보드 이동, 세션이 없는 보호
+페이지의 로그인 리다이렉트, 로그아웃, 현재 비밀번호를 확인하는 비밀번호
+변경(`/change-password`)이 프론트엔드에 구현되어 있습니다.
+
+`employee_accounts` 연결 모델과 Auth Seed 코드도 준비되어 있으나, 실제
+Supabase에서 migration과 Seed를 실행하고 계정 로그인을 확인해야 합니다.
+또한 기존 업무 API 전체의 `actor_id`를 JWT 기반 RBAC으로 교체하는 작업은
+다음 단계입니다. 따라서 현재 로그인 UI가 보인다고 해서 모든 업무 API의
+운영 인증이 완료된 것은 아닙니다.
+
+내일은 아래 순서로 진행합니다.
+
+1. `employee_accounts` migration/Auth Seed를 Supabase에 적용
+2. 실제 로그인·로그아웃·비밀번호 변경·세션 유지 확인
+3. API 전체 Bearer 인증과 역할별 권한 검사 전환
+4. 개발용 사용자 전환 및 `actor_id` 제거, 권한별 테스트 보강
+5. Jira에 개발 일정과 작업 우선순위 등록
+6. 기본 대시보드의 마일스톤, 현재 구현 범위, 접근 가능 모듈, 관리자 권한 안내 정리
+7. 여유가 있으면 Workspace 직원 매뉴얼 추가를 위한 기획 검토
+
 ## 현재 구현 기준 (2026-08-01)
 
 현재 애플리케이션 DB는 Supabase PostgreSQL만 사용합니다. `backend/.env`의
@@ -264,6 +287,44 @@ Service 단위 테스트로 상태 전환·권한·금액 계산을 우선 검�
 현재 전자결재 테스트는 DRAFT 작성·수정·상신, 승인, 반려 사유, 잘못된 상태 전환, 지정 결재자 권한, 대시보드 집계를 메모리 DB에서 검증한다.
 
 ## Troubleshooting
+
+### 로그인 후 다시 `/login`으로 이동하는 경우
+
+#### 문제 원인
+
+Supabase Auth 로그인은 성공했지만 백엔드 `employee_accounts`에 해당 Auth
+사용자와 직원 연결이 없거나, migration·Auth Seed가 아직 적용되지 않은
+상태일 수 있습니다.
+
+#### 해결 방법
+
+```powershell
+cd backend
+.\.venv\Scripts\alembic.exe upgrade head
+.\.venv\Scripts\python.exe -m app.scripts.seed_auth_accounts
+```
+
+`backend/.env`의 Supabase Auth 설정과 `frontend/.env.local`의 공개 키 설정을
+확인한 뒤 프론트엔드를 재시작하세요. 키 값 자체는 로그나 코드에 출력하지
+않습니다.
+
+### pytest fails before an SQLite fixture is used
+
+#### Problem cause
+
+The production FastAPI application validates Supabase in its lifespan. Reusing
+that application in tests made the startup validation run before dependency
+overrides could inject the SQLite test session.
+
+#### Solution
+
+Tests now use `create_app(verify_database_on_startup=False)` and override both
+`get_db_session` and `get_database_health`. Production startup still requires a
+reachable Supabase PostgreSQL database. Run backend tests from `backend/`:
+
+```powershell
+.\.venv\Scripts\python.exe -m pytest -q
+```
 
 ### Supabase 연결 및 Alembic 오류
 

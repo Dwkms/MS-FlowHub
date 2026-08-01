@@ -3,6 +3,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Query
 
 from app.api.approvals import router as approvals_router
+from app.api.auth import router as auth_router
 from app.api.dependencies import get_dashboard_service
 from app.api.employees import router as employees_router
 from app.api.recruitment import router as recruitment_router
@@ -10,6 +11,7 @@ from app.schemas.common import DashboardResponse, DepartmentResponse, EmployeeRe
 from app.services.dashboard_service import DashboardService
 
 api_router = APIRouter(prefix="/api/v1")
+api_router.include_router(auth_router)
 api_router.include_router(approvals_router)
 api_router.include_router(recruitment_router)
 api_router.include_router(employees_router)

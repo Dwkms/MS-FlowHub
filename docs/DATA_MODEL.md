@@ -22,6 +22,19 @@ counterparts on `employees`. The records also retain the reason registrant and t
 `reason_summary` is visible to all users, while `private_note` for sick leave and
 long-term leave is returned only to administrators and HR managers.
 
+### Planned attendance extensions
+
+The current `AttendanceRecord.employee_id` and `work_date` unique pair is the
+stable parent for the next two tables; neither table is created in this change.
+
+- `attendance_change_histories` should reference `attendance_records.id` and
+  store the before/after status, reason fields, actor, and timestamp.
+- `employee_leave_periods` should reference `employees.id` and hold the start,
+  end, status reason, and approval metadata for multi-day leave.
+
+Daily records must remain independent from leave periods so a historical daily
+record can be preserved even when a leave period is later corrected.
+
 ## 채용 포스터 메타데이터 (v0.5.7)
 
 `recruitment_requests`는 요청당 하나의 채용 포스터를 선택적으로 연결한다. `poster_original_name`, `poster_stored_name`, `poster_content_type`, `poster_size` 컬럼은 원본 파일명, 서버 내부 저장명, MIME 형식, 바이트 크기를 구분한다. 실제 파일은 프로토타입 로컬 개발 저장소에 두며, 요청 삭제 시 함께 제거한다. 생성된 `job_postings`는 연결된 채용 요청을 통해 이 메타데이터를 조회하므로 별도 중복 컬럼을 두지 않는다.
