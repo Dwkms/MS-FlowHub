@@ -241,6 +241,32 @@ a { color: inherit; text-decoration: none; }
 .approval-status.rejected { background: #fff0f0; color: #a94444; }
 .approval-status.large { font-size: 10px; padding: 7px 11px; }
 
+.employee-layout { display: grid; gap: 16px; grid-template-columns: minmax(0, 1fr) 290px; }
+.employee-count { color: #496486; font-size: 14px; font-weight: 700; }
+.organization-chart-button { margin-left: auto; white-space: nowrap; }
+.employee-filter-bar { flex-wrap: wrap; }.employee-filter-bar input { min-width: 260px; }.employee-filter-bar select { min-width: 120px; }
+.employment-badge, .work-badge { border-radius: 20px; display: inline-flex; font-size: 9px; font-weight: 700; padding: 5px 8px; white-space: nowrap; }.employment-badge { background: #e9f7ef; color: #327253; }.employment-badge.on_leave { background: #fff4db; color: #956721; }.employment-badge.scheduled { background: #eaf0fb; color: #405f95; }.employment-badge.resigned { background: #f1f2f4; color: #717985; }.work-badge { background: #eef3fb; color: #426898; }.work-badge.remote_work, .work-badge.annual_leave, .work-badge.morning_half, .work-badge.afternoon_half { background: #f2ecfb; color: #71519b; }.work-badge.absent, .work-badge.sick_leave { background: #fff0f0; color: #a04444; }.work-badge.off_work { background: #f2f3f5; color: #6d7482; }.empty-work-status { color: #9aa1ab; }
+.employee-table { min-width: 1060px; }.employee-table tbody tr { cursor: pointer; }.employee-table td:first-child { white-space: nowrap; }
+.employee-table small { color: #9298a3; display: block; font-size: 9px; font-weight: 400; margin-top: 3px; }
+.status-with-info { align-items: center; display: inline-flex; gap: 4px; white-space: nowrap; }
+.reason-info-button { background: transparent; border: 0; color: #6d84a4; cursor: pointer; font-size: 13px; line-height: 1; padding: 0; }
+.reason-info-button:hover { color: #2f67c8; }
+.employee-detail-button { background: transparent; border: 0; color: inherit; cursor: pointer; padding: 0; text-align: left; }
+.mini-avatar { align-items: center; background: #e3edf9; border-radius: 50%; color: #31588f; display: inline-flex; font-size: 10px; height: 25px; justify-content: center; margin-right: 8px; width: 25px; }.mini-avatar.large { font-size: 18px; height: 48px; margin: 0; width: 48px; }
+.pager { align-items: center; display: flex; gap: 12px; justify-content: center; padding: 16px; }.pager button { background: white; border: 1px solid #dfe2e7; border-radius: 5px; color: #596578; font-size: 10px; padding: 6px 10px; }.pager button:disabled { cursor: not-allowed; opacity: .45; }.pager span { color: #7d8490; font-size: 10px; }
+.org-panel { align-self: start; max-height: 690px; overflow: auto; padding: 21px; }.org-panel h2 { margin-bottom: 18px; }.org-tree, .org-tree ul { list-style: none; margin: 0; padding-left: 16px; }.org-tree > li { padding-left: 0; }.org-tree li { border-left: 1px solid #dce3ed; margin: 8px 0; padding-left: 12px; }.org-tree b { color: #3c4c63; display: block; font-size: 11px; }.org-tree span { color: #8993a1; display: block; font-size: 9px; margin-top: 3px; }
+.modal-backdrop { align-items: center; background: rgba(18,29,47,.45); display: flex; inset: 0; justify-content: center; padding: 20px; position: fixed; z-index: 50; }.employee-modal { background: white; border-radius: 10px; box-shadow: 0 20px 55px rgba(0,0,0,.22); max-width: 480px; padding: 28px; position: relative; width: 100%; }.employee-modal h2 { color: #33445d; font-size: 20px; margin: 14px 0 4px; }.employee-modal h2 small { color: #939ba6; font-size: 11px; font-weight: 400; }.employee-modal > p { color: #7c8795; font-size: 11px; margin: 0 0 20px; }.employee-modal dl { border-top: 1px solid var(--line); margin: 0; padding-top: 12px; }.employee-modal dl div { display: grid; grid-template-columns: 92px 1fr; padding: 8px 0; }.employee-modal dt { color: #929aa6; font-size: 10px; }.employee-modal dd { color: #485466; font-size: 11px; margin: 0; }.modal-close { background: transparent; border: 0; color: #8b94a1; font-size: 24px; position: absolute; right: 17px; top: 12px; }
+.chart-backdrop { z-index: 60; }.organization-chart-modal { background: white; border-radius: 10px; box-shadow: 0 20px 55px rgba(0,0,0,.28); max-height: calc(100vh - 40px); max-width: min(1540px, 100%); overflow: auto; padding: 22px; position: relative; }.organization-chart-heading { align-items: flex-start; display: flex; justify-content: space-between; margin-bottom: 16px; padding-right: 32px; }.organization-chart-heading h2 { color: #33445d; font-size: 18px; margin: 5px 0 0; }.organization-chart-heading .modal-close { top: 13px; }.organization-chart-modal img { display: block; height: auto; max-width: 100%; width: 100%; }
+.employee-status-modal { max-height: calc(100vh - 40px); overflow: auto; }
+.status-reason-form { border-top: 1px solid var(--line); display: grid; gap: 10px; margin-top: 18px; padding-top: 18px; }
+.status-reason-form h3 { color: #3d4e65; font-size: 12px; margin: 0; }
+.status-reason-form select, .status-reason-form textarea { border: 1px solid #dce1e8; border-radius: 6px; color: #455267; font: inherit; font-size: 11px; padding: 9px 10px; }
+.status-reason-form textarea { min-height: 72px; resize: vertical; }
+.status-reason-form .primary-button { justify-self: end; }
+.status-detail-panel { border-top: 1px solid var(--line); margin-top: 18px; padding-top: 18px; }
+.status-detail-panel h3 { color: #3d4e65; font-size: 12px; margin: 0 0 10px; }
+.status-detail-panel dl { border: 0; padding: 0; }
+
 .approval-form { padding: 26px; }
 .form-grid { display: grid; gap: 20px; grid-template-columns: 1fr 1fr; }
 .form-field { display: block; }
@@ -388,6 +414,8 @@ a { color: inherit; text-decoration: none; }
   .metrics { grid-template-columns: repeat(2, 1fr); }
   .grid { grid-template-columns: 1fr; }
   .approval-detail-grid { grid-template-columns: 1fr; }
+  .employee-layout { grid-template-columns: 1fr; }
+  .organization-chart-button { margin-left: 0; }
   .document-meta { grid-template-columns: repeat(2, 1fr); row-gap: 20px; }
   .document-meta div:nth-child(2) { border-right: 0; }
   .job-posting-hero { align-items: flex-start; flex-direction: column; gap: 22px; }

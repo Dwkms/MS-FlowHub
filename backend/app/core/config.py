@@ -1,7 +1,22 @@
 from functools import lru_cache
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+def normalize_postgres_url(url: str) -> str:
+    """Use the project's Psycopg 3 SQLAlchemy dialect for Supabase URIs."""
+    if url.startswith("postgresql://"):
+        url = f"postgresql+psycopg://{url.removeprefix('postgresql://')}"
+    elif url.startswith("postgres://"):
+        url = f"postgresql+psycopg://{url.removeprefix('postgres://')}"
+
+    parsed = urlsplit(url)
+    query = [(key, value) for key, value in parse_qsl(parsed.query) if key != "pgbouncer"]
+    return urlunsplit(
+        (parsed.scheme, parsed.netloc, parsed.path, urlencode(query), parsed.fragment)
+    )
 
 
 class Settings(BaseSettings):
@@ -22,7 +37,7 @@ class Settings(BaseSettings):
 
     @property
     def data_source(self) -> str:
-        return "supabase" if self.database_url else "local"
+        return "supabase"
 
     @property
     def frontend_origins(self) -> list[str]:

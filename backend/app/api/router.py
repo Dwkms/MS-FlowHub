@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, Query
 
 from app.api.approvals import router as approvals_router
 from app.api.dependencies import get_dashboard_service
+from app.api.employees import router as employees_router
 from app.api.recruitment import router as recruitment_router
 from app.schemas.common import DashboardResponse, DepartmentResponse, EmployeeResponse
 from app.services.dashboard_service import DashboardService
@@ -11,6 +12,7 @@ from app.services.dashboard_service import DashboardService
 api_router = APIRouter(prefix="/api/v1")
 api_router.include_router(approvals_router)
 api_router.include_router(recruitment_router)
+api_router.include_router(employees_router)
 DashboardServiceDependency = Annotated[DashboardService, Depends(get_dashboard_service)]
 
 
@@ -19,7 +21,7 @@ def list_departments(service: DashboardServiceDependency) -> list[DepartmentResp
     return service.list_departments()
 
 
-@api_router.get("/employees", response_model=list[EmployeeResponse], tags=["Employees"])
+@api_router.get("/employee-options", response_model=list[EmployeeResponse], tags=["Employees"])
 def list_employees(service: DashboardServiceDependency) -> list[EmployeeResponse]:
     return service.list_employees()
 

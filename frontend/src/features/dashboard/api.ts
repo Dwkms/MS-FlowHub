@@ -2,7 +2,7 @@ import { apiGet } from "@/lib/api-client";
 import type { DashboardData, Department, Employee } from "@/types/dashboard";
 
 export function getEmployees(): Promise<Employee[]> {
-  return apiGet<Employee[]>("/api/v1/employees");
+  return apiGet<Employee[]>("/api/v1/employee-options");
 }
 
 export function getDepartments(): Promise<Department[]> {

@@ -11,6 +11,7 @@ from app.repositories.organization_repository import OrganizationRepository
 from app.repositories.recruitment_repository import RecruitmentRepository
 from app.services.approval_service import ApprovalService
 from app.services.dashboard_service import DashboardService
+from app.services.employee_service import EmployeeService
 from app.services.recruitment_service import RecruitmentService
 
 DatabaseSession = Annotated[Session, Depends(get_db_session)]
@@ -22,6 +23,10 @@ def get_dashboard_service(session: DatabaseSession) -> DashboardService:
         approval_repository=ApprovalRepository(session),
         settings=get_settings(),
     )
+
+
+def get_employee_service(session: DatabaseSession) -> EmployeeService:
+    return EmployeeService(session=session, repository=OrganizationRepository(session))
 
 
 def get_approval_service(session: DatabaseSession) -> ApprovalService:

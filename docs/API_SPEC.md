@@ -1,5 +1,28 @@
 # API Specification
 
+## Employee organization management (v0.6.0)
+
+- `GET /api/v1/employees`: paginated employees; supports `page`, `page_size`,
+  `search`, `department_code`, `team_code`, `employment_status`, and `position`.
+- `GET/POST/PATCH/DELETE /api/v1/employees/{employee_id}`: detail and employee
+  lifecycle. DELETE transitions an employee to `INACTIVE` and rejects managers
+  with active reports.
+- `GET /api/v1/departments`, `GET /api/v1/organization`: department data and
+  the CEO-rooted management tree.
+
+`GET /api/v1/employees` also accepts `daily_work_status` and `work_date`.
+When `work_date` is omitted, the API uses the current date. Its employee summary
+includes `employment_status`, `daily_work_status`, `check_in_at`, and `check_out_at`.
+When no attendance record exists, `daily_work_status` is `null` and the UI displays `-`.
+
+- `PUT /api/v1/employees/{employee_id}/attendance?actor_id=`: the employee or an
+  administrator updates a daily status with `reason_category`, `reason_summary`,
+  and `private_note`. Sick leave and absence require `reason_summary`.
+- `PATCH /api/v1/employees/{employee_id}/employment-status-reason?actor_id=`:
+  the employee or an administrator updates the reason while the employee is on leave.
+  Employee list responses expose only reason-existence flags. Detail responses expose
+  public summaries to all viewers and private notes only to administrators and HR managers.
+
 ## Recruitment Poster (v0.5.7)
 
 ### POST /api/v1/recruitment-requests/{request_id}/poster
