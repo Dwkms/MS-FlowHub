@@ -1,5 +1,27 @@
 # Data Model
 
+## Employee organization management (v0.6.0)
+
+`departments` has unique code/name and display ordering. `teams` represents the
+two development subteams (`DEV_SW`, `DEV_HW`) and belongs to a department.
+`employees` references its department, optional team, and optional manager with
+`RESTRICT` foreign keys. Employee list queries return department/team/manager
+summaries; employee deletion is implemented as `employment_status=INACTIVE`.
+
+Database runtime is Supabase PostgreSQL only; SQLite is not a supported application database.
+
+## Attendance records (v0.6.1)
+
+`attendance_records` stores one daily work status per employee. The composite
+unique constraint on `(employee_id, work_date)` makes daily seed data idempotent.
+Long-lived employment status remains on `employees.employment_status`.
+Daily and employment-status reasons are separated into `reason_category`,
+`reason_summary`, and `private_note`. Attendance reasons use these fields on
+`attendance_records`; employment-status reasons use their `employment_status_*`
+counterparts on `employees`. The records also retain the reason registrant and time.
+`reason_summary` is visible to all users, while `private_note` for sick leave and
+long-term leave is returned only to administrators and HR managers.
+
 ## 채용 포스터 메타데이터 (v0.5.7)
 
 `recruitment_requests`는 요청당 하나의 채용 포스터를 선택적으로 연결한다. `poster_original_name`, `poster_stored_name`, `poster_content_type`, `poster_size` 컬럼은 원본 파일명, 서버 내부 저장명, MIME 형식, 바이트 크기를 구분한다. 실제 파일은 프로토타입 로컬 개발 저장소에 두며, 요청 삭제 시 함께 제거한다. 생성된 `job_postings`는 연결된 채용 요청을 통해 이 메타데이터를 조회하므로 별도 중복 컬럼을 두지 않는다.

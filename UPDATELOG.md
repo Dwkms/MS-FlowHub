@@ -1,5 +1,71 @@
 # Update Log
 
+## 2026-08-01 현재 구현 정리
+
+### 완료한 작업
+
+- SQLite 런타임 fallback과 로컬 DB 파일을 제거하고 Supabase PostgreSQL 단일 연결로 통일했습니다.
+- `run-backend.cmd`, `run-frontend.cmd`를 추가해 프로젝트 루트에서 서버를 간단히 실행할 수 있게 했습니다.
+- 조직도·부서·팀·직원 46명 데이터를 Supabase에 연결하고 멱등 Seed를 구성했습니다.
+- 직원 목록에 검색, 부서, 재직 상태, 당일 근무 상태 필터와 URL 쿼리 보존을 추가했습니다.
+- `attendance_records`와 날짜별 근무 상태, 체크인·체크아웃, 중복 방지 제약을 추가했습니다.
+- 조직도 이미지 확대 모달을 추가하고 과거 테스트 직원·빈 테스트 부서 데이터를 정리했습니다.
+- `BEFORE_WORK` 상태를 제거하고 기록이 없는 상태는 `-`로 표시하도록 변경했습니다.
+- 근무·휴직 사유를 `reason_category`, `reason_summary`, `private_note`로 분리했습니다.
+- 병가·결근·휴직의 공개 사유 필수 입력, 일반 근무 상태의 사유 아이콘 비노출, 정보 아이콘 상세 모달을 구현했습니다.
+- 병가·휴직의 비공개 상세는 관리자와 인사담당자만 조회하도록 제한했습니다.
+
+### DB 마이그레이션
+
+- `20260801_0006_employee_organization`
+- `20260801_0007_attendance_records`
+- `20260801_0008_remove_before_work`
+- `20260801_0009_remove_legacy_departments`
+- `20260801_0010_employee_status_reasons`
+- `20260801_0011_structured_status_reasons`
+
+### 검증 결과
+
+- Supabase 직원 46명, 오늘 근태 46건 확인
+- Seed 반복 실행 시 직원·근태 중복 생성 없음 확인
+- Ruff check / format check 통과
+- Frontend ESLint, TypeScript, production build 통과
+- SQLite 메모리 서비스 검증: 필수 사유, 공개·비공개 권한, 일반 상태 아이콘 비노출 확인
+- 기존 `pytest` 30개는 테스트 fixture가 DB override 전에 Supabase 연결을 강제하는 구조 때문에 앱 lifespan 단계에서 실패
+
+### 이후 작업
+
+- 테스트 fixture에서 Supabase health check를 격리하고 전체 API 테스트를 복구합니다.
+- 실제 인증·Supabase Auth와 관리자·인사·직속 관리자 권한을 세션 기반으로 연결합니다.
+- 근무 상태 변경 이력, 기간형 휴직, 사유 수정 이력을 추가합니다.
+- 직원별 근태 이력·월간 조회와 관리자 일괄 입력을 추가합니다.
+- Supabase Storage, 운영 배포, CI/CD와 E2E 테스트를 구성합니다.
+
+## 2026-08-01 문서화 규칙 보완
+
+- README Troubleshooting 항목을 `문제 원인`과 `해결 방법` 문단으로 구분했습니다.
+- 앞으로 발생하는 오류도 동일한 형식과 재현·검증 명령을 함께 기록합니다.
+
+## [2026-08-01] Employment and daily work status
+
+- Added date-based attendance records, combined employee filters, and status badges.
+- Seeded today's attendance for all 46 employees and randomized ten active employees' work statuses.
+
+## [2026-08-01] Organization chart image and legacy data cleanup
+
+- Removed five legacy placeholder employee records from Supabase.
+- Added an organization-chart button next to the employee status filter and an enlarged image modal.
+
+## [2026-08-01] Supabase-only database runtime
+
+- Removed the SQLite fallback, automatic local schema creation, and local SQLite database file.
+- Backend startup now requires a reachable Supabase `DATABASE_URL`.
+
+## [2026-08-01] Backend launcher
+
+- Added `run-backend.cmd` to start FastAPI with the project virtual environment.
+- Added `run-frontend.cmd` to start the Next.js development server.
+
 ## [2026-07-31] Supabase 연결 및 migration 완료
 
 ### Changed
@@ -377,3 +443,31 @@
 - v0.8.0: 통합 업무 흐름
 - v0.9.0: 프로토타입 안정화
 - v1.0.0: 포트폴리오 공개 버전
+# v0.6.0 - Employee organization management
+
+## 2026-08-01 - Remove before-work attendance status
+
+- Removed the `BEFORE_WORK` option from the employee work-status filter.
+- Employees without an attendance record now show `-`; legacy `BEFORE_WORK` records
+  are migrated to `OFF_WORK`.
+
+## 2026-08-01 - Clean up legacy organization data
+
+- Kept empty approval and recruitment tables because their implemented APIs and screens use them.
+- Added a guarded migration to remove only the empty legacy `FINANCE`, `PRODUCT`, and `SALES`
+  department records; departments with employees or teams are not removed.
+
+## 2026-08-01 - Employee status reasons
+
+- Added employee-entered reasons for sick leave, half days, and long-term leave.
+- Added self-or-admin-only status update APIs and detail-modal reason viewing.
+
+## 2026-08-01 - Structured status reason disclosure
+
+- Replaced repeated list-row reason text with compact info icons shown only when a reason exists.
+- Added public reason summaries, private notes, registrant, and registration time for daily and
+  employment-status reasons; private notes are limited to administrators and HR managers.
+
+- Added department/team/employee relationship fields and an Alembic migration.
+- Added idempotent 46-person organization seed data, employee search/filter/detail APIs, and organization tree API.
+- Connected the new employee management page to the shared API client.

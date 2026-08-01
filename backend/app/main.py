@@ -6,23 +6,24 @@ from fastapi.responses import JSONResponse
 
 from app.api.router import api_router
 from app.core.config import get_settings
-from app.db.session import check_database_connection, initialize_local_database
+from app.db.session import check_database_connection
 
 settings = get_settings()
 
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
-    if settings.database_url and not check_database_connection():
-        raise RuntimeError("DATABASE_URL에 지정된 데이터베이스에 연결할 수 없습니다.")
-    initialize_local_database()
+    if not settings.database_url:
+        raise RuntimeError("DATABASE_URL must be set to the Supabase PostgreSQL connection string.")
+    if not check_database_connection():
+        raise RuntimeError("Supabase PostgreSQL connection failed. Check DATABASE_URL.")
     yield
 
 
 app = FastAPI(
     title="MS FlowHub API",
-    version="0.5.11",
-    description="전자결재 중심 사내 업무 통합 플랫폼 API",
+    version="0.6.0",
+    description="MS FlowHub internal-work platform API",
     lifespan=lifespan,
 )
 app.add_middleware(
@@ -39,7 +40,7 @@ app.include_router(api_router)
 def health() -> dict[str, str]:
     payload = {
         "status": "ok" if check_database_connection() else "error",
-        "data_source": settings.data_source,
+        "data_source": "supabase",
         "service": settings.app_name,
     }
     if payload["status"] == "error":

@@ -1,8 +1,21 @@
 # MS FlowHub
 
+## 현재 구현 기준 (2026-08-01)
+
+현재 애플리케이션 DB는 Supabase PostgreSQL만 사용합니다. `backend/.env`의
+`DATABASE_URL`을 설정한 뒤 Alembic migration과 Seed를 실행해야 합니다. 이전
+SQLite fallback과 `backend/data/ms_flowhub.db`는 더 이상 사용하지 않습니다.
+
+현재 직원·조직 관리에는 46명 조직 데이터, 조직도 보기, 재직·당일 근무 상태 필터,
+날짜별 근태, 구조화된 사유(`reason_category`, `reason_summary`, `private_note`)가
+구현되어 있습니다. 일반 상태에는 아이콘을 표시하지 않고, 사유가 있는 특수 상태만
+ⓘ 아이콘으로 상세 사유를 엽니다.
+
+완료한 작업과 이후 작업은 [UPDATELOG](./UPDATELOG.md)에 누적 기록합니다.
+
 ## Supabase PostgreSQL 연결 검증 상태
 
-FastAPI는 `DATABASE_URL`이 있으면 PostgreSQL(Supabase)을 사용하고, 값이 없을 때만 로컬 SQLite fallback을 사용한다. Alembic은 `MIGRATION_DATABASE_URL`을 우선 사용하고, 없을 때 `DATABASE_URL`을 사용한다. 두 URL이 모두 없거나 연결에 실패하면 SQLite 성공으로 위장하지 않고 health 상태를 오류로 반환하며, Supabase 설정 상태에서는 서버 시작을 중단한다.
+FastAPI와 Alembic은 Supabase PostgreSQL 연결만 사용한다. `MIGRATION_DATABASE_URL`이 있으면 Alembic이 우선 사용하고, 없으면 `DATABASE_URL`을 사용한다. 두 URL이 없거나 연결에 실패하면 health 오류를 반환하고 서버 시작을 중단한다.
 
 현재 저장소 작업 환경에는 `backend/.env`와 DB URL이 없어 실제 Supabase 접속·migration·PostgreSQL 업무 흐름 검증은 보류되었다. 비밀값은 저장소에 기록하지 말고 `backend/.env.example` 형식에 맞춰 로컬 `backend/.env`에만 설정한다.
 
@@ -133,7 +146,7 @@ FastAPI만 `DATABASE_URL`을 사용한다. migration은 필요 시 별도 `MIGRA
 
 | 이름 | 목적 | 상태 |
 |---|---|---|
-| `DATABASE_URL` | Supabase PostgreSQL 연결, 비어 있으면 로컬 DB | 구현 |
+| `DATABASE_URL` | Supabase PostgreSQL 연결 | 구현 |
 | `MIGRATION_DATABASE_URL` | Alembic용 연결 | 예시 작성 |
 | `AI_PROVIDER` | Mock/실제 Provider 선택 | 기본값 Mock |
 | `AI_API_KEY` | 실제 Provider 인증 | 선택, 비밀 |
@@ -252,6 +265,83 @@ Service 단위 테스트로 상태 전환·권한·금액 계산을 우선 검�
 
 ## Troubleshooting
 
+### Supabase 연결 및 Alembic 오류
+
+#### 문제 원인
+
+잘못된 Supabase 호스트·포트·데이터베이스명, URL 특수문자 미인코딩, Psycopg 드라이버 불일치,
+pooler의 `pgbouncer` 옵션 또는 prepared statement 충돌로 연결이 실패할 수 있습니다.
+
+#### 해결 방법
+
+Supabase Connect의 PostgreSQL URI를 다시 복사하고 `DATABASE_URL`을 설정합니다.
+Psycopg 3 의존성을 설치하고, `pgbouncer=true`를 제거하며, Alembic은 반드시
+`\.venv\Scripts\alembic.exe upgrade head`로 실행합니다.
+
+### pytest가 Supabase 연결 오류로 시작하지 않는 문제
+
+#### 문제 원인
+
+테스트 fixture가 SQLite 세션을 override하기 전에 FastAPI lifespan이 운영용 Supabase health check를 실행합니다.
+
+#### 해결 방법
+
+다음 마일스톤에서 테스트 전용 lifespan 또는 health-check override를 추가합니다. 운영 실행에서는
+Supabase 연결 검사를 계속 유지합니다.
+
+### 프론트엔드 실행 위치 및 Next.js workspace 오류
+
+#### 문제 원인
+
+상위 폴더의 `package-lock.json`을 Turbopack이 workspace root로 잘못 인식하거나, frontend 밖에서
+명령을 실행하면 경로와 proxy 설정이 어긋날 수 있습니다.
+
+#### 해결 방법
+
+프로젝트 루트 launcher를 사용하거나 `frontend/` 폴더에서 실행합니다.
+
+```powershell
+.\run-backend.cmd
+.\run-frontend.cmd
+```
+
+### `alembic upgrade head`에서 `database "postgres" does not exist`가 발생하는 경우
+
+Supabase의 일반 연결 URL이 아니라 잘못된 호스트·포트·데이터베이스명이 입력된 경우입니다.
+Supabase Connect 화면에서 PostgreSQL URI를 다시 복사하고 `backend/.env`의
+`DATABASE_URL`과 `MIGRATION_DATABASE_URL`에 설정하세요. 비밀번호의 특수문자는 URL 인코딩해야 합니다.
+
+### `ModuleNotFoundError: No module named 'psycopg2'`
+
+프로젝트는 Psycopg 3를 사용합니다. backend 가상환경에서 의존성을 다시 설치하고
+URL은 `postgresql://` 형식으로 두면 애플리케이션이 `postgresql+psycopg://`로 정규화합니다.
+
+```powershell
+cd backend
+.\.venv\Scripts\python.exe -m pip install -e ".[dev]"
+```
+
+### `invalid connection option "pgbouncer"` 또는 `DuplicatePreparedStatement`
+
+Supabase pooler URI의 `pgbouncer=true` 옵션은 애플리케이션 URL에서 제거해야 합니다.
+현재 연결 설정은 Psycopg prepared statement를 비활성화해 transaction pooler와 호환되도록 처리합니다.
+
+### `pytest`가 테스트 DB를 만들었는데도 Supabase 연결 오류로 실패하는 경우
+
+현재 FastAPI lifespan이 테스트 fixture의 dependency override보다 먼저 Supabase health check를
+실행합니다. 따라서 SQLite 테스트 세션이 준비되어도 앱 시작 단계에서 실패할 수 있습니다.
+테스트 fixture에서 lifespan을 비활성화하거나 테스트 설정에서 DB health check를 명시적으로 우회하는
+작업이 다음 마일스톤입니다. 운영 실행에서는 Supabase 연결 검사를 유지해야 합니다.
+
+### 백엔드·프론트엔드 실행 위치가 헷갈리는 경우
+
+프로젝트 루트에서 아래 launcher를 사용하세요. 직접 실행할 때만 각각 `backend/`, `frontend/`로 이동합니다.
+
+```powershell
+.\run-backend.cmd
+.\run-frontend.cmd
+```
+
 ### Next.js가 상위 폴더를 workspace root로 잘못 선택하는 경우
 
 상위 사용자 폴더에 다른 `package-lock.json`이 있으면 Turbopack이 잘못된 루트를 탐색해 접근 거부가 발생할 수 있다. `frontend/next.config.ts`의 `turbopack.root`를 Frontend 실행 폴더로 제한해 해결했다. Frontend 명령은 반드시 `frontend/`에서 실행한다.
@@ -280,3 +370,34 @@ production 의존성은 audit 0건이다. 전체 audit에는 ESLint 전이 의�
 ## 이후 확장 계획
 
 프로토타입 안정화 후 인증·세분화 권한, 다단계 결재, 실제 이메일, 운영 DB 분리, 감사·관측성, CI/CD와 배포, 필요성이 검증된 문서 검색 기능을 순차 검토한다. 완성형 서비스와 실제 배포는 별도 마일스톤으로 관리한다.
+# Employee organization seed
+
+Run migrations, then seed the organization data from `backend`:
+
+```powershell
+.\.venv\Scripts\alembic.exe upgrade head
+.\.venv\Scripts\python.exe -m app.scripts.seed_organization
+```
+
+The simplest backend command from the repository root is:
+
+```powershell
+.\run-backend.cmd
+```
+
+The simplest frontend command from the repository root is:
+
+```powershell
+.\run-frontend.cmd
+```
+
+The seed is idempotent: departments and teams are matched by code and employees by
+employee number. It supports both the configured Supabase PostgreSQL database and
+the local SQLite fallback. Start the backend with `.\.venv\Scripts\uvicorn.exe app.main:app --reload`
+and the frontend with `npm run dev`; open `/employees` to verify the data.
+
+## Supabase-only database policy
+
+MS FlowHub now requires Supabase PostgreSQL. Set `DATABASE_URL` in `backend/.env`,
+run Alembic migrations, and then run the organization seed. SQLite fallback and
+the previous local `backend/data/ms_flowhub.db` database are no longer used.
