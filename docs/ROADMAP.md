@@ -1,5 +1,15 @@
 # Roadmap
 
+## Next implementation phase (updated 2026-08-01)
+
+1. Supabase Auth JWT verification and employee-account mapping
+2. Attendance change history and multi-day leave periods
+3. Manager/HR approval workflow for leave requests
+4. Production deployment, Supabase Storage, CI/CD, and E2E verification
+5. Jira-based schedule and work-item tracking
+6. Dashboard milestone, access-module, and administrator-context content cleanup
+7. Workspace employee manual planning (scope and information architecture)
+
 ## 현재 상태 요약 (2026-08-01)
 
 완료된 직원·조직 관리 마일스톤:

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 
 import { PortalShell } from "@/components/portal-shell";
+import { AuthSessionGuard } from "@/features/auth/auth-session-guard";
 import { CurrentUserProvider } from "@/features/current-user/current-user-provider";
 
 import "./globals.css";
@@ -15,7 +16,9 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
     <html lang="ko">
       <body>
         <CurrentUserProvider>
-          <PortalShell>{children}</PortalShell>
+          <AuthSessionGuard>
+            <PortalShell>{children}</PortalShell>
+          </AuthSessionGuard>
         </CurrentUserProvider>
       </body>
     </html>

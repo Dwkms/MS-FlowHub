@@ -24,6 +24,7 @@ class EmployeeResponse(BaseModel):
     name: str
     role: Role
     role_label: str
+    position: str
     department_id: str
     department_name: str
 

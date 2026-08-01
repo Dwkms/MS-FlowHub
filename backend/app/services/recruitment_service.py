@@ -5,6 +5,10 @@ from fastapi import HTTPException, UploadFile, status
 from sqlalchemy.orm import Session
 
 from app.core.upload_storage import get_poster_path
+from app.domain.recruitment_policy import (
+    is_recruitment_approver,
+    is_requestable_recruitment_department,
+)
 from app.models.approval import ApprovalDocument
 from app.models.recruitment import JobPosting, RecruitmentRequest
 from app.repositories.approval_repository import ApprovalRepository
@@ -63,6 +67,15 @@ class RecruitmentService:
         if self.organization.get_department(payload.request_department_id) is None:
             raise HTTPException(status_code=400, detail="기안 부서를 찾을 수 없습니다.")
         approver = self._require_employee(payload.approver_id)
+        department = self.organization.get_department_model(payload.request_department_id)
+        if department and not is_requestable_recruitment_department(department.code):
+            raise HTTPException(
+                status_code=422, detail="경영진 부서는 채용 요청 부서로 선택할 수 없습니다."
+            )
+        if not is_recruitment_approver(approver.position):
+            raise HTTPException(
+                status_code=422, detail="채용 요청 결재자는 팀장급 이상만 지정할 수 있습니다."
+            )
         if approver.id == requester.id:
             raise HTTPException(status_code=400, detail="요청자와 결재자는 같을 수 없습니다.")
 

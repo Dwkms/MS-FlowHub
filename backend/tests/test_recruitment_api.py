@@ -39,6 +39,21 @@ def test_department_head_can_create_recruitment_request(client) -> None:
     assert response.json()["status"] == "DRAFT"
 
 
+def test_recruitment_request_rejects_staff_approver_and_executive_department(client) -> None:
+    staff_approver = request_payload()
+    staff_approver["approver_id"] = "emp-sales"
+
+    response = client.post("/api/v1/recruitment-requests", json=staff_approver)
+
+    assert response.status_code == 422
+
+    executive_department = request_payload()
+    executive_department["request_department_id"] = "dept-exec"
+    response = client.post("/api/v1/recruitment-requests", json=executive_department)
+
+    assert response.status_code == 422
+
+
 def test_employee_can_create_recruitment_request_for_any_department(client) -> None:
     payload = request_payload(requester_id="emp-sales")
     payload["request_department_id"] = "dept-sales"

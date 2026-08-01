@@ -3,7 +3,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query, Response, status
 
-from app.api.dependencies import get_employee_service
+from app.api.dependencies import CurrentActor, OptionalActor, get_employee_service
 from app.schemas.employee import (
     AttendanceStatusUpdate,
     EmployeeCreate,
@@ -46,8 +46,8 @@ def list_employees(
 
 
 @router.get("/employees/{employee_id}", response_model=EmployeeDetail)
-def get_employee(employee_id: str, service: Service, actor_id: str | None = None) -> EmployeeDetail:
-    return service.detail(employee_id, actor_id)
+def get_employee(employee_id: str, service: Service, actor: OptionalActor) -> EmployeeDetail:
+    return service.detail(employee_id, actor)
 
 
 @router.post("/employees", response_model=EmployeeDetail, status_code=status.HTTP_201_CREATED)
@@ -65,9 +65,9 @@ def update_attendance_status(
     employee_id: str,
     payload: AttendanceStatusUpdate,
     service: Service,
-    actor_id: str = Query(...),
+    actor: CurrentActor,
 ) -> EmployeeDetail:
-    return service.update_attendance_status(employee_id, actor_id, payload)
+    return service.update_attendance_status(employee_id, actor, payload)
 
 
 @router.patch("/employees/{employee_id}/employment-status-reason", response_model=EmployeeDetail)
@@ -75,9 +75,9 @@ def update_employment_status_reason(
     employee_id: str,
     payload: EmploymentStatusReasonUpdate,
     service: Service,
-    actor_id: str = Query(...),
+    actor: CurrentActor,
 ) -> EmployeeDetail:
-    return service.update_employment_status_reason(employee_id, actor_id, payload)
+    return service.update_employment_status_reason(employee_id, actor, payload)
 
 
 @router.delete("/employees/{employee_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -88,4 +88,4 @@ def delete_employee(employee_id: str, service: Service) -> Response:
 
 @router.get("/organization", response_model=OrganizationNode)
 def organization_tree(service: Service) -> OrganizationNode:
-    return service.repository.organization_tree()
+    return service.organization_tree()

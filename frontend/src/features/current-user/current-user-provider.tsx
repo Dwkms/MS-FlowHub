@@ -23,6 +23,7 @@ interface CurrentUserContextValue {
   selectedId: string;
   setSelectedId: (employeeId: string) => void;
   apiConnected: boolean;
+  isLoadingCurrentUser: boolean;
 }
 
 const CurrentUserContext = createContext<CurrentUserContextValue | null>(null);
@@ -31,6 +32,7 @@ export function CurrentUserProvider({ children }: { children: ReactNode }) {
   const [employees, setEmployees] = useState<Employee[]>(fallbackEmployees);
   const [selectedId, setSelectedIdState] = useState(fallbackEmployees[0].id);
   const [apiConnected, setApiConnected] = useState(false);
+  const [isLoadingCurrentUser, setIsLoadingCurrentUser] = useState(true);
 
   useEffect(() => {
     const storedId = getStoredEmployeeId();
@@ -51,6 +53,9 @@ export function CurrentUserProvider({ children }: { children: ReactNode }) {
           }
           setApiConnected(false);
         }
+      })
+      .finally(() => {
+        if (active) setIsLoadingCurrentUser(false);
       });
     return () => {
       active = false;
@@ -70,8 +75,9 @@ export function CurrentUserProvider({ children }: { children: ReactNode }) {
         setStoredEmployeeId(employeeId);
       },
       apiConnected,
+      isLoadingCurrentUser,
     }),
-    [apiConnected, currentEmployee, employees, selectedId],
+    [apiConnected, currentEmployee, employees, isLoadingCurrentUser, selectedId],
   );
 
   return (
