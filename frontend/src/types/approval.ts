@@ -49,6 +49,5 @@ export interface ApprovalCreateInput {
   document_type: DocumentType;
   content: string;
   department_id: string;
-  author_id: string;
   approver_id: string;
 }

@@ -1,6 +1,7 @@
 from fastapi.testclient import TestClient
 
-from app.api.dependencies import get_database_health
+from app.api.dependencies import get_authenticated_actor, get_database_health
+from app.security.identity import ActorContext
 
 
 def test_health_reports_supabase_database_source(client: TestClient) -> None:
@@ -35,6 +36,9 @@ def test_local_frontend_origin_is_allowed(client: TestClient) -> None:
 
 
 def test_list_employees_returns_paginated_organization_seed(client: TestClient) -> None:
+    client.app.dependency_overrides[get_authenticated_actor] = lambda: ActorContext(
+        employee_id="emp-ms0001", role="SUPER_ADMIN", auth_user_id="auth-admin"
+    )
     response = client.get("/api/v1/employees")
 
     assert response.status_code == 200
@@ -53,7 +57,10 @@ def test_list_departments_returns_organization_departments(client: TestClient) -
 
 
 def test_dashboard_reflects_selected_employee_access(client: TestClient) -> None:
-    response = client.get("/api/v1/dashboard", params={"employee_id": "emp-ms0001"})
+    client.app.dependency_overrides[get_authenticated_actor] = lambda: ActorContext(
+        employee_id="emp-ms0001", role="SUPER_ADMIN", auth_user_id="auth-admin"
+    )
+    response = client.get("/api/v1/dashboard")
 
     assert response.status_code == 200
     payload = response.json()
@@ -61,7 +68,7 @@ def test_dashboard_reflects_selected_employee_access(client: TestClient) -> None
     assert payload["metrics"][0]["value"] == 0
 
 
-def test_dashboard_rejects_unknown_employee(client: TestClient) -> None:
-    response = client.get("/api/v1/dashboard", params={"employee_id": "missing"})
+def test_dashboard_requires_bearer_auth(client: TestClient) -> None:
+    response = client.get("/api/v1/dashboard")
 
-    assert response.status_code == 404
+    assert response.status_code == 401

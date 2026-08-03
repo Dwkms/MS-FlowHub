@@ -34,7 +34,6 @@ export interface RecruitmentRequest {
 
 export interface RecruitmentRequestInput {
   request_department_id: string;
-  requester_id: string;
   approver_id: string;
   position_title: string;
   headcount: number;

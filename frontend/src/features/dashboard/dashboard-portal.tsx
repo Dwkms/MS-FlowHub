@@ -29,7 +29,7 @@ export function DashboardPortal() {
         active = false;
       };
     }
-    void getDashboard(currentEmployee.id)
+    void getDashboard()
       .then((result) => {
         if (!active) return;
         setDashboard(result);
@@ -121,27 +121,6 @@ export function DashboardPortal() {
             })}
           </div>
         </section>
-
-        <aside className="panel guide-panel">
-          <span className="section-kicker">MILESTONE 02</span>
-          <h2>현재 구현 범위</h2>
-          <p>전자결재 작성부터 승인·반려까지 실제 저장되는 단계입니다.</p>
-          <ul>
-            <li className="done">Backend · Frontend 기본 환경</li>
-            <li className="done">직원 및 역할 전환</li>
-            <li className="done">업무 대시보드</li>
-            <li className="done">전자결재 단일 승인 흐름</li>
-            <li>ATS · CRM 업무 연결</li>
-          </ul>
-          <div className="progress">
-            <span>
-              <b>4 / 5</b> 준비
-            </span>
-            <div>
-              <i style={{ width: "80%" }} />
-            </div>
-          </div>
-        </aside>
       </div>
     </section>
   );

@@ -16,11 +16,9 @@ export function listEmployees(filters: EmployeeFilters): Promise<EmployeePage> {
   }
   return apiGet<EmployeePage>(`/api/v1/employees?${query}`);
 }
-export const getEmployee = (id: string, actorId: string) =>
-  apiGet<EmployeeDetail>(`/api/v1/employees/${id}?actor_id=${encodeURIComponent(actorId)}`);
+export const getEmployee = (id: string) => apiGet<EmployeeDetail>(`/api/v1/employees/${id}`);
 export const updateAttendanceStatus = (
   employeeId: string,
-  actorId: string,
   payload: {
     work_status: string;
     reason_category?: string;
@@ -29,12 +27,11 @@ export const updateAttendanceStatus = (
     work_date?: string;
   },
 ) => apiRequest<EmployeeDetail>(
-  `/api/v1/employees/${employeeId}/attendance?actor_id=${encodeURIComponent(actorId)}`,
+  `/api/v1/employees/${employeeId}/attendance`,
   { method: "PUT", body: payload },
 );
 export const updateEmploymentStatusReason = (
   employeeId: string,
-  actorId: string,
   payload: {
     reason_category?: string;
     reason_summary: string;
@@ -43,7 +40,7 @@ export const updateEmploymentStatusReason = (
   },
 ) =>
   apiRequest<EmployeeDetail>(
-    `/api/v1/employees/${employeeId}/employment-status-reason?actor_id=${encodeURIComponent(actorId)}`,
+    `/api/v1/employees/${employeeId}/employment-status-reason`,
     { method: "PATCH", body: payload },
   );
 export const getOrganization = () => apiGet<OrganizationNode>("/api/v1/organization");

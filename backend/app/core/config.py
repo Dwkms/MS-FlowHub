@@ -33,6 +33,8 @@ class Settings(BaseSettings):
     supabase_secret_key: str | None = None
     supabase_jwks_url: str | None = None
     auth_seed_default_password: str | None = None
+    e2e_auth_employee_password: str | None = None
+    e2e_auth_super_admin_password: str | None = None
 
     model_config = SettingsConfigDict(
         env_file=".env",

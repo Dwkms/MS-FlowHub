@@ -21,8 +21,9 @@ from app.schemas.recruitment import (
     RecruitmentRequestResponse,
     RecruitmentSubmit,
 )
+from app.security.identity import ActorContext
 
-_FULL_ACCESS_ROLES = {"ADMIN", "HR_MANAGER"}
+_FULL_ACCESS_ROLES = {"SUPER_ADMIN", "HR_ADMIN", "ADMIN", "HR_MANAGER"}
 _POSTER_CONTENT_TYPES = {"image/jpeg", "image/png", "image/webp", "application/pdf"}
 _POSTER_SUFFIXES = {".jpg", ".jpeg", ".png", ".webp", ".pdf"}
 _MAX_POSTER_SIZE = 5 * 1024 * 1024
@@ -44,26 +45,26 @@ class RecruitmentService:
         self.organization = organization_repository
         self.notifications = notification_repository
 
-    def list_requests(self, employee_id: str) -> list[RecruitmentRequestResponse]:
-        employee = self._require_employee(employee_id)
-        visible_employee_id = None if employee.role in _FULL_ACCESS_ROLES else employee.id
+    def list_requests(self, actor: ActorContext) -> list[RecruitmentRequestResponse]:
+        visible_employee_id = None if actor.role in _FULL_ACCESS_ROLES else actor.employee_id
         return [
             self.recruitment.to_request_response(item)
             for item in self.recruitment.list_requests(visible_employee_id)
         ]
 
-    def get_request(self, request_id: str, employee_id: str) -> RecruitmentRequestResponse:
-        employee = self._require_employee(employee_id)
+    def get_request(self, request_id: str, actor: ActorContext) -> RecruitmentRequestResponse:
         request = self._get_request(request_id)
-        if employee.role not in _FULL_ACCESS_ROLES and employee.id not in {
+        if actor.role not in _FULL_ACCESS_ROLES and actor.employee_id not in {
             request.requester_id,
             request.approver_id,
         }:
             raise HTTPException(status_code=403, detail="채용 요청을 조회할 권한이 없습니다.")
         return self.recruitment.to_request_response(request)
 
-    def create_request(self, payload: RecruitmentRequestCreate) -> RecruitmentRequestResponse:
-        requester = self._require_employee(payload.requester_id)
+    def create_request(
+        self, payload: RecruitmentRequestCreate, actor: ActorContext
+    ) -> RecruitmentRequestResponse:
+        requester = self._require_employee(actor.employee_id)
         if self.organization.get_department(payload.request_department_id) is None:
             raise HTTPException(status_code=400, detail="기안 부서를 찾을 수 없습니다.")
         approver = self._require_employee(payload.approver_id)
@@ -79,17 +80,18 @@ class RecruitmentService:
         if approver.id == requester.id:
             raise HTTPException(status_code=400, detail="요청자와 결재자는 같을 수 없습니다.")
 
-        request = self.recruitment.create_request(**payload.model_dump())
+        request = self.recruitment.create_request(
+            **payload.model_dump(), requester_id=actor.employee_id
+        )
         self.session.commit()
         self.session.refresh(request)
         return self.recruitment.to_request_response(request)
 
     async def upload_poster(
-        self, request_id: str, actor_id: str, poster: UploadFile
+        self, request_id: str, actor: ActorContext, poster: UploadFile
     ) -> RecruitmentRequestResponse:
-        actor = self._require_employee(actor_id)
         request = self._get_request(request_id)
-        if actor.role != "ADMIN" and actor.id != request.requester_id:
+        if actor.role not in {"SUPER_ADMIN", "ADMIN"} and actor.employee_id != request.requester_id:
             raise HTTPException(
                 status_code=403, detail="요청 작성자 또는 관리자만 포스터를 첨부할 수 있습니다."
             )
@@ -131,10 +133,9 @@ class RecruitmentService:
             get_poster_path(previous_stored_name).unlink(missing_ok=True)
         return self.recruitment.to_request_response(request)
 
-    def get_poster_file(self, request_id: str, employee_id: str) -> tuple[Path, str, str]:
-        employee = self._require_employee(employee_id)
+    def get_poster_file(self, request_id: str, actor: ActorContext) -> tuple[Path, str, str]:
         request = self._get_request(request_id)
-        self._require_view_permission(request, employee)
+        self._require_view_permission(request, actor)
         if not request.poster_stored_name or not request.poster_original_name:
             raise HTTPException(status_code=404, detail="첨부된 채용 포스터가 없습니다.")
         path = get_poster_path(request.poster_stored_name)
@@ -146,9 +147,8 @@ class RecruitmentService:
             request.poster_content_type or "application/octet-stream",
         )
 
-    def delete_request(self, request_id: str, actor_id: str) -> None:
-        actor = self._require_employee(actor_id)
-        if actor.role != "ADMIN":
+    def delete_request(self, request_id: str, actor: ActorContext) -> None:
+        if actor.role not in {"SUPER_ADMIN", "ADMIN"}:
             raise HTTPException(status_code=403, detail="관리자만 채용 요청을 삭제할 수 있습니다.")
 
         request = self._get_request(request_id)
@@ -179,11 +179,11 @@ class RecruitmentService:
             get_poster_path(poster_stored_name).unlink(missing_ok=True)
 
     def submit_request(
-        self, request_id: str, payload: RecruitmentSubmit
+        self, request_id: str, payload: RecruitmentSubmit, actor: ActorContext
     ) -> RecruitmentRequestResponse:
         request = self._get_request(request_id)
         self._require_status(request, "DRAFT", "임시 저장 상태의 채용 요청만 상신할 수 있습니다.")
-        if payload.actor_id != request.requester_id:
+        if actor.employee_id != request.requester_id:
             raise HTTPException(status_code=403, detail="요청자만 채용 요청을 상신할 수 있습니다.")
 
         document = self.approvals.create(
@@ -196,7 +196,7 @@ class RecruitmentService:
             related_type="RECRUITMENT_REQUEST",
             related_id=request.id,
         )
-        self.approvals.mark_submitted(document, payload.actor_id, payload.comment)
+        self.approvals.mark_submitted(document, actor.employee_id, payload.comment)
         request.approval_document_id = document.id
         request.status = "PENDING_APPROVAL"
         self.notifications.create(
@@ -245,9 +245,8 @@ class RecruitmentService:
             return
         raise RuntimeError("지원하지 않는 채용 요청 결재 결과입니다.")
 
-    def create_posting(self, request_id: str, actor_id: str) -> JobPostingResponse:
-        actor = self._require_employee(actor_id)
-        if actor.role not in _FULL_ACCESS_ROLES:
+    def create_posting(self, request_id: str, actor: ActorContext) -> JobPostingResponse:
+        if actor.role not in {"SUPER_ADMIN", "HR_ADMIN", "ADMIN", "HR_MANAGER"}:
             raise HTTPException(
                 status_code=403, detail="인사 담당자 또는 관리자만 채용공고를 생성할 수 있습니다."
             )
@@ -261,8 +260,7 @@ class RecruitmentService:
         self.session.refresh(posting)
         return self.recruitment.to_posting_response(posting)
 
-    def list_postings(self, employee_id: str) -> list[JobPostingResponse]:
-        self._require_employee(employee_id)
+    def list_postings(self, actor: ActorContext) -> list[JobPostingResponse]:
         return [
             self.recruitment.to_posting_response(item) for item in self.recruitment.list_postings()
         ]
@@ -309,8 +307,8 @@ class RecruitmentService:
         return employee
 
     @staticmethod
-    def _require_view_permission(request: RecruitmentRequest, employee) -> None:
-        if employee.role not in _FULL_ACCESS_ROLES and employee.id not in {
+    def _require_view_permission(request: RecruitmentRequest, actor: ActorContext) -> None:
+        if actor.role not in _FULL_ACCESS_ROLES and actor.employee_id not in {
             request.requester_id,
             request.approver_id,
         }:

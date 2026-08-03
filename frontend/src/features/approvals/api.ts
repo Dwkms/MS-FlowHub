@@ -6,14 +6,12 @@ import type {
 } from "@/types/approval";
 
 interface ApprovalListQuery {
-  employeeId?: string;
   search?: string;
   status?: ApprovalStatus | "";
 }
 
 export function listApprovals(query: ApprovalListQuery): Promise<ApprovalDocument[]> {
   const params = new URLSearchParams();
-  if (query.employeeId) params.set("employee_id", query.employeeId);
   if (query.search) params.set("search", query.search);
   if (query.status) params.set("status", query.status);
   const suffix = params.size > 0 ? `?${params.toString()}` : "";
@@ -35,7 +33,7 @@ export function createApproval(
 
 export function updateApproval(
   documentId: string,
-  input: Partial<ApprovalCreateInput> & { actor_id: string },
+  input: Partial<ApprovalCreateInput>,
 ): Promise<ApprovalDocument> {
   return apiRequest<ApprovalDocument>(`/api/v1/approvals/${documentId}`, {
     method: "PATCH",
@@ -43,49 +41,45 @@ export function updateApproval(
   });
 }
 
-export function deleteApproval(documentId: string, actorId: string): Promise<void> {
-  const params = new URLSearchParams({ actor_id: actorId });
-  return apiDelete(`/api/v1/approvals/${documentId}?${params.toString()}`);
+export function deleteApproval(documentId: string): Promise<void> {
+  return apiDelete(`/api/v1/approvals/${documentId}`);
 }
 
 export function submitApproval(
   documentId: string,
-  actorId: string,
   comment?: string,
 ): Promise<ApprovalDocument> {
   return apiRequest<ApprovalDocument>(
     `/api/v1/approvals/${documentId}/submit`,
     {
       method: "POST",
-      body: { actor_id: actorId, comment: comment || null },
+      body: { comment: comment || null },
     },
   );
 }
 
 export function approveApproval(
   documentId: string,
-  actorId: string,
   comment?: string,
 ): Promise<ApprovalDocument> {
   return apiRequest<ApprovalDocument>(
     `/api/v1/approvals/${documentId}/approve`,
     {
       method: "POST",
-      body: { actor_id: actorId, comment: comment || null },
+      body: { comment: comment || null },
     },
   );
 }
 
 export function rejectApproval(
   documentId: string,
-  actorId: string,
   comment: string,
 ): Promise<ApprovalDocument> {
   return apiRequest<ApprovalDocument>(
     `/api/v1/approvals/${documentId}/reject`,
     {
       method: "POST",
-      body: { actor_id: actorId, comment },
+      body: { comment },
     },
   );
 }

@@ -3,27 +3,25 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
-import { useCurrentUser } from "@/features/current-user/current-user-provider";
 import { listRecruitmentRequests } from "@/features/recruitment/api";
 import { recruitmentStatusLabels } from "@/features/recruitment/presentation";
 import type { RecruitmentRequest } from "@/types/recruitment";
 
 export function RecruitmentList() {
-  const { currentEmployee } = useCurrentUser();
   const [items, setItems] = useState<RecruitmentRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
-    void listRecruitmentRequests(currentEmployee.id)
+    void listRecruitmentRequests()
       .then((result) => active && setItems(result))
       .catch((reason: unknown) => {
         if (active) setError(reason instanceof Error ? reason.message : "채용 요청을 불러오지 못했습니다.");
       })
       .finally(() => active && setLoading(false));
     return () => { active = false; };
-  }, [currentEmployee.id]);
+  }, []);
 
   return (
     <section className="content approval-page">

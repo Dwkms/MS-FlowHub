@@ -99,7 +99,6 @@ export function RecruitmentForm() {
     try {
       const created = await createRecruitmentRequest({
         request_department_id: selectedDepartmentId,
-        requester_id: currentEmployee.id,
         approver_id: selectedApproverId,
         position_title: form.positionTitle.trim(),
         headcount: Number(form.headcount),
@@ -112,7 +111,7 @@ export function RecruitmentForm() {
         desired_start_date: form.desiredStartDate || null,
       });
       if (posterFile) {
-        await uploadRecruitmentPoster(created.id, currentEmployee.id, posterFile);
+        await uploadRecruitmentPoster(created.id, posterFile);
       }
       router.push(`/recruitment-requests/${created.id}`);
     } catch (reason) {

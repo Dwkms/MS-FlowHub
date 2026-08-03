@@ -1,3 +1,5 @@
+import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
+
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, "") ?? "";
 
@@ -22,17 +24,37 @@ export async function apiRequest<T>(
   path: string,
   options: RequestOptions = {},
 ): Promise<T> {
-  let response: Response;
+  const response = await fetchApi(path, options);
+  if (response.status === 204) return undefined as T;
 
+  return (await response.json()) as T;
+}
+
+export async function apiGetBlob(path: string): Promise<Blob> {
+  const response = await fetchApi(path);
+  return response.blob();
+}
+
+async function fetchApi(path: string, options: RequestOptions = {}): Promise<Response> {
+  let response: Response;
   try {
+    const requestHeaders = new Headers(options.headers);
+    requestHeaders.set("Accept", "application/json");
+    if (options.body !== undefined && !options.formData) {
+      requestHeaders.set("Content-Type", "application/json");
+    }
+    if (!requestHeaders.has("Authorization")) {
+      const { data } = await getSupabaseBrowserClient().auth.getSession();
+      const accessToken = data.session?.access_token;
+      if (accessToken) {
+        requestHeaders.set("Authorization", `Bearer ${accessToken}`);
+      }
+    }
+
     response = await fetch(`${API_BASE_URL}${path}`, {
       cache: "no-store",
       method: options.method ?? "GET",
-      headers: {
-        Accept: "application/json",
-        ...(options.body === undefined || options.formData ? {} : { "Content-Type": "application/json" }),
-        ...options.headers,
-      },
+      headers: requestHeaders,
       body: options.formData ?? (options.body === undefined ? undefined : JSON.stringify(options.body)),
     });
   } catch {
@@ -50,9 +72,7 @@ export async function apiRequest<T>(
     throw new ApiError(message, response.status);
   }
 
-  if (response.status === 204) return undefined as T;
-
-  return (await response.json()) as T;
+  return response;
 }
 
 export function apiGet<T>(path: string): Promise<T> {

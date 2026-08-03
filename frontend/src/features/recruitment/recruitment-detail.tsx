@@ -25,19 +25,19 @@ export function RecruitmentDetail() {
 
   useEffect(() => {
     let active = true;
-    void getRecruitmentRequest(id, currentEmployee.id)
+    void getRecruitmentRequest(id)
       .then((result) => active && setItem(result))
       .catch((reason: unknown) => active && setError(reason instanceof Error ? reason.message : "채용 요청을 불러오지 못했습니다."))
       .finally(() => active && setLoading(false));
     return () => { active = false; };
-  }, [id, currentEmployee.id]);
+  }, [id]);
 
   async function submit() {
     if (!item) return;
     setProcessing(true);
     setError(null);
     try {
-      const result = await submitRecruitmentRequest(item.id, currentEmployee.id);
+      const result = await submitRecruitmentRequest(item.id);
       setItem(result);
       router.push(`/approvals/${result.approval_document_id}`);
     } catch (reason) {
@@ -52,7 +52,7 @@ export function RecruitmentDetail() {
     setProcessing(true);
     setError(null);
     try {
-      await deleteRecruitmentRequest(item.id, currentEmployee.id);
+      await deleteRecruitmentRequest(item.id);
       router.push("/recruitment-requests");
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "채용 요청을 삭제하지 못했습니다.");

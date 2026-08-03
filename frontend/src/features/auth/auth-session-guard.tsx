@@ -29,7 +29,7 @@ export function AuthSessionGuard({ children }: { children: ReactNode }) {
         return;
       }
       try {
-        const employeeId = await getAuthenticatedEmployee(data.session.access_token);
+        const employeeId = await getAuthenticatedEmployee();
         if (!active) return;
         setSelectedId(employeeId);
         setReady(true);

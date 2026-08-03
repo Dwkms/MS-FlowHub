@@ -1,4 +1,5 @@
 from datetime import date, datetime
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -37,6 +38,10 @@ class EmployeeUpdate(BaseModel):
     phone_extension: str | None = None
     work_location: str | None = None
     profile_image_url: str | None = None
+
+
+class EmployeeRoleUpdate(BaseModel):
+    role: Literal["SUPER_ADMIN", "HR_ADMIN", "TEAM_ADMIN", "EMPLOYEE"]
 
 
 class EmployeeManagerSummary(BaseModel):

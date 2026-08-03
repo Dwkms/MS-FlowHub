@@ -16,12 +16,10 @@ class ApprovalCreate(ApprovalBaseModel):
     document_type: DocumentType
     content: str = Field(min_length=1)
     department_id: str = Field(min_length=1)
-    author_id: str = Field(min_length=1)
     approver_id: str = Field(min_length=1)
 
 
 class ApprovalUpdate(ApprovalBaseModel):
-    actor_id: str = Field(min_length=1)
     title: str | None = Field(default=None, min_length=1, max_length=200)
     document_type: DocumentType | None = None
     content: str | None = Field(default=None, min_length=1)
@@ -37,12 +35,14 @@ class ApprovalUpdate(ApprovalBaseModel):
 
 
 class ApprovalAction(ApprovalBaseModel):
-    actor_id: str = Field(min_length=1)
+    comment: str | None = None
+
+
+class ApprovalSubmit(ApprovalBaseModel):
     comment: str | None = None
 
 
 class ApprovalReject(ApprovalBaseModel):
-    actor_id: str = Field(min_length=1)
     comment: str = Field(min_length=1)
 
 

@@ -29,7 +29,7 @@ export function ApprovalForm() {
     approverId && approverId !== currentEmployee.id
       ? approverId
       : approvers[0]?.id ?? "";
-  const canDraftForAnyDepartment = currentEmployee.role === "ADMIN";
+  const canDraftForAnyDepartment = ["SUPER_ADMIN", "ADMIN"].includes(currentEmployee.role);
   const availableDepartments = canDraftForAnyDepartment
     ? departments
     : departments.filter((department) => department.id === currentEmployee.department_id);
@@ -77,11 +77,10 @@ export function ApprovalForm() {
         document_type: documentType,
         content: content.trim(),
         department_id: departmentId,
-        author_id: currentEmployee.id,
         approver_id: effectiveApproverId,
       });
       const result = submit
-        ? await submitApproval(created.id, currentEmployee.id)
+        ? await submitApproval(created.id)
         : created;
       router.push(`/approvals/${result.id}?saved=${submit ? "submitted" : "draft"}`);
     } catch (reason) {

@@ -16,6 +16,9 @@ frontend/tsconfig.tsbuildinfo
 .env
 backend/.env
 frontend/.env.local
+frontend/.env.e2e
+frontend/playwright-report/
+frontend/test-results/
 
 # Editors and operating systems
 .idea/

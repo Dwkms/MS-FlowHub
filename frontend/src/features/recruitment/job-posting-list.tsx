@@ -20,12 +20,12 @@ export function JobPostingList() {
 
   useEffect(() => {
     let active = true;
-    void listJobPostings(currentEmployee.id)
+    void listJobPostings()
       .then((result) => active && setItems(result))
       .catch((reason: unknown) => active && setError(reason instanceof Error ? reason.message : "채용공고를 불러오지 못했습니다."))
       .finally(() => active && setLoading(false));
     return () => { active = false; };
-  }, [currentEmployee.id]);
+  }, []);
 
   return (
     <section className="content approval-page">

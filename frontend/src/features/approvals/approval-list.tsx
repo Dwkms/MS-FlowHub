@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { FormEvent, useEffect, useState } from "react";
 
-import { useCurrentUser } from "@/features/current-user/current-user-provider";
 import { listApprovals } from "@/features/approvals/api";
 import {
   documentTypeLabels,
@@ -16,7 +15,6 @@ import type {
 } from "@/types/approval";
 
 export function ApprovalList() {
-  const { currentEmployee } = useCurrentUser();
   const [documents, setDocuments] = useState<ApprovalDocument[]>([]);
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
@@ -27,7 +25,6 @@ export function ApprovalList() {
   useEffect(() => {
     let active = true;
     void listApprovals({
-      employeeId: currentEmployee.id,
       search,
       status,
     })
@@ -46,7 +43,7 @@ export function ApprovalList() {
     return () => {
       active = false;
     };
-  }, [currentEmployee.id, search, status]);
+  }, [search, status]);
 
   function handleSearch(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();

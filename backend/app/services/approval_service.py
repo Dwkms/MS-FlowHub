@@ -9,8 +9,11 @@ from app.schemas.approval import (
     ApprovalCreate,
     ApprovalReject,
     ApprovalResponse,
+    ApprovalSubmit,
     ApprovalUpdate,
 )
+from app.security.identity import ActorContext
+from app.security.permissions import TEAM_ADMIN
 from app.services.recruitment_service import RecruitmentService
 
 
@@ -28,13 +31,9 @@ class ApprovalService:
         self.recruitment = recruitment_service
 
     def list(
-        self, *, employee_id: str | None, search: str | None, status_filter: str | None
+        self, *, actor: ActorContext, search: str | None, status_filter: str | None
     ) -> list[ApprovalResponse]:
-        selected_employee_id = employee_id
-        if employee_id is not None:
-            employee = self._require_employee(employee_id)
-            if employee.role == "ADMIN":
-                selected_employee_id = None
+        selected_employee_id = None if actor.role in {"SUPER_ADMIN", "ADMIN"} else actor.employee_id
         return self.approvals.list_documents(
             employee_id=selected_employee_id,
             search=search,
@@ -44,35 +43,43 @@ class ApprovalService:
     def get(self, document_id: str) -> ApprovalResponse:
         return self.approvals.to_response(self._get_document(document_id))
 
-    def create(self, payload: ApprovalCreate) -> ApprovalResponse:
-        author = self._require_employee(payload.author_id)
+    def create(self, payload: ApprovalCreate, actor: ActorContext) -> ApprovalResponse:
+        author = self._require_employee(actor.employee_id)
         approver = self._require_employee(payload.approver_id)
         if self.organization.get_department(payload.department_id) is None:
             raise HTTPException(status_code=400, detail="기안 부서를 찾을 수 없습니다.")
-        if author.role != "ADMIN" and author.department_id != payload.department_id:
+        if (
+            actor.role not in {"SUPER_ADMIN", "ADMIN"}
+            and author.department_id != payload.department_id
+        ):
             raise HTTPException(
                 status_code=400, detail="기안자의 소속 부서와 기안 부서가 다릅니다."
             )
         if author.id == approver.id:
             raise HTTPException(status_code=400, detail="작성자와 결재자는 같을 수 없습니다.")
 
-        document = self.approvals.create(**payload.model_dump())
+        document = self.approvals.create(**payload.model_dump(), author_id=actor.employee_id)
         self.session.commit()
         self.session.refresh(document)
         return self.approvals.to_response(document)
 
-    def update(self, document_id: str, payload: ApprovalUpdate) -> ApprovalResponse:
+    def update(
+        self, document_id: str, payload: ApprovalUpdate, actor: ActorContext
+    ) -> ApprovalResponse:
         document = self._get_document(document_id)
         self._require_status(document, "DRAFT", "임시 저장 문서만 수정할 수 있습니다.")
-        if payload.actor_id != document.author_id:
+        if actor.employee_id != document.author_id:
             raise HTTPException(status_code=403, detail="작성자만 문서를 수정할 수 있습니다.")
 
-        changes = payload.model_dump(exclude={"actor_id"}, exclude_none=True)
+        changes = payload.model_dump(exclude_none=True)
         if "department_id" in changes:
-            actor = self._require_employee(payload.actor_id)
             if self.organization.get_department(changes["department_id"]) is None:
                 raise HTTPException(status_code=400, detail="기안 부서를 찾을 수 없습니다.")
-            if actor.role != "ADMIN" and actor.department_id != changes["department_id"]:
+            if (
+                actor.role not in {"SUPER_ADMIN", "ADMIN"}
+                and self._require_employee(actor.employee_id).department_id
+                != changes["department_id"]
+            ):
                 raise HTTPException(
                     status_code=400, detail="기안자의 소속 부서만 선택할 수 있습니다."
                 )
@@ -84,7 +91,7 @@ class ApprovalService:
             setattr(document, field, value)
         self.approvals.add_history(
             document=document,
-            actor_id=payload.actor_id,
+            actor_id=actor.employee_id,
             action="UPDATED",
             from_status="DRAFT",
             to_status="DRAFT",
@@ -93,31 +100,34 @@ class ApprovalService:
         self.session.refresh(document)
         return self.approvals.to_response(document)
 
-    def delete(self, document_id: str, actor_id: str) -> None:
+    def delete(self, document_id: str, actor: ActorContext) -> None:
         document = self._get_document(document_id)
-        actor = self._require_employee(actor_id)
-        if actor.role != "ADMIN":
+        if actor.role not in {"SUPER_ADMIN", "ADMIN"}:
             raise HTTPException(status_code=403, detail="관리자만 문서를 삭제할 수 있습니다.")
 
         self.approvals.delete(document)
         self.session.commit()
 
-    def submit(self, document_id: str, payload: ApprovalAction) -> ApprovalResponse:
+    def submit(
+        self, document_id: str, actor: ActorContext, payload: ApprovalSubmit
+    ) -> ApprovalResponse:
         document = self._get_document(document_id)
         self._require_status(document, "DRAFT", "임시 저장 문서만 상신할 수 있습니다.")
-        if payload.actor_id != document.author_id:
+        if actor.employee_id != document.author_id:
             raise HTTPException(status_code=403, detail="작성자만 문서를 상신할 수 있습니다.")
-        self.approvals.mark_submitted(document, payload.actor_id, payload.comment)
+        self.approvals.mark_submitted(document, actor.employee_id, payload.comment)
         self.session.commit()
         self.session.refresh(document)
         return self.approvals.to_response(document)
 
-    def approve(self, document_id: str, payload: ApprovalAction) -> ApprovalResponse:
+    def approve(
+        self, document_id: str, actor: ActorContext, payload: ApprovalAction
+    ) -> ApprovalResponse:
         document = self._get_document(document_id)
-        self._require_decision_permission(document, payload.actor_id)
+        self._require_decision_permission(document, actor)
         self.approvals.mark_processed(
             document,
-            actor_id=payload.actor_id,
+            actor_id=actor.employee_id,
             target_status="APPROVED",
             action="APPROVED",
             comment=payload.comment,
@@ -127,12 +137,14 @@ class ApprovalService:
         self.session.refresh(document)
         return self.approvals.to_response(document)
 
-    def reject(self, document_id: str, payload: ApprovalReject) -> ApprovalResponse:
+    def reject(
+        self, document_id: str, actor: ActorContext, payload: ApprovalReject
+    ) -> ApprovalResponse:
         document = self._get_document(document_id)
-        self._require_decision_permission(document, payload.actor_id)
+        self._require_decision_permission(document, actor)
         self.approvals.mark_processed(
             document,
-            actor_id=payload.actor_id,
+            actor_id=actor.employee_id,
             target_status="REJECTED",
             action="REJECTED",
             comment=payload.comment.strip(),
@@ -159,10 +171,22 @@ class ApprovalService:
         if document.status != expected:
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=message)
 
-    def _require_decision_permission(self, document: ApprovalDocument, actor_id: str) -> None:
+    def _require_decision_permission(self, document: ApprovalDocument, actor: ActorContext) -> None:
         self._require_status(document, "PENDING", "결재 대기 문서만 처리할 수 있습니다.")
-        actor = self._require_employee(actor_id)
-        if actor.role != "ADMIN" and actor.id != document.approver_id:
+        if actor.employee_id == document.author_id:
+            raise HTTPException(
+                status_code=403, detail="작성자는 본인 문서를 승인하거나 반려할 수 없습니다."
+            )
+        if actor.role in {"SUPER_ADMIN", "ADMIN"}:
+            return
+        if actor.role == TEAM_ADMIN and self._is_same_team(actor.employee_id, document.author_id):
+            return
+        if actor.employee_id != document.approver_id:
             raise HTTPException(
                 status_code=403, detail="지정된 결재자 또는 관리자만 처리할 수 있습니다."
             )
+
+    def _is_same_team(self, first_employee_id: str, second_employee_id: str) -> bool:
+        first = self._require_employee(first_employee_id)
+        second = self._require_employee(second_employee_id)
+        return first.team_id is not None and first.team_id == second.team_id
