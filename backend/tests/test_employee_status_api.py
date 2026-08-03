@@ -1,10 +1,13 @@
 from fastapi.testclient import TestClient
 
-from app.api.dependencies import get_current_actor
+from app.api.dependencies import get_authenticated_actor
 from app.security.identity import ActorContext
 
 
 def test_employee_filters_combine_employment_and_daily_work_status(client: TestClient) -> None:
+    client.app.dependency_overrides[get_authenticated_actor] = lambda: ActorContext(
+        employee_id="emp-ms0001", role="SUPER_ADMIN", auth_user_id="auth-admin"
+    )
     response = client.get(
         "/api/v1/employees",
         params={"employment_status": "ACTIVE", "daily_work_status": "WORKING"},
@@ -16,7 +19,7 @@ def test_employee_filters_combine_employment_and_daily_work_status(client: TestC
 
 
 def test_sick_leave_requires_public_reason_and_redacts_private_note(client: TestClient) -> None:
-    client.app.dependency_overrides[get_current_actor] = lambda: ActorContext(
+    client.app.dependency_overrides[get_authenticated_actor] = lambda: ActorContext(
         employee_id="emp-ms0010", role="EMPLOYEE"
     )
 
@@ -41,7 +44,7 @@ def test_sick_leave_requires_public_reason_and_redacts_private_note(client: Test
 
 
 def test_admin_can_view_private_reason_detail(client: TestClient) -> None:
-    client.app.dependency_overrides[get_current_actor] = lambda: ActorContext(
+    client.app.dependency_overrides[get_authenticated_actor] = lambda: ActorContext(
         employee_id="emp-ms0010", role="EMPLOYEE"
     )
     client.put(
@@ -53,7 +56,40 @@ def test_admin_can_view_private_reason_detail(client: TestClient) -> None:
         },
     )
 
-    response = client.get("/api/v1/employees/emp-ms0010", params={"actor_id": "emp-ms0001"})
+    client.app.dependency_overrides[get_authenticated_actor] = lambda: ActorContext(
+        employee_id="emp-ms0001", role="SUPER_ADMIN", auth_user_id="auth-admin"
+    )
+    response = client.get("/api/v1/employees/emp-ms0010")
 
     assert response.status_code == 200
     assert response.json()["daily_work_reason"]["private_note"] == "진단 상세"
+
+
+def test_team_admin_can_update_same_team_but_not_other_team(client: TestClient) -> None:
+    client.app.dependency_overrides[get_authenticated_actor] = lambda: ActorContext(
+        employee_id="emp-ms0003", role="TEAM_ADMIN", auth_user_id="auth-team-admin"
+    )
+
+    same_team = client.put(
+        "/api/v1/employees/emp-ms0004/attendance",
+        json={"work_status": "WORKING"},
+    )
+    other_team = client.put(
+        "/api/v1/employees/emp-ms0008/attendance",
+        json={"work_status": "WORKING"},
+    )
+
+    assert same_team.status_code == 200
+    assert other_team.status_code == 403
+
+
+def test_team_admin_can_list_only_own_team_members(client: TestClient) -> None:
+    client.app.dependency_overrides[get_authenticated_actor] = lambda: ActorContext(
+        employee_id="emp-ms0003", role="TEAM_ADMIN", auth_user_id="auth-team-admin"
+    )
+
+    response = client.get("/api/v1/employees")
+
+    assert response.status_code == 200
+    assert response.json()["items"]
+    assert {item["team_code"] for item in response.json()["items"]} == {"DEV_SW"}

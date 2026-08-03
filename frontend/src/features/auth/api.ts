@@ -6,10 +6,8 @@ type AuthMeResponse = {
   employee_id: string;
 };
 
-export async function getAuthenticatedEmployee(token: string): Promise<string> {
-  const response = await apiRequest<AuthMeResponse>("/api/v1/auth/me", {
-    headers: { Authorization: `Bearer ${token}` },
-  });
+export async function getAuthenticatedEmployee(): Promise<string> {
+  const response = await apiRequest<AuthMeResponse>("/api/v1/auth/me");
   return response.employee_id;
 }
 

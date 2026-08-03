@@ -1,9 +1,9 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, File, Query, UploadFile, status
+from fastapi import APIRouter, Depends, File, UploadFile, status
 from fastapi.responses import FileResponse
 
-from app.api.dependencies import get_recruitment_service
+from app.api.dependencies import AuthenticatedActor, get_recruitment_service
 from app.schemas.recruitment import (
     JobPostingResponse,
     RecruitmentRequestCreate,
@@ -18,9 +18,9 @@ RecruitmentServiceDependency = Annotated[RecruitmentService, Depends(get_recruit
 
 @router.get("/recruitment-requests", response_model=list[RecruitmentRequestResponse])
 def list_recruitment_requests(
-    service: RecruitmentServiceDependency, employee_id: str = Query(...)
+    service: RecruitmentServiceDependency, actor: AuthenticatedActor
 ) -> list[RecruitmentRequestResponse]:
-    return service.list_requests(employee_id)
+    return service.list_requests(actor)
 
 
 @router.post(
@@ -29,18 +29,20 @@ def list_recruitment_requests(
     status_code=status.HTTP_201_CREATED,
 )
 def create_recruitment_request(
-    payload: RecruitmentRequestCreate, service: RecruitmentServiceDependency
+    payload: RecruitmentRequestCreate,
+    service: RecruitmentServiceDependency,
+    actor: AuthenticatedActor,
 ) -> RecruitmentRequestResponse:
-    return service.create_request(payload)
+    return service.create_request(payload, actor)
 
 
 @router.delete("/recruitment-requests/{request_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_recruitment_request(
     request_id: str,
     service: RecruitmentServiceDependency,
-    actor_id: str = Query(...),
+    actor: AuthenticatedActor,
 ) -> None:
-    service.delete_request(request_id, actor_id)
+    service.delete_request(request_id, actor)
 
 
 @router.post("/recruitment-requests/{request_id}/poster", response_model=RecruitmentRequestResponse)
@@ -48,44 +50,47 @@ async def upload_recruitment_poster(
     request_id: str,
     service: RecruitmentServiceDependency,
     poster: Annotated[UploadFile, File(...)],
-    actor_id: str = Query(...),
+    actor: AuthenticatedActor,
 ) -> RecruitmentRequestResponse:
-    return await service.upload_poster(request_id, actor_id, poster)
+    return await service.upload_poster(request_id, actor, poster)
 
 
 @router.get("/recruitment-requests/{request_id}/poster")
 def download_recruitment_poster(
     request_id: str,
     service: RecruitmentServiceDependency,
-    employee_id: str = Query(...),
+    actor: AuthenticatedActor,
 ) -> FileResponse:
-    path, filename, media_type = service.get_poster_file(request_id, employee_id)
+    path, filename, media_type = service.get_poster_file(request_id, actor)
     return FileResponse(path, media_type=media_type, filename=filename)
 
 
 @router.get("/recruitment-requests/{request_id}", response_model=RecruitmentRequestResponse)
 def get_recruitment_request(
-    request_id: str, service: RecruitmentServiceDependency, employee_id: str = Query(...)
+    request_id: str, service: RecruitmentServiceDependency, actor: AuthenticatedActor
 ) -> RecruitmentRequestResponse:
-    return service.get_request(request_id, employee_id)
+    return service.get_request(request_id, actor)
 
 
 @router.post("/recruitment-requests/{request_id}/submit", response_model=RecruitmentRequestResponse)
 def submit_recruitment_request(
-    request_id: str, payload: RecruitmentSubmit, service: RecruitmentServiceDependency
+    request_id: str,
+    payload: RecruitmentSubmit,
+    service: RecruitmentServiceDependency,
+    actor: AuthenticatedActor,
 ) -> RecruitmentRequestResponse:
-    return service.submit_request(request_id, payload)
+    return service.submit_request(request_id, payload, actor)
 
 
 @router.post("/recruitment-requests/{request_id}/job-posting", response_model=JobPostingResponse)
 def create_job_posting(
-    request_id: str, service: RecruitmentServiceDependency, actor_id: str = Query(...)
+    request_id: str, service: RecruitmentServiceDependency, actor: AuthenticatedActor
 ) -> JobPostingResponse:
-    return service.create_posting(request_id, actor_id)
+    return service.create_posting(request_id, actor)
 
 
 @router.get("/job-postings", response_model=list[JobPostingResponse])
 def list_job_postings(
-    service: RecruitmentServiceDependency, employee_id: str = Query(...)
+    service: RecruitmentServiceDependency, actor: AuthenticatedActor
 ) -> list[JobPostingResponse]:
-    return service.list_postings(employee_id)
+    return service.list_postings(actor)

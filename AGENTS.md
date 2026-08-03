@@ -66,7 +66,8 @@ DB 변경 시 migration 생성과 내용, 개발 DB 적용, downgrade 가능 여
 
 ## Documentation Rules
 
-- 의미 있는 작업 단위가 끝날 때마다 `UPDATELOG.md`에 실제 수행 내용만 기록한다.
+- 의미 있는 작업 단위가 끝날 때마다 `UPDATELOG.md`에 실제 수행 내용만 한국어로 기록한다.
+- `UPDATELOG.md`는 최신 날짜 항목이 위에 오도록 내림차순으로 정리한다.
 - README에서 현재 동작 기능과 예정 기능을 구분한다.
 - 실행 방법, 환경변수, 구조가 바뀌면 README를 갱신한다.
 - 반복 오류와 해결 방법은 README의 Troubleshooting에 추가한다.

@@ -2,11 +2,12 @@
 
 import json
 import os
-from datetime import UTC, datetime
+from collections.abc import Callable
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
 from sqlalchemy import select
+from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
 from app.db.session import SessionLocal
@@ -23,7 +24,12 @@ ROLE_BY_EMPLOYEE_NO = {
 }
 
 
-def _admin_request(path: str, payload: dict[str, object] | None = None) -> dict[str, object]:
+def _admin_request(
+    path: str,
+    payload: dict[str, object] | None = None,
+    *,
+    method: str | None = None,
+) -> dict[str, object]:
     settings = get_settings()
     if not settings.supabase_url or not settings.supabase_secret_key:
         raise RuntimeError("SUPABASE_URL and SUPABASE_SECRET_KEY must be configured.")
@@ -35,7 +41,7 @@ def _admin_request(path: str, payload: dict[str, object] | None = None) -> dict[
             "Authorization": f"Bearer {settings.supabase_secret_key}",
             "Content-Type": "application/json",
         },
-        method="POST" if payload is not None else "GET",
+        method=method or ("POST" if payload is not None else "GET"),
     )
     try:
         with urlopen(request, timeout=10) as response:  # noqa: S310
@@ -50,8 +56,65 @@ def _existing_auth_users() -> dict[str, str]:
     return {
         item["email"]: item["id"]
         for item in users
-        if isinstance(item, dict) and isinstance(item.get("email"), str) and isinstance(item.get("id"), str)
+        if isinstance(item, dict)
+        and isinstance(item.get("email"), str)
+        and isinstance(item.get("id"), str)
     }
+
+
+def _create_auth_user(email: str, password: str) -> str:
+    result = _admin_request(
+        "/auth/v1/admin/users",
+        {"email": email, "password": password, "email_confirm": True},
+    )
+    auth_user_id = result.get("id")
+    if not isinstance(auth_user_id, str):
+        raise RuntimeError("Supabase Auth did not return a user ID.")
+    return auth_user_id
+
+
+def _update_auth_user_password(auth_user_id: str, password: str) -> None:
+    _admin_request(
+        f"/auth/v1/admin/users/{auth_user_id}",
+        {"password": password},
+        method="PUT",
+    )
+
+
+def sync_employee_accounts(
+    session: Session,
+    auth_users: dict[str, str],
+    password: str,
+    create_auth_user: Callable[[str, str], str] = _create_auth_user,
+) -> None:
+    """Create missing Auth links and update existing account roles without duplicates."""
+    employees = session.scalars(select(Employee).order_by(Employee.employee_no)).all()
+    accounts_by_employee_id = {
+        account.employee_id: account for account in session.scalars(select(EmployeeAccount)).all()
+    }
+    for employee in employees:
+        auth_user_id = auth_users.get(employee.email)
+        if auth_user_id is None:
+            auth_user_id = create_auth_user(employee.email, password)
+            auth_users[employee.email] = auth_user_id
+
+        role = ROLE_BY_EMPLOYEE_NO.get(employee.employee_no, "EMPLOYEE")
+        account = accounts_by_employee_id.get(employee.id)
+        if account is None:
+            account = EmployeeAccount(
+                id=f"account-{employee.id}",
+                auth_user_id=auth_user_id,
+                employee_id=employee.id,
+                role=role,
+                is_active=employee.employment_status == "ACTIVE",
+            )
+            session.add(account)
+            accounts_by_employee_id[employee.id] = account
+            continue
+
+        account.auth_user_id = auth_user_id
+        account.role = role
+        account.is_active = employee.employment_status == "ACTIVE"
 
 
 def main() -> None:
@@ -62,35 +125,7 @@ def main() -> None:
     if not password:
         raise RuntimeError("AUTH_SEED_DEFAULT_PASSWORD must be configured.")
     with SessionLocal() as session:
-        auth_users = _existing_auth_users()
-        employees = session.scalars(select(Employee).order_by(Employee.employee_no)).all()
-        for employee in employees:
-            account = session.scalar(
-                select(EmployeeAccount).where(EmployeeAccount.employee_id == employee.id)
-            )
-            if account is None:
-                auth_user_id = auth_users.get(employee.email)
-                if auth_user_id is None:
-                    result = _admin_request(
-                        "/auth/v1/admin/users",
-                        {
-                            "email": employee.email,
-                            "password": password,
-                            "email_confirm": True,
-                        },
-                    )
-                    auth_user_id = result.get("id")
-                if not isinstance(auth_user_id, str):
-                    raise RuntimeError("Supabase Auth did not return a user ID.")
-                account = EmployeeAccount(
-                    id=f"account-{employee.id}",
-                    auth_user_id=auth_user_id,
-                    employee_id=employee.id,
-                    role=ROLE_BY_EMPLOYEE_NO.get(employee.employee_no, "EMPLOYEE"),
-                    is_active=employee.employment_status == "ACTIVE",
-                    last_login_at=datetime.now(UTC),
-                )
-                session.add(account)
+        sync_employee_accounts(session, _existing_auth_users(), password)
         session.commit()
 
 

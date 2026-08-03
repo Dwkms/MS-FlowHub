@@ -10,7 +10,8 @@ from app.api.dependencies import get_database_health
 from app.db.base import Base
 from app.db.session import get_db_session
 from app.main import create_app
-from app.models import approval, notification, organization, recruitment  # noqa: F401
+from app.models import approval, auth, manual, notification, organization, recruitment  # noqa: F401
+from app.models.auth import EmployeeAccount
 from app.models.organization import Department, Employee
 from app.repositories.organization_repository import OrganizationRepository
 
@@ -59,6 +60,14 @@ def client() -> Generator[TestClient, None, None]:
     with testing_session() as session:
         OrganizationRepository(session).seed_sample_organization()
         seed_workflow_test_identities(session)
+        session.add(
+            EmployeeAccount(
+                id="account-emp-ms0010",
+                auth_user_id="auth-emp-ms0010",
+                employee_id="emp-ms0010",
+                role="EMPLOYEE",
+            )
+        )
         session.commit()
 
     def override_session() -> Generator[Session, None, None]:
@@ -66,6 +75,7 @@ def client() -> Generator[TestClient, None, None]:
             yield session
 
     test_app = create_app(verify_database_on_startup=False)
+    test_app.state.testing_session_factory = testing_session
     test_app.dependency_overrides[get_db_session] = override_session
     test_app.dependency_overrides[get_database_health] = lambda: True
     with TestClient(test_app) as test_client:

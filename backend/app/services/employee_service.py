@@ -1,3 +1,4 @@
+import logging
 from datetime import UTC, date, datetime, time
 
 from fastapi import HTTPException, status
@@ -13,18 +14,23 @@ from app.domain.employee_status import (
     requires_reason,
     supports_daily_work_status,
 )
+from app.models.auth import EmployeeAccount
 from app.models.organization import Department, Employee, Team
 from app.repositories.organization_repository import OrganizationRepository
 from app.schemas.employee import (
     AttendanceStatusUpdate,
     EmployeeCreate,
     EmployeeDetail,
+    EmployeeRoleUpdate,
     EmployeeUpdate,
     EmploymentStatusReasonUpdate,
     PaginatedEmployeeResponse,
 )
-from app.security.authorization import can_view_private_status_reasons, require_self_or_admin
+from app.security.authorization import can_view_private_status_reasons
 from app.security.identity import ActorContext
+from app.security.permissions import HR_ADMIN, SUPER_ADMIN, TEAM_ADMIN
+
+logger = logging.getLogger(__name__)
 
 
 class EmployeeService:
@@ -32,7 +38,17 @@ class EmployeeService:
         self.session = session
         self.repository = repository
 
-    def list(self, **filters: object) -> PaginatedEmployeeResponse:
+    def list(self, actor: ActorContext, **filters: object) -> PaginatedEmployeeResponse:
+        if actor.role not in {SUPER_ADMIN, HR_ADMIN, "ADMIN", "HR_MANAGER"}:
+            if actor.role == TEAM_ADMIN:
+                team_id = self._require_employee(actor.employee_id).team_id
+                if team_id is None:
+                    raise HTTPException(
+                        status_code=403, detail="팀 관리자에게 연결된 팀이 없습니다."
+                    )
+                filters["visible_team_id"] = team_id
+            else:
+                filters["visible_employee_id"] = actor.employee_id
         return self.repository.list_employee_page(**filters)
 
     def organization_tree(self):
@@ -42,6 +58,15 @@ class EmployeeService:
         item = self.repository.get_employee_detail(employee_id)
         if item is None:
             raise HTTPException(status_code=404, detail="직원을 찾을 수 없습니다.")
+        if viewer is not None and viewer.role not in {SUPER_ADMIN, HR_ADMIN, "ADMIN", "HR_MANAGER"}:
+            if viewer.role == TEAM_ADMIN:
+                viewer_employee = self._require_employee(viewer.employee_id)
+                if viewer_employee.team_id is None or viewer_employee.team_id != item.team_id:
+                    raise HTTPException(
+                        status_code=403, detail="다른 팀 직원 조회 권한이 없습니다."
+                    )
+            elif viewer.employee_id != item.id:
+                raise HTTPException(status_code=403, detail="본인 정보만 조회할 수 있습니다.")
         if not can_view_private_status_reasons(viewer):
             item = item.model_copy(
                 update={
@@ -83,6 +108,28 @@ class EmployeeService:
         self._commit()
         return self.detail(employee_id)
 
+    def update_role(
+        self, employee_id: str, payload: EmployeeRoleUpdate, actor: ActorContext
+    ) -> EmployeeDetail:
+        employee = self._require_employee(employee_id)
+        account = self.session.scalar(
+            select(EmployeeAccount).where(EmployeeAccount.employee_id == employee.id)
+        )
+        if account is None:
+            raise HTTPException(status_code=404, detail="연결된 Auth 계정을 찾을 수 없습니다.")
+        previous_role = account.role
+        account.role = payload.role
+        self.session.commit()
+        logger.info(
+            "employee role changed actor_employee_id=%s target_employee_id=%s "
+            "from_role=%s to_role=%s",
+            actor.employee_id,
+            employee.id,
+            previous_role,
+            payload.role,
+        )
+        return self.detail(employee.id)
+
     def deactivate(self, employee_id: str) -> None:
         employee = self.session.get(Employee, employee_id)
         if employee is None:
@@ -103,7 +150,7 @@ class EmployeeService:
         self, employee_id: str, actor: ActorContext, payload: AttendanceStatusUpdate
     ) -> EmployeeDetail:
         employee = self._require_employee(employee_id)
-        require_self_or_admin(actor, employee.id)
+        self._require_status_update_permission(actor, employee)
         if not supports_daily_work_status(employee.employment_status):
             raise HTTPException(
                 status_code=409, detail="재직 중인 직원만 근무 상태를 변경할 수 있습니다."
@@ -161,7 +208,7 @@ class EmployeeService:
         self, employee_id: str, actor: ActorContext, payload: EmploymentStatusReasonUpdate
     ) -> EmployeeDetail:
         employee = self._require_employee(employee_id)
-        require_self_or_admin(actor, employee.id)
+        self._require_status_update_permission(actor, employee)
         if not requires_employment_reason(employee.employment_status):
             raise HTTPException(
                 status_code=409, detail="휴직 상태에서만 휴직 사유를 작성할 수 있습니다."
@@ -181,6 +228,18 @@ class EmployeeService:
         if employee is None:
             raise HTTPException(status_code=404, detail="직원을 찾을 수 없습니다.")
         return employee
+
+    def _require_status_update_permission(self, actor: ActorContext, employee: Employee) -> None:
+        if actor.employee_id == employee.id or actor.role in {SUPER_ADMIN, HR_ADMIN, "ADMIN"}:
+            return
+        if actor.role == TEAM_ADMIN:
+            actor_employee = self._require_employee(actor.employee_id)
+            if actor_employee.team_id and actor_employee.team_id == employee.team_id:
+                return
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="본인, 같은 팀 관리자 또는 권한 있는 관리자만 상태를 변경할 수 있습니다.",
+        )
 
     def _require_self_or_admin(self, actor_id: str, employee: Employee) -> None:
         actor = self._require_employee(actor_id)

@@ -18,7 +18,6 @@ class RecruitmentBaseModel(BaseModel):
 
 class RecruitmentRequestCreate(RecruitmentBaseModel):
     request_department_id: str = Field(min_length=1)
-    requester_id: str = Field(min_length=1)
     approver_id: str = Field(min_length=1)
     position_title: str = Field(min_length=1, max_length=150)
     headcount: int = Field(gt=0, le=100)
@@ -32,7 +31,6 @@ class RecruitmentRequestCreate(RecruitmentBaseModel):
 
 
 class RecruitmentSubmit(RecruitmentBaseModel):
-    actor_id: str = Field(min_length=1)
     comment: str | None = None
 
 

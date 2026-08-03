@@ -5,7 +5,7 @@ from sqlalchemy import engine_from_config, pool
 
 from app.core.config import get_settings, normalize_postgres_url
 from app.db.base import Base
-from app.models import approval, auth, notification, organization, recruitment  # noqa: F401
+from app.models import approval, auth, manual, notification, organization, recruitment  # noqa: F401
 
 config = context.config
 if config.config_file_name is not None:

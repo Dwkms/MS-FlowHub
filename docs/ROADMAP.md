@@ -8,7 +8,7 @@
 4. Production deployment, Supabase Storage, CI/CD, and E2E verification
 5. Jira-based schedule and work-item tracking
 6. Dashboard milestone, access-module, and administrator-context content cleanup
-7. Workspace employee manual planning (scope and information architecture)
+7. Employee manual MVP (implemented: text manual, image summary, role-based management)
 
 ## 현재 상태 요약 (2026-08-01)
 

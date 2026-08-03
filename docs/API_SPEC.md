@@ -1,5 +1,55 @@
 # API Specification
 
+## 직원 매뉴얼 MVP (v0.7.0)
+
+모든 매뉴얼 API는 `Authorization: Bearer {supabase_access_token}`을 사용합니다.
+
+| Method / URL | 목적 | 권한 |
+|---|---|---|
+| `GET /api/v1/manuals/categories` | 카테고리 목록 | 인증된 전 직원 |
+| `POST/PATCH/DELETE /api/v1/manuals/categories` | 카테고리 관리 | `SUPER_ADMIN`, `HR_ADMIN` |
+| `GET /api/v1/manuals?search=&category_id=` | 매뉴얼 목록·검색·카테고리 필터 | 인증된 전 직원 |
+| `GET /api/v1/manuals/{slug}` | 매뉴얼 본문과 이미지/PDF URL 상세 | 인증된 전 직원 |
+| `POST /api/v1/manuals` | 매뉴얼 작성 | `SUPER_ADMIN`, `HR_ADMIN` |
+| `PATCH/DELETE /api/v1/manuals/{slug}` | 매뉴얼 수정·삭제 | `SUPER_ADMIN`, `HR_ADMIN` |
+
+일반 조회 역할은 `PUBLISHED` 상태만 볼 수 있습니다. 관리자 역할은 초안도 조회할 수 있습니다.
+목록은 중요 고정(`is_pinned`)을 먼저, 그 다음 최근 수정일 내림차순으로 정렬합니다. 쓰기
+요청의 이미지·PDF는 `assets` 배열의 URL로 등록하며 서버 파일 업로드는 지원하지 않습니다.
+
+## Supabase Bearer authentication transition (v0.6.2)
+
+Employee attendance and employment-status-reason updates now require an
+`Authorization: Bearer {supabase_access_token}` header. The authenticated
+employee is resolved through `employee_accounts`; the request no longer accepts
+`actor_id` as the identity source for these endpoints. Missing or invalid bearer
+credentials return `401`.
+
+Approval submission now also requires the bearer header. Its request body accepts
+only an optional `comment`; the submitting employee is resolved from the token,
+not an `actor_id` field.
+
+Approval approval and rejection also require the bearer header. Approval accepts
+an optional `comment` and rejection requires a `comment`; both resolve the
+acting employee from the token instead of an `actor_id` field. Only the assigned
+approver or a `SUPER_ADMIN` can process a pending approval.
+
+Approval creation, draft update, deletion, and listing require the bearer header
+as well. Creation records the token owner as the author, draft update uses that
+owner for author validation and history, and deletion is limited to `SUPER_ADMIN`.
+Lists return all documents to `SUPER_ADMIN` and only author-or-approver related
+documents to other users. These endpoints no longer accept `author_id`, `actor_id`,
+or `employee_id` as an identity source.
+
+All recruitment request and job posting endpoints now require the bearer header.
+The token owner becomes the requester, and these APIs no longer accept
+`requester_id`, `actor_id`, or `employee_id` as an identity source. Poster files
+are downloaded through the shared API client so the bearer header is included.
+
+Dashboard and employee-detail APIs also require the bearer header and resolve the
+current employee from the token. Supabase access tokens are verified against the
+configured JWKS before the linked `employee_accounts` role is loaded.
+
 ## Employee organization management (v0.6.0)
 
 - `GET /api/v1/employees`: paginated employees; supports `page`, `page_size`,
@@ -43,7 +93,7 @@ This is a transitional identity bridge until Supabase Auth supplies the actor.
 ### POST /api/v1/recruitment-requests/{request_id}/poster
 
 - 목적: 임시 저장 상태의 채용 요청에 포스터 파일을 첨부한다.
-- 요청: Query `actor_id`, multipart field `poster`.
+- 요청: Bearer header, multipart field `poster`.
 - 허용 형식: JPG, PNG, WEBP, PDF. 최대 5MB.
 - 권한: 요청 작성자 또는 관리자. 상신 후에는 변경할 수 없다.
 - 응답: 포스터 메타데이터가 포함된 채용 요청.
@@ -52,11 +102,11 @@ This is a transitional identity bridge until Supabase Auth supplies the actor.
 ### GET /api/v1/recruitment-requests/{request_id}/poster
 
 - 목적: 권한이 있는 직원이 첨부된 채용 포스터를 연다.
-- 요청: Query `employee_id`.
+- 요청: Bearer header.
 - 응답: 원본 파일명과 MIME 형식을 유지한 파일 응답.
 - 관련 테이블: `recruitment_requests`.
 
-Base path는 `/api/v1`이다. 공통 조회 API와 전자결재 Router는 구현되었고, 나머지 모듈의 API는 이 문서의 계약을 기준으로 구현할 예정이다. 공통 오류는 현재 FastAPI의 `detail` 응답을 사용하며, 이후 `{code, message, details?, request_id?}` 형태로 확장할 수 있다. 현재 사용자 ID는 조회 시 `employee_id` query parameter, 상태 변경 시 요청 body의 `actor_id`로 전달하되 Service가 해당 직원과 역할을 저장소에서 다시 조회한다.
+Base path는 `/api/v1`이다. 공통 조회 API와 전자결재 Router는 구현되었고, 나머지 모듈의 API는 이 문서의 계약을 기준으로 구현할 예정이다. 공통 오류는 현재 FastAPI의 `detail` 응답을 사용하며, 이후 `{code, message, details?, request_id?}` 형태로 확장할 수 있다. Bearer 인증으로 전환된 API는 토큰에서 현재 직원과 역할을 확인하며, 남은 레거시 API만 query 또는 body의 사용자 ID를 사용한다.
 
 ## API 목록
 
@@ -66,21 +116,21 @@ Base path는 `/api/v1`이다. 공통 조회 API와 전자결재 Router는 구현
 | Departments | `GET /departments` | 부서 목록, query `active?` | 부서 목록 / 전체 / 200 | `departments` |
 | Employees | `GET /employees` | 샘플 직원 목록, query `department_id?, role?` | 직원 목록 / 전체 / 200 | `employees`, `departments` |
 | Current User | `PUT /session/current-user` | body `{employee_id}` | 현재 직원·역할·접근 모듈 / 전체 / 200, 404, 409 | 활성 직원 재조회; 영속 세션 방식은 구현 시 결정 |
-| Dashboard | `GET /dashboard` | 현재 역할의 업무 요약 | counts/tasks / 전체 / 200, 403 | 결재·채용·견적·알림 read transaction |
-| Approvals | `GET /approvals` | query `employee_id?, status?` | 목록 / 역할별 / 200 | 관리자는 전체, 그 외 역할은 작성·결재 관련 문서만 조회, `approval_documents` |
+| Dashboard | `GET /dashboard` | Bearer 기반 현재 역할의 업무 요약 | counts/tasks / 전체 / 200,401 | 토큰 사용자 기준 결재·채용·견적·알림 read transaction |
+| Approvals | `GET /approvals` | Bearer, query `status?` | 목록 / 역할별 / 200,401 | `SUPER_ADMIN`은 전체, 그 외 역할은 작성·결재 관련 문서만 조회, `approval_documents` |
 | Approvals | `GET /approvals/{id}` | 결재와 이력 상세 | 상세 / 작성자·결재자·관리자 / 200,403,404 | approval/history |
-| Approvals | `POST /approvals` | body `{document_type,title,content,department_id,author_id,approver_id}` | DRAFT / 작성 가능 역할 / 201,400 | 직원·부서 확인, 작성자≠결재자; 관리자는 모든 부서, 그 외 역할은 소속 부서만 기안; 문서와 초기 이력 transaction |
-| Approvals | `PATCH /approvals/{id}` | body `{actor_id,title?,document_type?,content?,department_id?,approver_id?}` | 수정된 DRAFT / 작성자 / 200,400,403,409 | DRAFT와 작성자만 수정 가능 |
-| Approvals | `DELETE /approvals/{id}` | query `{actor_id}` | 빈 응답 / 관리자 / 204,403,404 | 상태와 관계없이 관리자만 물리 삭제하며 `approval_histories`는 FK cascade로 함께 삭제 |
-| Approvals | `POST /approvals/{id}/submit` | body `{actor_id,comment?}` | PENDING / 작성자 / 200,403,409 | DRAFT→PENDING, 이력 transaction |
-| Approvals | `POST /approvals/{id}/approve` | body `{actor_id,comment?}` | APPROVED / 지정 결재자 / 200,403,409 | PENDING→APPROVED; 이력 원자 처리 |
-| Approvals | `POST /approvals/{id}/reject` | body `{actor_id,comment}` | REJECTED / 지정 결재자 / 200,403,409,422 | PENDING→REJECTED; 반려 사유 필수 |
+| Approvals | `POST /approvals` | Bearer, body `{document_type,title,content,department_id,approver_id}` | DRAFT / 작성 가능 역할 / 201,400,401 | 토큰 사용자가 작성자; 작성자≠결재자; `SUPER_ADMIN`은 모든 부서, 그 외 역할은 소속 부서만 기안; 문서와 초기 이력 transaction |
+| Approvals | `PATCH /approvals/{id}` | Bearer, body `{title?,document_type?,content?,department_id?,approver_id?}` | 수정된 DRAFT / 작성자 / 200,400,401,403,409 | DRAFT와 토큰 작성자만 수정 가능 |
+| Approvals | `DELETE /approvals/{id}` | Bearer | 빈 응답 / `SUPER_ADMIN` / 204,401,403,404 | 상태와 관계없이 관리자만 물리 삭제하며 `approval_histories`는 FK cascade로 함께 삭제 |
+| Approvals | `POST /approvals/{id}/submit` | Bearer, body `{comment?}` | PENDING / 작성자 / 200,401,403,409 | DRAFT→PENDING, 이력 transaction |
+| Approvals | `POST /approvals/{id}/approve` | Bearer, body `{comment?}` | APPROVED / 지정 결재자 / 200,401,403,409 | PENDING→APPROVED; 이력 원자 처리 |
+| Approvals | `POST /approvals/{id}/reject` | Bearer, body `{comment}` | REJECTED / 지정 결재자 / 200,401,403,409,422 | PENDING→REJECTED; 반려 사유 필수 |
 | Approvals | `POST /approvals/{id}/cancel` | body `{reason?}` | CANCELLED / 작성자 / 200,409 | DRAFT→CANCELLED |
-| Recruitment Requests | `POST /recruitment-requests` | body 직무·인원·사유·부서 | DRAFT / 활성 직원 / 201,400 | `recruitment_requests` |
+| Recruitment Requests | `POST /recruitment-requests` | Bearer, body 직무·인원·사유·부서·결재자 | DRAFT / 활성 직원 / 201,400,401 | 토큰 사용자를 요청자로 기록, `recruitment_requests` |
 | Recruitment Requests | `GET /recruitment-requests` | query status/department | 목록 / 부서장·인사·관리자 / 200 | role scope |
 | Recruitment Requests | `GET /recruitment-requests/{id}` | 상세 | 요청·결재·AI 링크 / 관련 역할 / 200,403,404 | 여러 테이블 read |
-| Recruitment Requests | `POST /recruitment-requests/{id}/submit` | body `{approver_id,comment?}` | 요청 PENDING+결재 | 요청 작성자 / 200,403,409 | 요청·결재·이력·알림 transaction |
-| Job Postings | `POST /recruitment-requests/{id}/job-posting` | body `{title,description}` | 공고 / 인사 / 201,403,409 | 요청 APPROVED, 1회만; posting transaction |
+| Recruitment Requests | `POST /recruitment-requests/{id}/submit` | Bearer, body `{comment?}` | 요청 PENDING+결재 | 토큰 요청자 / 200,401,403,409 | 요청·결재·이력·알림 transaction |
+| Job Postings | `POST /recruitment-requests/{id}/job-posting` | Bearer | 공고 / 인사 / 201,401,403,409 | 요청 APPROVED, 1회만; posting transaction |
 | Job Postings | `GET /job-postings` | query status? | 목록 / 관련 역할 / 200 | `job_postings` |
 | Job Postings | `GET /job-postings/{id}` | 상세 | 공고 / 관련 역할 / 200,404 | posting |
 | Applicants | `POST /job-postings/{id}/applicants` | body 이름·연락·경력 | APPLIED 지원자 / 인사 / 201,400,403 | posting 존재 확인 |
@@ -116,7 +166,7 @@ Base path는 `/api/v1`이다. 공통 조회 API와 전자결재 Router는 구현
 - 승인/반려에서 결재문서, 관련 업무, 이력, 알림은 한 트랜잭션이다.
 ## v0.5.0 구현 API
 
-| Recruitment Requests | `DELETE /recruitment-requests/{id}?actor_id=` | 관리자만 삭제 가능. 연결된 공고·결재·이력·관련 알림도 같은 트랜잭션으로 삭제 |
+| Recruitment Requests | `DELETE /recruitment-requests/{id}` | Bearer 인증된 `SUPER_ADMIN`만 삭제 가능. 연결된 공고·결재·이력·관련 알림도 같은 트랜잭션으로 삭제 |
 
 관리자는 지정 결재자가 아니어도 `PENDING` 전자결재를 승인 또는 반려할 수 있다. 처리 이력에는 실제 관리자 ID가 기록된다.
 

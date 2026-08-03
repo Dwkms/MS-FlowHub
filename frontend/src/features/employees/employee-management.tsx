@@ -48,6 +48,25 @@ const reasonCategories = {
 const normalWorkStatuses = new Set(["WORKING", "OFF_WORK"]);
 const requiredWorkReasonStatuses = new Set(["SICK_LEAVE", "ABSENT"]);
 
+function teamBadgeLabel(teamCode: string | null, team: string | null, department: string) {
+  const source = `${teamCode ?? ""} ${team ?? ""} ${department}`.toUpperCase();
+  if (source.includes("SW")) return "SW";
+  if (source.includes("HW")) return "HW";
+  if (source.includes("HR") || source.includes("인사")) return "HR";
+  if (source.includes("경영") || source.includes("EXEC")) return "EX";
+  return (team ?? department).slice(0, 2);
+}
+
+function teamBadgeTone(teamCode: string | null, team: string | null, department: string) {
+  const source = `${teamCode ?? ""} ${team ?? ""} ${department}`.toUpperCase();
+  if (source.includes("SW") || source.includes("HW") || source.includes("개발")) return "development";
+  if (source.includes("마케팅") || source.includes("MKT")) return "marketing";
+  if (source.includes("인사") || source.includes("HR")) return "hr";
+  if (source.includes("기획") || source.includes("PLAN")) return "planning";
+  if (source.includes("QA")) return "qa";
+  return "executive";
+}
+
 function queryValue(name: string, fallback = "") {
   if (typeof window === "undefined") return fallback;
   return new URLSearchParams(window.location.search).get(name) ?? fallback;
@@ -113,7 +132,7 @@ export function EmployeeManagement() {
 
   const resetPage = () => setPage(1);
   const openDetail = (employeeId: string) => {
-    void getEmployee(employeeId, currentEmployee.id).then((detail) => {
+    void getEmployee(employeeId).then((detail) => {
       setSelected(detail);
       setDraftWorkStatus(detail.daily_work_status ?? "WORKING");
       setWorkReasonCategory(detail.daily_work_reason?.reason_category ?? "OTHER");
@@ -124,7 +143,10 @@ export function EmployeeManagement() {
       setLeavePrivateNote(detail.employment_status_reason?.private_note ?? "");
     }).catch(() => setError("직원 상세 정보를 불러오지 못했습니다."));
   };
-  const canEditSelected = Boolean(selected && (currentEmployee.role === "ADMIN" || currentEmployee.id === selected.id));
+  const canEditSelected = Boolean(selected && (
+    ["SUPER_ADMIN", "HR_ADMIN", "TEAM_ADMIN", "ADMIN"].includes(currentEmployee.role)
+    || currentEmployee.id === selected.id
+  ));
   const showWorkReasonInputs = !normalWorkStatuses.has(draftWorkStatus);
   const workReasonRequired = requiredWorkReasonStatuses.has(draftWorkStatus);
 
@@ -133,7 +155,7 @@ export function EmployeeManagement() {
     if (!selected) return;
     setSaving(true);
     try {
-      const detail = await updateAttendanceStatus(selected.id, currentEmployee.id, {
+      const detail = await updateAttendanceStatus(selected.id, {
         work_status: draftWorkStatus,
         reason_category: showWorkReasonInputs ? workReasonCategory : undefined,
         reason_summary: showWorkReasonInputs ? workReasonSummary || undefined : undefined,
@@ -153,7 +175,7 @@ export function EmployeeManagement() {
     if (!selected) return;
     setSaving(true);
     try {
-      const detail = await updateEmploymentStatusReason(selected.id, currentEmployee.id, {
+      const detail = await updateEmploymentStatusReason(selected.id, {
         reason_category: leaveReasonCategory,
         reason_summary: leaveReasonSummary,
         private_note: leavePrivateNote || undefined,
@@ -169,8 +191,8 @@ export function EmployeeManagement() {
   return <section className="content approval-page employee-page">
     <div className="page-heading"><div><span className="section-kicker">EMPLOYEE MANAGEMENT</span><h1>직원 · 조직 관리</h1><p>조직과 직원 정보를 실제 DB 데이터로 조회합니다.</p></div><span className="employee-count">{data ? `${data.total}명` : "불러오는 중"}</span></div>
     {error && <div className="inline-alert error">{error}</div>}
-    <section className="panel approval-list-panel"><div className="filter-bar employee-filter-bar"><input value={search} onChange={(event) => { setSearch(event.target.value); resetPage(); }} placeholder="이름, 사번, 이메일, 담당 역할 검색" /><select value={department} onChange={(event) => { setDepartment(event.target.value); resetPage(); }}><option value="">전체 부서</option>{departments.map((item) => <option key={item.id} value={item.code}>{item.name}</option>)}</select><select value={employmentStatus} onChange={(event) => { setEmploymentStatus(event.target.value); resetPage(); }}><option value="">전체 상태</option>{Object.entries(employmentLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select><select value={dailyWorkStatus} onChange={(event) => { setDailyWorkStatus(event.target.value); resetPage(); }}><option value="">전체 근무 상태</option>{Object.entries(workLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select><button className="secondary-button organization-chart-button" onClick={() => setChartOpen(true)}>조직도 보기</button></div>
-      {!data ? <div className="state-box">직원 데이터를 불러오는 중입니다.</div> : data.items.length === 0 ? <div className="state-box"><strong>검색 결과가 없습니다.</strong><p>검색어나 필터를 변경해 보세요.</p></div> : <><div className="table-wrap"><table className="approval-table employee-table"><thead><tr><th>직원</th><th>부서 / 팀</th><th>직급</th><th>담당 역할</th><th>이메일</th><th>재직 상태</th><th>오늘 근무 상태</th><th>근무지</th></tr></thead><tbody>{data.items.map((item) => <tr key={item.id}><td><button className="employee-detail-button" onClick={() => openDetail(item.id)}><span className="mini-avatar">{item.name.slice(0, 1)}</span><b>{item.name}</b><small>{item.employee_no}</small></button></td><td>{item.department}<small>{item.team ?? "-"}</small></td><td>{item.position}</td><td>{item.job_title}</td><td>{item.email}</td><td><span className="status-with-info"><span className={`employment-badge ${item.employment_status.toLowerCase()}`}>{employmentLabels[item.employment_status]}</span>{item.has_employment_status_reason && <button className="reason-info-button" onClick={() => openDetail(item.id)} aria-label={`${item.name} 재직 상태 사유 보기`} title="상태 사유 보기">ⓘ</button>}</span></td><td>{item.daily_work_status ? <span className="status-with-info"><span className={`work-badge ${item.daily_work_status.toLowerCase()}`}>{workLabels[item.daily_work_status]}</span>{item.has_daily_work_reason && <button className="reason-info-button" onClick={() => openDetail(item.id)} aria-label={`${item.name} 근무 상태 사유 보기`} title="상태 사유 보기">ⓘ</button>}</span> : <span className="empty-work-status">-</span>}</td><td>{item.work_location}</td></tr>)}</tbody></table></div><div className="pager"><button disabled={page <= 1} onClick={() => setPage(page - 1)}>이전</button><span>{data.page} / {data.total_pages || 1}</span><button disabled={page >= data.total_pages} onClick={() => setPage(page + 1)}>다음</button></div></>}
+    <section className="panel approval-list-panel"><div className="filter-bar employee-filter-bar"><input aria-label="직원 검색" value={search} onChange={(event) => { setSearch(event.target.value); resetPage(); }} placeholder="이름, 사번, 이메일, 담당 역할 검색" /><select aria-label="부서 필터" value={department} onChange={(event) => { setDepartment(event.target.value); resetPage(); }}><option value="">전체 부서</option>{departments.map((item) => <option key={item.id} value={item.code}>{item.name}</option>)}</select><select aria-label="재직 상태 필터" value={employmentStatus} onChange={(event) => { setEmploymentStatus(event.target.value); resetPage(); }}><option value="">전체 상태</option>{Object.entries(employmentLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select><select aria-label="근무 상태 필터" value={dailyWorkStatus} onChange={(event) => { setDailyWorkStatus(event.target.value); resetPage(); }}><option value="">전체 근무 상태</option>{Object.entries(workLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select><button className="secondary-button organization-chart-button" onClick={() => setChartOpen(true)}>조직도 보기</button></div>
+      {!data ? <div className="state-box">직원 데이터를 불러오는 중입니다.</div> : data.items.length === 0 ? <div className="state-box"><strong>검색 결과가 없습니다.</strong><p>검색어나 필터를 변경해 보세요.</p></div> : <><div className="employee-mobile-list"><div className="employee-mobile-head"><span>직원</span><span>직급</span><span>재직 상태</span><span>근무 상태</span></div>{data.items.map((item) => <div className="employee-mobile-row" key={item.id}><button className="employee-mobile-name" onClick={() => openDetail(item.id)}><span className={`team-avatar ${teamBadgeTone(item.team_code, item.team, item.department)}`}>{teamBadgeLabel(item.team_code, item.team, item.department)}</span><span><b>{item.name}</b><small>{item.team ?? item.department}</small></span></button><span className="employee-mobile-position">{item.position}</span><span className="status-with-info"><span className={`employment-badge ${item.employment_status.toLowerCase()}`}>{employmentLabels[item.employment_status]}</span>{item.has_employment_status_reason && <button className="reason-info-button" onClick={() => openDetail(item.id)} aria-label={`${item.name} 재직 상태 사유 보기`} title="상태 사유 보기">ⓘ</button>}</span><span className="status-with-info">{item.daily_work_status ? <><span className={`work-badge ${item.daily_work_status.toLowerCase()}`}>{workLabels[item.daily_work_status]}</span>{item.has_daily_work_reason && <button className="reason-info-button" onClick={() => openDetail(item.id)} aria-label={`${item.name} 근무 상태 사유 보기`} title="상태 사유 보기">ⓘ</button>}</> : <span className="empty-work-status">-</span>}</span></div>)}</div><div className="table-wrap employee-desktop-table"><table className="approval-table employee-table"><thead><tr><th>직원</th><th>부서 / 팀</th><th>직급</th><th>담당 역할</th><th>이메일</th><th>재직 상태</th><th>오늘 근무 상태</th><th>근무지</th></tr></thead><tbody>{data.items.map((item) => <tr key={item.id}><td><button className="employee-detail-button" onClick={() => openDetail(item.id)}><span className="mini-avatar">{item.name.slice(0, 1)}</span><b>{item.name}</b><small>{item.employee_no}</small></button></td><td>{item.department}<small>{item.team ?? "-"}</small></td><td>{item.position}</td><td>{item.job_title}</td><td>{item.email}</td><td><span className="status-with-info"><span className={`employment-badge ${item.employment_status.toLowerCase()}`}>{employmentLabels[item.employment_status]}</span>{item.has_employment_status_reason && <button className="reason-info-button" onClick={() => openDetail(item.id)} aria-label={`${item.name} 재직 상태 사유 보기`} title="상태 사유 보기">ⓘ</button>}</span></td><td>{item.daily_work_status ? <span className="status-with-info"><span className={`work-badge ${item.daily_work_status.toLowerCase()}`}>{workLabels[item.daily_work_status]}</span>{item.has_daily_work_reason && <button className="reason-info-button" onClick={() => openDetail(item.id)} aria-label={`${item.name} 근무 상태 사유 보기`} title="상태 사유 보기">ⓘ</button>}</span> : <span className="empty-work-status">-</span>}</td><td>{item.work_location}</td></tr>)}</tbody></table></div><div className="pager"><button disabled={page <= 1} onClick={() => setPage(page - 1)}>이전</button><span>{data.page} / {data.total_pages || 1}</span><button disabled={page >= data.total_pages} onClick={() => setPage(page + 1)}>다음</button></div></>}
     </section>
     {selected && <div className="modal-backdrop" onClick={() => setSelected(null)}><section className="employee-modal employee-status-modal" onClick={(event) => event.stopPropagation()}><button className="modal-close" onClick={() => setSelected(null)} aria-label="닫기">×</button><span className="mini-avatar large">{selected.name.slice(0, 1)}</span><h2>{selected.name} <small>{selected.employee_no}</small></h2><p>{selected.department}{selected.team ? ` · ${selected.team}` : ""} · {selected.position}</p><dl><div><dt>담당 역할</dt><dd>{selected.job_title}</dd></div><div><dt>재직 / 근무</dt><dd>{employmentLabels[selected.employment_status]} / {selected.daily_work_status ? workLabels[selected.daily_work_status] : "-"}</dd></div></dl>{selected.daily_work_reason && <ReasonPanel title="근무 상태 상세" status={workLabels[selected.daily_work_status ?? ""] ?? "-"} reason={selected.daily_work_reason} />}{selected.employment_status_reason && <ReasonPanel title="재직 상태 상세" status={employmentLabels[selected.employment_status]} reason={selected.employment_status_reason} />}
       {canEditSelected && selected.employment_status === "ACTIVE" && <form className="status-reason-form" onSubmit={saveAttendance}><h3>오늘의 근무 상태</h3><select value={draftWorkStatus} onChange={(event) => setDraftWorkStatus(event.target.value)}>{Object.entries(workLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>{showWorkReasonInputs && <><select value={workReasonCategory} onChange={(event) => setWorkReasonCategory(event.target.value)}>{Object.entries(reasonCategories).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select><textarea value={workReasonSummary} onChange={(event) => setWorkReasonSummary(event.target.value)} placeholder={workReasonRequired ? "공개 사유를 입력해 주세요 (필수)" : "공개 사유를 입력할 수 있습니다 (선택)"} required={workReasonRequired} maxLength={200} /><textarea value={workPrivateNote} onChange={(event) => setWorkPrivateNote(event.target.value)} placeholder="비공개 상세: 관리자·인사담당자만 조회합니다 (선택)" maxLength={500} /></>}<button className="primary-button" disabled={saving}>{saving ? "저장 중" : "근무 상태 저장"}</button></form>}

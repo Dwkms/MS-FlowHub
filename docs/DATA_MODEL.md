@@ -1,5 +1,23 @@
 # Data Model
 
+## 직원 매뉴얼 MVP (v0.7.0)
+
+`manual_categories`는 이름, 설명, 표시 순서를 관리합니다. `manuals`는 텍스트 원본인
+제목·요약·본문과 대상 역할, 공개 상태(`DRAFT`, `PUBLISHED`), 중요 고정 여부를 보관합니다.
+`slug`는 상세 페이지의 안정적인 식별자이며 유일합니다.
+
+`manual_assets`는 매뉴얼별 이미지 또는 PDF URL을 표시 순서대로 연결합니다. MVP는 URL 등록만
+지원하며 파일 업로드 저장소나 대용량 첨부파일은 포함하지 않습니다. 매뉴얼 삭제 시 연결된
+asset는 함께 삭제되고, 카테고리에 매뉴얼이 남아 있으면 카테고리를 삭제할 수 없습니다.
+
+- `manual_categories` 1:N `manuals`
+- `manuals` 1:N `manual_assets`
+- `manuals.created_by`, `manuals.updated_by`는 작성·수정한 직원의 선택적 참조입니다.
+
+공개 매뉴얼은 모든 인증된 직원이 읽을 수 있으며 초안은 `SUPER_ADMIN`, `HR_ADMIN`에게만
+노출됩니다. 초기 7개 카테고리와 15개 매뉴얼은 slug/name을 기준으로 갱신하므로 seed를 다시
+실행해도 중복 생성되지 않습니다.
+
 ## Employee organization management (v0.6.0)
 
 `departments` has unique code/name and display ordering. `teams` represents the
@@ -9,6 +27,19 @@ two development subteams (`DEV_SW`, `DEV_HW`) and belongs to a department.
 summaries; employee deletion is implemented as `employment_status=INACTIVE`.
 
 Database runtime is Supabase PostgreSQL only; SQLite is not a supported application database.
+
+## Supabase Auth employee accounts (v0.6.2)
+
+`employee_accounts` is the application-side link between a Supabase Auth user
+and exactly one `employees` record. `auth_user_id` and `employee_id` are both
+unique, which prevents duplicate links. The application role is stored in
+`employee_accounts.role`; it is intentionally separate from the employee's job
+role and is used by the upcoming JWT-based authorization layer.
+
+The Auth seed reconciles all employee records on every run: it reuses Auth users
+by email, creates only missing Auth users, and synchronizes the account role and
+active flag. Seed passwords are read only from the environment and are never
+persisted or logged by the application.
 
 ## Attendance records (v0.6.1)
 

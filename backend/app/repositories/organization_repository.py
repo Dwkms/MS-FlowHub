@@ -324,6 +324,8 @@ class OrganizationRepository:
         daily_work_status: str | None,
         work_date: date | None,
         position: str | None,
+        visible_employee_id: str | None = None,
+        visible_team_id: str | None = None,
     ) -> PaginatedEmployeeResponse:
         target_date = work_date or date.today()
         statement: Select = (
@@ -359,6 +361,10 @@ class OrganizationRepository:
             )
         if position:
             statement = statement.where(Employee.position == position)
+        if visible_employee_id:
+            statement = statement.where(Employee.id == visible_employee_id)
+        if visible_team_id:
+            statement = statement.where(Employee.team_id == visible_team_id)
         total = self.session.scalar(select(func.count()).select_from(statement.subquery())) or 0
         rows = self.session.execute(
             statement.order_by(Employee.employee_no).offset((page - 1) * page_size).limit(page_size)

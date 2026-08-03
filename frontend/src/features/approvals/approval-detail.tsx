@@ -50,7 +50,7 @@ export function ApprovalDetail() {
       .then((result) => {
         if (active) setDocument(result);
         if (result.related_type === "RECRUITMENT_REQUEST" && result.related_id) {
-          void getRecruitmentRequest(result.related_id, currentEmployee.id)
+          void getRecruitmentRequest(result.related_id)
             .then((request) => {
               if (active) setRelatedRecruitmentRequest(request);
             })
@@ -85,13 +85,12 @@ export function ApprovalDetail() {
     try {
       let result: ApprovalDocument;
       if (action === "submit") {
-        result = await submitApproval(document.id, currentEmployee.id, comment);
+        result = await submitApproval(document.id, comment);
       } else if (action === "approve") {
-        result = await approveApproval(document.id, currentEmployee.id, comment);
+        result = await approveApproval(document.id, comment);
       } else {
         result = await rejectApproval(
           document.id,
-          currentEmployee.id,
           rejectReason.trim(),
         );
       }
@@ -121,7 +120,7 @@ export function ApprovalDetail() {
     setProcessing(true);
     setError(null);
     try {
-      await deleteApproval(document.id, currentEmployee.id);
+      await deleteApproval(document.id);
       router.push("/approvals");
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "문서를 삭제하지 못했습니다.");
@@ -149,8 +148,9 @@ export function ApprovalDetail() {
     document.status === "DRAFT" && document.author_id === currentEmployee.id;
   const canDecide =
     document.status === "PENDING" &&
-    (document.approver_id === currentEmployee.id || currentEmployee.role === "ADMIN");
-  const canDelete = currentEmployee.role === "ADMIN";
+    document.author_id !== currentEmployee.id
+    && (document.approver_id === currentEmployee.id || ["SUPER_ADMIN", "ADMIN"].includes(currentEmployee.role));
+  const canDelete = ["SUPER_ADMIN", "ADMIN"].includes(currentEmployee.role);
   const isCompleted =
     document.status === "APPROVED" || document.status === "REJECTED";
 

@@ -2,13 +2,14 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query, status
 
-from app.api.dependencies import get_approval_service
+from app.api.dependencies import AuthenticatedActor, get_approval_service
 from app.schemas.approval import (
     ApprovalAction,
     ApprovalCreate,
     ApprovalReject,
     ApprovalResponse,
     ApprovalStatus,
+    ApprovalSubmit,
     ApprovalUpdate,
 )
 from app.services.approval_service import ApprovalService
@@ -20,12 +21,12 @@ ApprovalServiceDependency = Annotated[ApprovalService, Depends(get_approval_serv
 @router.get("", response_model=list[ApprovalResponse])
 def list_approvals(
     service: ApprovalServiceDependency,
-    employee_id: str | None = None,
+    actor: AuthenticatedActor,
     search: str | None = None,
     status_filter: Annotated[ApprovalStatus | None, Query(alias="status")] = None,
 ) -> list[ApprovalResponse]:
     return service.list(
-        employee_id=employee_id,
+        actor=actor,
         search=search,
         status_filter=status_filter,
     )
@@ -38,9 +39,9 @@ def get_approval(document_id: str, service: ApprovalServiceDependency) -> Approv
 
 @router.post("", response_model=ApprovalResponse, status_code=status.HTTP_201_CREATED)
 def create_approval(
-    payload: ApprovalCreate, service: ApprovalServiceDependency
+    payload: ApprovalCreate, service: ApprovalServiceDependency, actor: AuthenticatedActor
 ) -> ApprovalResponse:
-    return service.create(payload)
+    return service.create(payload, actor)
 
 
 @router.patch("/{document_id}", response_model=ApprovalResponse)
@@ -48,26 +49,28 @@ def update_approval(
     document_id: str,
     payload: ApprovalUpdate,
     service: ApprovalServiceDependency,
+    actor: AuthenticatedActor,
 ) -> ApprovalResponse:
-    return service.update(document_id, payload)
+    return service.update(document_id, payload, actor)
 
 
 @router.delete("/{document_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_approval(
     document_id: str,
-    actor_id: str,
     service: ApprovalServiceDependency,
+    actor: AuthenticatedActor,
 ) -> None:
-    service.delete(document_id, actor_id)
+    service.delete(document_id, actor)
 
 
 @router.post("/{document_id}/submit", response_model=ApprovalResponse)
 def submit_approval(
     document_id: str,
-    payload: ApprovalAction,
+    payload: ApprovalSubmit,
     service: ApprovalServiceDependency,
+    actor: AuthenticatedActor,
 ) -> ApprovalResponse:
-    return service.submit(document_id, payload)
+    return service.submit(document_id, actor, payload)
 
 
 @router.post("/{document_id}/approve", response_model=ApprovalResponse)
@@ -75,8 +78,9 @@ def approve_approval(
     document_id: str,
     payload: ApprovalAction,
     service: ApprovalServiceDependency,
+    actor: AuthenticatedActor,
 ) -> ApprovalResponse:
-    return service.approve(document_id, payload)
+    return service.approve(document_id, actor, payload)
 
 
 @router.post("/{document_id}/reject", response_model=ApprovalResponse)
@@ -84,5 +88,6 @@ def reject_approval(
     document_id: str,
     payload: ApprovalReject,
     service: ApprovalServiceDependency,
+    actor: AuthenticatedActor,
 ) -> ApprovalResponse:
-    return service.reject(document_id, payload)
+    return service.reject(document_id, actor, payload)
