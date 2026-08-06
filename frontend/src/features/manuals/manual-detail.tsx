@@ -10,7 +10,7 @@ import { formatManualDate, manualRoleLabels } from "@/features/manuals/presentat
 import { useCurrentUser } from "@/features/current-user/current-user-provider";
 import type { ManualAsset, ManualDetail as ManualDetailType } from "@/types/manual";
 
-const manageableRoles = ["SUPER_ADMIN", "HR_ADMIN", "ADMIN"];
+const manageableRoles = ["SUPER_ADMIN", "HR_ADMIN"];
 
 export function ManualDetail({ slug }: { slug: string }) {
   const router = useRouter();

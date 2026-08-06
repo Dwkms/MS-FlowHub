@@ -1,8 +1,10 @@
 # AI Design
 
+> 상태: 미래 확장 설계. 현재 AI Provider, `ai_generations` 테이블, AI API 및 화면은 구현하지 않았습니다.
+
 ## 원칙과 호출 구조
 
-`ATS/CRM Service → AI Application Service → AIProvider → Mock 또는 실제 LLM` 순서로 호출한다. Provider 생성은 Backend의 AI factory 또는 FastAPI dependency 경계에서 환경설정을 읽어 한 곳에서 담당한다. Router와 UI는 Provider를 직접 호출하지 않는다.
+`ATS Service → AI Application Service → AIProvider → Mock 또는 실제 LLM` 순서로 호출한다. Provider 생성은 Backend의 AI factory 또는 FastAPI dependency 경계에서 환경설정을 읽어 한 곳에서 담당한다. Router와 UI는 Provider를 직접 호출하지 않는다.
 
 ```python
 # 인터페이스 형태를 설명하기 위한 의사 코드이며 아직 구현하지 않는다.
@@ -27,11 +29,8 @@ Provider 결과 후보는 `content`, `provider`, `model_name`, `success`, `error
 | `JOB_POSTING_DRAFT` | 직무, 필요 역량, 업무, 조건 | 구조화 초안: 제목, 주요 업무, 자격 요건, 우대 사항 |
 | `APPLICANT_CAREER_SUMMARY` | 입력된 경력 텍스트, 지원 직무 | 사실 중심 요약: “관련 업무 2년, 고객 문의 처리와 문서화 경험이 입력되었습니다.” |
 | `INTERVIEW_QUESTIONS_DRAFT` | 직무, 경력, 공고 | 문자열 배열: `["업무 우선순위를 정한 경험을 설명해 주세요.", ...]` |
-| `QUOTATION_SUMMARY` | 고객, 상품 항목, 수량, 금액 | 견적 개요: “상품 A 2개, 할인 전 …, 최종 …인 견적입니다.” |
-| `DISCOUNT_REASON_SUMMARY` | 할인율, 사유, 기회 맥락 | 판단 없는 요약: “장기 계약 협의를 이유로 12% 할인이 요청되었습니다.” |
-| `QUOTATION_EMAIL_DRAFT` | 고객명, 확정 견적, 유효기간 | 제목/본문 초안. 실제 발송 문구와 동작은 없음 |
 
-공고·질문·이메일은 구조화된 JSON 출력을 우선 검토하고, 단순 요약은 텍스트가 충분하다. Pydantic 스키마로 검증하되 출력 파싱 실패도 AI 실패로 기록한다.
+공고·질문은 구조화된 JSON 출력을 우선 검토하고, 단순 요약은 텍스트가 충분하다. Pydantic 스키마로 검증하되 출력 파싱 실패도 AI 실패로 기록한다.
 
 ## 저장 구조
 
@@ -50,11 +49,11 @@ AI 재실행은 기존 행을 덮어쓰기보다 새 generation 행을 생성해
 - timeout 후보는 Provider 설정값으로 중앙 관리하며 초기값은 실제 연동 때 측정 후 확정한다.
 - 호출 실패도 `success=false`, 안전하게 정리한 오류 메시지와 함께 기록한다. 비밀·원시 SDK 응답은 사용자에게 노출하지 않는다.
 - AI가 부가 동작이면 핵심 업무 데이터 저장을 먼저 안정적으로 완료하고 “초안을 생성하지 못했으나 직접 작성 가능” 상태를 반환한다.
-- AI 결과가 반드시 필요한 별도 생성 요청은 성공 응답과 실패 결과의 HTTP 의미를 API 구현 시 확정하되, 관련 채용 요청·견적을 rollback하지 않는다.
+- AI 결과가 반드시 필요한 별도 생성 요청은 성공 응답과 실패 결과의 HTTP 의미를 API 구현 시 확정하되, 관련 채용 요청을 rollback하지 않는다.
 - Mock fallback 사용 여부를 UI에 표시해 실제 LLM 결과로 오해하지 않게 한다.
 
 ## 개인정보·기밀과 금지 판단
 
 프로토타입에는 실제 개인정보와 회사 기밀을 넣지 않는다. 지원자 입력은 가상 데이터만 사용하고 Provider 전달 필드를 최소화한다. 로그에 API 키나 접속정보를 남기지 않는다.
 
-AI는 지원자 평가·순위·자동 탈락, 승인·반려, 합격·불합격, 견적 확정, 고객 실제 발송을 수행하지 않는다. 모든 결과는 담당자가 확인하고 수정하는 보조 초안이며 업무 상태에 자동 반영하지 않는다.
+AI는 지원자 평가·순위·자동 탈락, 승인·반려, 합격·불합격을 수행하지 않는다. 모든 결과는 담당자가 확인하고 수정하는 보조 초안이며 업무 상태에 자동 반영하지 않는다.

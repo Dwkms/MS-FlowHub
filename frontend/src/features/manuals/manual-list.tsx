@@ -46,7 +46,7 @@ export function ManualList() {
   return <section className="content manual-page">
     <div className="page-heading">
       <div><span className="section-kicker">EMPLOYEE MANUAL</span><h1>직원 매뉴얼</h1><p>업무 기능의 사용 방법과 핵심 흐름을 한눈에 확인하세요.</p></div>
-      {["SUPER_ADMIN", "HR_ADMIN", "ADMIN"].includes(currentEmployee.role) && <Link className="primary-button" href="/manuals/new">매뉴얼 작성</Link>}
+      {["SUPER_ADMIN", "HR_ADMIN"].includes(currentEmployee.role) && <Link className="primary-button" href="/manuals/new">매뉴얼 작성</Link>}
     </div>
     <section className="panel manual-list-panel">
       <form className="filter-bar" onSubmit={submitSearch}>

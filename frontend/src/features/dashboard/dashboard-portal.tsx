@@ -6,14 +6,12 @@ import { useEffect, useState } from "react";
 import { ArrowIcon } from "@/components/icons";
 import { useCurrentUser } from "@/features/current-user/current-user-provider";
 import { getDashboard } from "@/features/dashboard/api";
-import { createFallbackDashboard } from "@/features/dashboard/mock-data";
+import { DashboardMetrics } from "@/features/dashboard/dashboard-metrics";
 import type { DashboardData } from "@/types/dashboard";
 
 export function DashboardPortal() {
   const { apiConnected, currentEmployee, isLoadingCurrentUser } = useCurrentUser();
-  const [dashboard, setDashboard] = useState<DashboardData>(
-    createFallbackDashboard(currentEmployee),
-  );
+  const [dashboard, setDashboard] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -37,8 +35,7 @@ export function DashboardPortal() {
       })
       .catch(() => {
         if (!active) return;
-        setDashboard(createFallbackDashboard(currentEmployee));
-        setError("대시보드 API에 연결하지 못해 안내용 데이터를 표시합니다.");
+        setError("대시보드 데이터를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.");
       })
       .finally(() => {
         if (active) setLoading(false);
@@ -46,14 +43,23 @@ export function DashboardPortal() {
     return () => {
       active = false;
     };
-  }, [apiConnected, currentEmployee, isLoadingCurrentUser]);
+  }, [apiConnected, isLoadingCurrentUser]);
 
   const isDashboardLoading = isLoadingCurrentUser || (apiConnected && loading);
+  const todayLabel = new Intl.DateTimeFormat("en-US", {
+    weekday: "long",
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  }).format(new Date()).toUpperCase();
+
+  if (isDashboardLoading) return <section className="content"><div className="state-box">대시보드를 불러오는 중입니다.</div></section>;
+  if (!dashboard) return <section className="content"><div className="state-box error">{error ?? "대시보드를 불러올 수 없습니다."}</div></section>;
 
   return (
     <section className="content">
       {error && <div className="inline-alert warning">{error}</div>}
-      <div className="eyebrow">THURSDAY · JUL 30, 2026</div>
+      <div className="eyebrow">{todayLabel}</div>
       <div className="welcome">
         <div>
           <h1>안녕하세요, {currentEmployee.name}님.</h1>
@@ -72,18 +78,7 @@ export function DashboardPortal() {
         </div>
       </div>
 
-      <div className={isDashboardLoading ? "metrics loading" : "metrics"}>
-        {dashboard.metrics.map((metric) => (
-          <article className={`metric ${metric.tone}`} key={metric.label}>
-            <div className="metric-top">
-              <span>{metric.label}</span>
-              <i />
-            </div>
-            <strong>{metric.value}</strong>
-            <p>{metric.helper}</p>
-          </article>
-        ))}
-      </div>
+      <DashboardMetrics metrics={dashboard.metrics} />
 
       <div className="grid">
         <section className="panel tasks-panel">
@@ -97,6 +92,9 @@ export function DashboardPortal() {
             </Link>
           </div>
           <div className="task-list">
+            {dashboard.recent_tasks.length === 0 && (
+              <div className="state-box">최근 처리한 전자결재 또는 채용 요청이 없습니다.</div>
+            )}
             {dashboard.recent_tasks.map((task) => {
               const content = (
                 <>

@@ -4,18 +4,23 @@ from uuid import uuid4
 from fastapi import HTTPException, UploadFile, status
 from sqlalchemy.orm import Session
 
-from app.core.upload_storage import get_poster_path
+from app.core import supabase_storage
+from app.core.supabase_storage import POSTER_BUCKET, StorageObjectNotFoundError
 from app.domain.recruitment_policy import (
     is_recruitment_approver,
     is_requestable_recruitment_department,
 )
 from app.models.approval import ApprovalDocument
-from app.models.recruitment import JobPosting, RecruitmentRequest
+from app.models.recruitment import Applicant, JobPosting, RecruitmentRequest
 from app.repositories.approval_repository import ApprovalRepository
 from app.repositories.notification_repository import NotificationRepository
 from app.repositories.organization_repository import OrganizationRepository
 from app.repositories.recruitment_repository import RecruitmentRepository
 from app.schemas.recruitment import (
+    ApplicantCreate,
+    ApplicantResponse,
+    ApplicantStageUpdate,
+    ApplicantUpdate,
     JobPostingResponse,
     RecruitmentRequestCreate,
     RecruitmentRequestResponse,
@@ -27,6 +32,9 @@ _FULL_ACCESS_ROLES = {"SUPER_ADMIN", "HR_ADMIN", "ADMIN", "HR_MANAGER"}
 _POSTER_CONTENT_TYPES = {"image/jpeg", "image/png", "image/webp", "application/pdf"}
 _POSTER_SUFFIXES = {".jpg", ".jpeg", ".png", ".webp", ".pdf"}
 _MAX_POSTER_SIZE = 5 * 1024 * 1024
+_ATS_WRITE_ROLES = {"SUPER_ADMIN", "HR_ADMIN", "ADMIN", "HR_MANAGER"}
+_ATS_VIEW_ROLES = _ATS_WRITE_ROLES | {"TEAM_ADMIN"}
+_TERMINAL_APPLICANT_STAGES = {"HIRED", "REJECTED"}
 
 
 class RecruitmentService:
@@ -73,11 +81,15 @@ class RecruitmentService:
             raise HTTPException(
                 status_code=422, detail="경영진 부서는 채용 요청 부서로 선택할 수 없습니다."
             )
-        if not is_recruitment_approver(approver.position):
+        is_super_admin_self_approver = approver.id == requester.id and actor.role in {
+            "SUPER_ADMIN",
+            "ADMIN",
+        }
+        if not is_recruitment_approver(approver.position) and not is_super_admin_self_approver:
             raise HTTPException(
                 status_code=422, detail="채용 요청 결재자는 팀장급 이상만 지정할 수 있습니다."
             )
-        if approver.id == requester.id:
+        if approver.id == requester.id and not is_super_admin_self_approver:
             raise HTTPException(status_code=400, detail="요청자와 결재자는 같을 수 없습니다.")
 
         request = self.recruitment.create_request(
@@ -115,10 +127,9 @@ class RecruitmentService:
             )
 
         stored_name = f"{uuid4()}{suffix}"
-        destination = get_poster_path(stored_name)
         previous_stored_name = request.poster_stored_name
+        supabase_storage.upload_object(POSTER_BUCKET, stored_name, content, poster.content_type)
         try:
-            destination.write_bytes(content)
             request.poster_original_name = original_name
             request.poster_stored_name = stored_name
             request.poster_content_type = poster.content_type
@@ -127,22 +138,23 @@ class RecruitmentService:
             self.session.refresh(request)
         except Exception:
             self.session.rollback()
-            destination.unlink(missing_ok=True)
+            supabase_storage.delete_object(POSTER_BUCKET, stored_name)
             raise
         if previous_stored_name:
-            get_poster_path(previous_stored_name).unlink(missing_ok=True)
+            supabase_storage.delete_object(POSTER_BUCKET, previous_stored_name)
         return self.recruitment.to_request_response(request)
 
-    def get_poster_file(self, request_id: str, actor: ActorContext) -> tuple[Path, str, str]:
+    def get_poster_file(self, request_id: str, actor: ActorContext) -> tuple[bytes, str, str]:
         request = self._get_request(request_id)
         self._require_view_permission(request, actor)
         if not request.poster_stored_name or not request.poster_original_name:
             raise HTTPException(status_code=404, detail="첨부된 채용 포스터가 없습니다.")
-        path = get_poster_path(request.poster_stored_name)
-        if not path.is_file():
-            raise HTTPException(status_code=404, detail="첨부 파일을 찾을 수 없습니다.")
+        try:
+            content = supabase_storage.download_object(POSTER_BUCKET, request.poster_stored_name)
+        except StorageObjectNotFoundError as error:
+            raise HTTPException(status_code=404, detail="첨부 파일을 찾을 수 없습니다.") from error
         return (
-            path,
+            content,
             request.poster_original_name,
             request.poster_content_type or "application/octet-stream",
         )
@@ -176,7 +188,7 @@ class RecruitmentService:
                 self.approvals.delete(document)
         self.session.commit()
         if poster_stored_name:
-            get_poster_path(poster_stored_name).unlink(missing_ok=True)
+            supabase_storage.delete_object(POSTER_BUCKET, poster_stored_name)
 
     def submit_request(
         self, request_id: str, payload: RecruitmentSubmit, actor: ActorContext
@@ -265,6 +277,120 @@ class RecruitmentService:
             self.recruitment.to_posting_response(item) for item in self.recruitment.list_postings()
         ]
 
+    def list_applicants(
+        self,
+        *,
+        job_posting_id: str | None,
+        stage: str | None,
+        search: str | None,
+        actor: ActorContext,
+    ) -> list[ApplicantResponse]:
+        department_id = self._get_ats_department_scope(actor)
+        items = self.recruitment.list_applicants(
+            job_posting_id=job_posting_id,
+            stage=stage,
+            search=search,
+            department_id=department_id,
+        )
+        return [self.recruitment.to_applicant_response(item) for item in items]
+
+    def create_applicant(
+        self, posting_id: str, payload: ApplicantCreate, actor: ActorContext
+    ) -> ApplicantResponse:
+        self._require_ats_write_permission(actor)
+        self._get_posting(posting_id)
+        normalized_email = payload.email.lower()
+        existing = self.recruitment.list_applicants(
+            job_posting_id=posting_id,
+            stage=None,
+            search=normalized_email,
+            department_id=None,
+        )
+        if any(item.email == normalized_email for item in existing):
+            raise HTTPException(status_code=409, detail="같은 채용공고에 등록된 이메일입니다.")
+        applicant = self.recruitment.create_applicant(
+            job_posting_id=posting_id,
+            name=payload.name,
+            email=normalized_email,
+            phone=payload.phone,
+            career_summary=payload.career_summary,
+            created_by_id=actor.employee_id,
+        )
+        self.recruitment.create_stage_history(
+            applicant_id=applicant.id,
+            from_stage=None,
+            to_stage="APPLIED",
+            note="지원자 등록",
+            actor_id=actor.employee_id,
+        )
+        self.session.commit()
+        self.session.refresh(applicant)
+        return self.recruitment.to_applicant_response(applicant, include_histories=True)
+
+    def get_applicant(self, applicant_id: str, actor: ActorContext) -> ApplicantResponse:
+        applicant = self._get_applicant(applicant_id)
+        self._require_ats_view_permission(applicant, actor)
+        return self.recruitment.to_applicant_response(applicant, include_histories=True)
+
+    def update_applicant(
+        self, applicant_id: str, payload: ApplicantUpdate, actor: ActorContext
+    ) -> ApplicantResponse:
+        self._require_ats_write_permission(actor)
+        applicant = self._get_applicant(applicant_id)
+        values = payload.model_dump(exclude_unset=True)
+        if "email" in values and values["email"] is not None:
+            values["email"] = values["email"].lower()
+            existing = self.recruitment.list_applicants(
+                job_posting_id=applicant.job_posting_id,
+                stage=None,
+                search=values["email"],
+                department_id=None,
+            )
+            if any(item.id != applicant.id and item.email == values["email"] for item in existing):
+                raise HTTPException(status_code=409, detail="같은 채용공고에 등록된 이메일입니다.")
+        for key, value in values.items():
+            setattr(applicant, key, value)
+        self.session.commit()
+        self.session.refresh(applicant)
+        return self.recruitment.to_applicant_response(applicant, include_histories=True)
+
+    def change_applicant_stage(
+        self, applicant_id: str, payload: ApplicantStageUpdate, actor: ActorContext
+    ) -> ApplicantResponse:
+        self._require_ats_write_permission(actor)
+        applicant = self._get_applicant(applicant_id)
+        if applicant.stage in _TERMINAL_APPLICANT_STAGES:
+            raise HTTPException(
+                status_code=409, detail="종료된 지원자는 단계를 변경할 수 없습니다."
+            )
+        if applicant.stage == payload.stage:
+            raise HTTPException(
+                status_code=409, detail="현재 단계와 같은 단계로 변경할 수 없습니다."
+            )
+        if payload.stage == "REJECTED" and not payload.note:
+            raise HTTPException(
+                status_code=422,
+                detail="불합격 처리에는 사유 메모가 필요합니다.",
+            )
+        before_stage = applicant.stage
+        applicant.stage = payload.stage
+        self.recruitment.create_stage_history(
+            applicant_id=applicant.id,
+            from_stage=before_stage,
+            to_stage=payload.stage,
+            note=payload.note,
+            actor_id=actor.employee_id,
+        )
+        self.session.commit()
+        self.session.refresh(applicant)
+        return self.recruitment.to_applicant_response(applicant, include_histories=True)
+
+    def delete_applicant(self, applicant_id: str, actor: ActorContext) -> None:
+        self._require_ats_write_permission(actor)
+        applicant = self._get_applicant(applicant_id)
+        self.recruitment.delete_applicant(applicant)
+        self.session.commit()
+
     def _create_posting(self, request: RecruitmentRequest) -> JobPosting:
         if self.recruitment.get_posting_by_request(request.id) is not None:
             raise HTTPException(status_code=409, detail="이미 생성된 채용공고가 있습니다.")
@@ -299,6 +425,44 @@ class RecruitmentService:
         if request is None:
             raise HTTPException(status_code=404, detail="채용 요청을 찾을 수 없습니다.")
         return request
+
+    def _get_posting(self, posting_id: str) -> JobPosting:
+        posting = self.recruitment.get_posting(posting_id)
+        if posting is None:
+            raise HTTPException(status_code=404, detail="채용공고를 찾을 수 없습니다.")
+        return posting
+
+    def _get_applicant(self, applicant_id: str) -> Applicant:
+        applicant = self.recruitment.get_applicant(applicant_id)
+        if applicant is None:
+            raise HTTPException(status_code=404, detail="지원자를 찾을 수 없습니다.")
+        return applicant
+
+    def _get_ats_department_scope(self, actor: ActorContext) -> str | None:
+        if actor.role in _ATS_WRITE_ROLES:
+            return None
+        if actor.role != "TEAM_ADMIN":
+            raise HTTPException(status_code=403, detail="지원자 정보를 조회할 권한이 없습니다.")
+        employee = self.organization.get_employee_model(actor.employee_id)
+        if employee is None:
+            raise HTTPException(status_code=403, detail="직원 정보를 찾을 수 없습니다.")
+        return employee.department_id
+
+    def _require_ats_view_permission(self, applicant: Applicant, actor: ActorContext) -> None:
+        department_id = self._get_ats_department_scope(actor)
+        if department_id is None:
+            return
+        request = self.recruitment.get_request_for_posting(applicant.job_posting_id)
+        if request is None or request.request_department_id != department_id:
+            raise HTTPException(status_code=403, detail="해당 지원자를 조회할 권한이 없습니다.")
+
+    @staticmethod
+    def _require_ats_write_permission(actor: ActorContext) -> None:
+        if actor.role not in _ATS_WRITE_ROLES:
+            raise HTTPException(
+                status_code=403,
+                detail="인사 담당자 또는 관리자만 지원자를 수정할 수 있습니다.",
+            )
 
     def _require_employee(self, employee_id: str):
         employee = self.organization.get_employee(employee_id)

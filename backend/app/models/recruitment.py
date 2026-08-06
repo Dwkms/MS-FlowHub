@@ -1,6 +1,16 @@
 from datetime import date, datetime
 
-from sqlalchemy import CheckConstraint, Date, DateTime, ForeignKey, Integer, String, Text, func
+from sqlalchemy import (
+    CheckConstraint,
+    Date,
+    DateTime,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+    func,
+)
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base
@@ -65,4 +75,52 @@ class JobPosting(Base):
     )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )
+
+
+class Applicant(Base):
+    __tablename__ = "applicants"
+    __table_args__ = (
+        UniqueConstraint("job_posting_id", "email", name="uq_applicants_posting_email"),
+        CheckConstraint(
+            "stage IN ('APPLIED','SCREENING','INTERVIEW','OFFERED','HIRED','REJECTED')",
+            name="ck_applicants_stage",
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    job_posting_id: Mapped[str] = mapped_column(
+        ForeignKey("job_postings.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    name: Mapped[str] = mapped_column(String(100), nullable=False)
+    email: Mapped[str] = mapped_column(String(255), nullable=False)
+    phone: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    career_summary: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    stage: Mapped[str] = mapped_column(String(20), default="APPLIED", nullable=False, index=True)
+    created_by_id: Mapped[str] = mapped_column(
+        ForeignKey("employees.id", ondelete="RESTRICT"), nullable=False
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )
+
+
+class ApplicantStageHistory(Base):
+    __tablename__ = "applicant_stage_histories"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    applicant_id: Mapped[str] = mapped_column(
+        ForeignKey("applicants.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    from_stage: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    to_stage: Mapped[str] = mapped_column(String(20), nullable=False)
+    note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    actor_id: Mapped[str] = mapped_column(
+        ForeignKey("employees.id", ondelete="RESTRICT"), nullable=False
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
     )

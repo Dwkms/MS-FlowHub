@@ -66,6 +66,12 @@ def test_dashboard_reflects_selected_employee_access(client: TestClient) -> None
     payload = response.json()
     assert payload["current_employee"]["role"] == "ADMIN"
     assert payload["metrics"][0]["value"] == 0
+    assert [metric["label"] for metric in payload["metrics"]] == [
+        "내 결재 대기",
+        "내가 상신한 결재",
+        "진행 중 채용",
+    ]
+    assert "CRM Lite" not in payload["accessible_modules"]
 
 
 def test_dashboard_requires_bearer_auth(client: TestClient) -> None:

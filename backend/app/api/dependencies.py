@@ -97,6 +97,7 @@ def get_dashboard_service(session: DatabaseSession) -> DashboardService:
     return DashboardService(
         organization_repository=OrganizationRepository(session),
         approval_repository=ApprovalRepository(session),
+        recruitment_repository=RecruitmentRepository(session),
         settings=get_settings(),
     )
 

@@ -10,6 +10,7 @@ from app.api.dependencies import (
     require_super_admin,
 )
 from app.schemas.employee import (
+    AttendanceChangeHistoryItem,
     AttendanceStatusUpdate,
     EmployeeCreate,
     EmployeeDetail,
@@ -95,6 +96,18 @@ def update_attendance_status(
     actor: AuthenticatedActor,
 ) -> EmployeeDetail:
     return service.update_attendance_status(employee_id, actor, payload)
+
+
+@router.get(
+    "/employees/{employee_id}/attendance-history", response_model=list[AttendanceChangeHistoryItem]
+)
+def get_attendance_change_history(
+    employee_id: str,
+    service: Service,
+    actor: AuthenticatedActor,
+    work_date: date | None = None,
+) -> list[AttendanceChangeHistoryItem]:
+    return service.attendance_change_history(employee_id, actor, work_date)
 
 
 @router.patch("/employees/{employee_id}/employment-status-reason", response_model=EmployeeDetail)

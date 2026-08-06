@@ -1,126 +1,293 @@
 # Data Model
 
-## 직원 매뉴얼 MVP (v0.7.0)
+## 1. 문서 개요
 
-`manual_categories`는 이름, 설명, 표시 순서를 관리합니다. `manuals`는 텍스트 원본인
-제목·요약·본문과 대상 역할, 공개 상태(`DRAFT`, `PUBLISHED`), 중요 고정 여부를 보관합니다.
-`slug`는 상세 페이지의 안정적인 식별자이며 유일합니다.
+이 문서는 MS FlowHub의 **현재 구현된 Supabase PostgreSQL 데이터 모델**을 기준일(2026-08-05) 기준으로 정리한 기록입니다. 실제 운영 DB에 없는 테이블·컬럼·관계는 이 문서에 포함하지 않습니다. 아직 만들어지지 않은 확장 설계는 "14. 향후 확장 계획"에 짧게만 남기고, 과거 초안·미구현 예측 설계는 [`docs/archive/DATA_MODEL_LEGACY.md`](./archive/DATA_MODEL_LEGACY.md)로 이동했습니다. Migration 적용 이력은 이 문서가 아니라 [`UPDATELOG.md`](../UPDATELOG.md)와 `backend/migrations/versions/`를 기준으로 확인합니다.
 
-`manual_assets`는 매뉴얼별 이미지 또는 PDF URL을 표시 순서대로 연결합니다. MVP는 URL 등록만
-지원하며 파일 업로드 저장소나 대용량 첨부파일은 포함하지 않습니다. 매뉴얼 삭제 시 연결된
-asset는 함께 삭제되고, 카테고리에 매뉴얼이 남아 있으면 카테고리를 삭제할 수 없습니다.
+## 2. 목차
 
+1. [문서 개요](#1-문서-개요)
+2. [목차](#2-목차)
+3. [현재 데이터베이스 요약](#3-현재-데이터베이스-요약)
+4. [기능별 데이터 모델 요약](#4-기능별-데이터-모델-요약)
+5. [전체 테이블 목록](#5-전체-테이블-목록)
+6. [핵심 관계도](#6-핵심-관계도)
+7. [조직·직원·인증](#7-조직직원인증)
+8. [근태 관리](#8-근태-관리)
+9. [전자결재](#9-전자결재)
+10. [채용 요청·채용공고](#10-채용-요청채용공고)
+11. [ATS 지원자 관리](#11-ats-지원자-관리)
+12. [직원 매뉴얼](#12-직원-매뉴얼)
+13. [공통 데이터 규칙](#13-공통-데이터-규칙)
+14. [향후 확장 계획](#14-향후-확장-계획)
+15. [Migration 정보](#15-migration-정보)
+
+## 3. 현재 데이터베이스 요약
+
+- 운영 DB는 **Supabase PostgreSQL 전용**입니다. SQLite 등 다른 런타임 DB는 사용하지 않습니다.
+- 현재 Alembic head는 `20260805_0015_ats_applicants.py`이며, 총 15개 migration이 적용되어 있습니다.
+- 스키마는 `public` 한 곳에 총 **16개 테이블**(`alembic_version` 포함)로 구성됩니다.
+- 프론트엔드는 Supabase 업무 테이블에 직접 접근하지 않고, 항상 FastAPI 백엔드를 거칩니다.
+- DB 레벨 `CHECK` 제약이 걸린 상태값은 `approval_documents.status`, `recruitment_requests.status`, `applicants.stage` 3곳뿐이며, 그 외 상태값(근태 상태, 직원 재직 상태, 매뉴얼 상태 등)은 애플리케이션 레이어(Pydantic `Literal`, `app/domain/employee_status.py`)에서 검증합니다.
+
+## 4. 기능별 데이터 모델 요약
+
+| 기능 영역 | 테이블 수 | 테이블 | 상태 |
+|---|---|---|---|
+| 조직·직원·인증 | 4 | `departments`, `teams`, `employees`, `employee_accounts` | 구현됨 |
+| 근태 관리 | 2 | `attendance_records`, `attendance_change_histories` | 구현됨 |
+| 전자결재 | 2 | `approval_documents`, `approval_histories` | 구현됨 |
+| 채용 요청·채용공고 | 3 | `recruitment_requests`, `job_postings`, `notifications` | 구현됨 |
+| ATS 지원자 관리 | 2 | `applicants`, `applicant_stage_histories` | 구현됨 |
+| 직원 매뉴얼 | 3 | `manual_categories`, `manuals`, `manual_assets` | 구현됨 |
+| 마이그레이션 관리 | 1 | `alembic_version` | Alembic 내부 관리 |
+
+## 5. 전체 테이블 목록
+
+| 테이블 | 기능 영역 | 설명 | 주요 FK |
+|---|---|---|---|
+| `departments` | 조직·직원·인증 | 부서 기준 정보 | - |
+| `teams` | 조직·직원·인증 | 부서 하위 팀 | `department_id` → `departments.id` |
+| `employees` | 조직·직원·인증 | 직원 기준 정보 | `department_id` → `departments.id`, `team_id` → `teams.id`, `manager_id` → `employees.id` |
+| `employee_accounts` | 조직·직원·인증 | Supabase Auth 계정과 직원 연결 | `employee_id` → `employees.id` |
+| `attendance_records` | 근태 관리 | 직원별 일자 근무 상태 | `employee_id` → `employees.id` |
+| `attendance_change_histories` | 근태 관리 | 근태 상태 변경 이력 | `attendance_record_id` → `attendance_records.id`, `changed_by_id` → `employees.id` |
+| `approval_documents` | 전자결재 | 전자결재 문서 | `department_id` → `departments.id`, `author_id`/`approver_id` → `employees.id` |
+| `approval_histories` | 전자결재 | 결재 처리 이력 | `approval_document_id` → `approval_documents.id`, `actor_id` → `employees.id` |
+| `recruitment_requests` | 채용 요청·채용공고 | 채용 요청 | `request_department_id` → `departments.id`, `requester_id`/`approver_id` → `employees.id`, `approval_document_id` → `approval_documents.id` |
+| `job_postings` | 채용 요청·채용공고 | 승인된 요청으로 생성된 채용공고 | `recruitment_request_id` → `recruitment_requests.id` |
+| `notifications` | 채용 요청·채용공고 | 채용 요청 처리에 따른 인앱 알림 | `recipient_id` → `employees.id` |
+| `applicants` | ATS 지원자 관리 | 채용공고별 지원자 | `job_posting_id` → `job_postings.id`, `created_by_id` → `employees.id` |
+| `applicant_stage_histories` | ATS 지원자 관리 | 지원자 전형 단계 변경 이력 | `applicant_id` → `applicants.id`, `actor_id` → `employees.id` |
+| `manual_categories` | 직원 매뉴얼 | 매뉴얼 카테고리 | - |
+| `manuals` | 직원 매뉴얼 | 매뉴얼 본문 | `category_id` → `manual_categories.id`, `created_by`/`updated_by` → `employees.id` |
+| `manual_assets` | 직원 매뉴얼 | 매뉴얼 이미지·PDF 자산 | `manual_id` → `manuals.id` |
+| `alembic_version` | 마이그레이션 관리 | Alembic 현재 head 기록 | - |
+
+## 6. 핵심 관계도
+
+```mermaid
+erDiagram
+    DEPARTMENTS ||--o{ TEAMS : "has"
+    DEPARTMENTS ||--o{ EMPLOYEES : "has"
+    TEAMS ||--o{ EMPLOYEES : "has"
+    EMPLOYEES ||--o| EMPLOYEE_ACCOUNTS : "linked to"
+    EMPLOYEES ||--o{ EMPLOYEES : "manages"
+    EMPLOYEES ||--o{ ATTENDANCE_RECORDS : "records"
+    ATTENDANCE_RECORDS ||--o{ ATTENDANCE_CHANGE_HISTORIES : "logs"
+    DEPARTMENTS ||--o{ APPROVAL_DOCUMENTS : "owns"
+    EMPLOYEES ||--o{ APPROVAL_DOCUMENTS : "authors / approves"
+    APPROVAL_DOCUMENTS ||--o{ APPROVAL_HISTORIES : "logs"
+    APPROVAL_DOCUMENTS ||--o| RECRUITMENT_REQUESTS : "linked to"
+    DEPARTMENTS ||--o{ RECRUITMENT_REQUESTS : "requests"
+    EMPLOYEES ||--o{ RECRUITMENT_REQUESTS : "requests / approves"
+    RECRUITMENT_REQUESTS ||--o| JOB_POSTINGS : "creates"
+    EMPLOYEES ||--o{ NOTIFICATIONS : "receives"
+    JOB_POSTINGS ||--o{ APPLICANTS : "receives"
+    EMPLOYEES ||--o{ APPLICANTS : "registers"
+    APPLICANTS ||--o{ APPLICANT_STAGE_HISTORIES : "logs"
+    MANUAL_CATEGORIES ||--o{ MANUALS : "groups"
+    MANUALS ||--o{ MANUAL_ASSETS : "attaches"
+    EMPLOYEES ||--o{ MANUALS : "writes"
+```
+
+## 7. 조직·직원·인증
+
+**기능 요약**: 부서·팀·직원 기준 정보를 관리하고, Supabase Auth 계정을 직원 1명과 1:1로 연결해 로그인 후 역할 기반 권한을 부여합니다.
+
+**사용 테이블**: `departments`, `teams`, `employees`, `employee_accounts`
+
+**테이블별 역할**
+- `departments`: 부서 코드·이름·설명·표시 순서.
+- `teams`: 부서에 속한 하위 팀(개발팀 산하 `DEV_SW`/`DEV_HW` 등).
+- `employees`: 사번·이름·이메일·직급·담당 업무·재직 상태·근무 위치 등 직원 기준 정보와 상급자(`manager_id`) 참조.
+- `employee_accounts`: Supabase Auth `auth_user_id`와 `employees.id`를 1:1로 연결하고, 애플리케이션 권한 `role`과 활성 여부를 보관.
+
+**핵심 관계**
+- `departments` 1:N `teams`
+- `departments` 1:N `employees`, `teams` 1:N `employees`(선택)
+- `employees` 1:N `employees`(`manager_id`, 자기참조, 선택)
+- `employees` 1:1 `employee_accounts`
+
+**핵심 제약조건**
+- `departments.code`, `teams.code`, `teams.name` UNIQUE
+- `employees.employee_no`, `employees.email` UNIQUE
+- `employees.department_id`는 `RESTRICT`로 부서 삭제를 막고, `team_id`/`manager_id`도 `RESTRICT`
+- `employee_accounts.auth_user_id`, `employee_accounts.employee_id` UNIQUE (중복 연결 방지)
+
+**주요 상태값** (DB `CHECK` 아님, 애플리케이션 검증)
+- `employees.employment_status`: `ACTIVE`, `ON_LEAVE`, `SCHEDULED`, `RESIGNED`
+- `employee_accounts.role`: `SUPER_ADMIN`, `HR_ADMIN`, `TEAM_ADMIN`, `EMPLOYEE`
+- `employees.employment_type`: 문자열 컬럼이며 현재 기본값 `REGULAR`만 사용, 별도 enum 제약 없음
+
+**삭제 및 이력 보존 정책**
+- 직원 삭제는 물리 삭제가 아니라 `employment_status=INACTIVE` 전환으로 처리(레코드 보존).
+- 부서·팀·상급자 참조는 모두 `RESTRICT`라 참조 중인 레코드가 있으면 삭제할 수 없습니다.
+
+## 8. 근태 관리
+
+**기능 요약**: 직원별 하루 단위 근무 상태를 기록하고, 실제로 상태가 바뀐 경우에만 변경 이력을 남깁니다.
+
+**사용 테이블**: `attendance_records`, `attendance_change_histories`
+
+**테이블별 역할**
+- `attendance_records`: 직원 1명의 특정 날짜 근무 상태, 출퇴근 시각, 공개 사유(`reason_summary`)와 비공개 상세(`private_note`).
+- `attendance_change_histories`: 근무 상태가 실제로 변경된 시점의 변경 전/후 상태·사유·변경자·변경 시각.
+
+**핵심 관계**
+- `employees` 1:N `attendance_records`
+- `attendance_records` 1:N `attendance_change_histories`
+
+**핵심 제약조건**
+- `attendance_records`는 `(employee_id, work_date)` UNIQUE로 직원당 하루 1건만 허용(Seed 재실행 시 중복 방지).
+- `attendance_records.employee_id`는 `CASCADE` 삭제, `attendance_change_histories.changed_by_id`는 `RESTRICT`.
+
+**주요 상태값** (`app/domain/employee_status.py`, 애플리케이션 검증)
+- `work_status`: `WORKING`, `REMOTE_WORK`, `OUT_OF_OFFICE`, `BUSINESS_TRIP`, `ANNUAL_LEAVE`, `MORNING_HALF`, `AFTERNOON_HALF`, `SICK_LEAVE`, `TRAINING`, `OTHER`, `OFF_WORK`, `ABSENT`
+- `SICK_LEAVE`, `ABSENT`는 사유 입력이 필수입니다.
+
+**삭제 및 이력 보존 정책**
+- 근태 변경 이력은 append-only 감사 기록이며 수정·삭제 API가 없습니다.
+- 비공개 사유(`private_note`)는 `SUPER_ADMIN`, `HR_ADMIN`, `ADMIN`, `HR_MANAGER`에게만 조회되며, 일반 직원·팀 관리자 응답에서는 제외됩니다.
+
+## 9. 전자결재
+
+**기능 요약**: 일반 품의 문서와 채용 요청에 연결되는 결재 문서를 작성·상신·승인·반려하고, 모든 처리 행위를 이력으로 남깁니다.
+
+**사용 테이블**: `approval_documents`, `approval_histories`
+
+**테이블별 역할**
+- `approval_documents`: 문서 종류·제목·본문·작성자·결재자·상태·처리 시각과 관련 업무(`related_type`/`related_id`, 예: 채용 요청) 참조.
+- `approval_histories`: 생성·상신·승인·반려 등 처리 행위와 상태 전이(`from_status` → `to_status`) 기록.
+
+**핵심 관계**
+- `departments` 1:N `approval_documents`
+- `employees` 1:N `approval_documents`(작성자, 결재자 각각)
+- `approval_documents` 1:N `approval_histories`
+
+**핵심 제약조건**
+- `approval_documents.status` DB `CHECK`: `DRAFT`, `PENDING`, `APPROVED`, `REJECTED`, `CANCELLED`
+- `department_id`, `author_id`, `approver_id`는 모두 `RESTRICT`
+
+**주요 상태값**
+- `document_type`: `GENERAL`, `RECRUITMENT_REQUEST`가 실제로 생성되며, `EXPENSE`, `QUOTATION_DISCOUNT`는 타입에는 정의되어 있으나 현재 생성 로직에서 사용되지 않습니다.
+- `approval_histories.action`: `CREATED`, `SUBMITTED`, `UPDATED`, `APPROVED`, `REJECTED`
+
+**삭제 및 이력 보존 정책**
+- 관리자(`SUPER_ADMIN`, `ADMIN`)만 상태와 무관하게 문서를 물리 삭제할 수 있고, 그 외 역할은 삭제할 수 없습니다.
+- `approval_histories`는 수정·삭제하지 않는 감사 원칙을 따릅니다.
+
+## 10. 채용 요청·채용공고
+
+**기능 요약**: 부서의 채용 요청을 작성해 전자결재로 승인받으면 채용공고가 생성되고, 요청 처리 결과에 따라 관련자에게 인앱 알림을 남깁니다.
+
+**사용 테이블**: `recruitment_requests`, `job_postings`, `notifications`
+
+**테이블별 역할**
+- `recruitment_requests`: 요청 부서·요청자·결재자, 직무·인원·경력·채용 사유, 채용 포스터 메타데이터(`poster_original_name`, `poster_stored_name`, `poster_content_type`, `poster_size`), 연결된 결재 문서.
+- `job_postings`: 승인된 요청 1건당 생성되는 채용공고 초안(제목·본문).
+- `notifications`: 요청 상신·승인·반려에 따라 생성·삭제되는 인앱 알림 레코드.
+
+**핵심 관계**
+- `departments` 1:N `recruitment_requests`
+- `employees` 1:N `recruitment_requests`(요청자, 결재자 각각)
+- `recruitment_requests` 1:0..1 `approval_documents`
+- `recruitment_requests` 1:0..1 `job_postings`
+- `employees` 1:N `notifications`
+
+**핵심 제약조건**
+- `recruitment_requests.status` DB `CHECK`: `DRAFT`, `PENDING_APPROVAL`, `APPROVED`, `REJECTED`, `POSTING_CREATED`
+- `recruitment_requests.approval_document_id` UNIQUE
+- `job_postings.recruitment_request_id` UNIQUE (요청당 채용공고 1건만 허용)
+
+**주요 상태값**
+- `recruitment_requests.status`는 위 5개 값을 사용하며 결재 문서 상태와는 별도로 관리됩니다.
+- `job_postings.status`는 현재 생성 시 `DRAFT`로 고정되며, 별도 상태 전이 API는 아직 없습니다.
+
+**삭제 및 이력 보존 정책**
+- 채용 요청 삭제는 관리자(`SUPER_ADMIN`, `ADMIN`) 전용이며, 연결된 채용공고·알림을 함께 정리한 뒤 요청을 삭제합니다.
+- 채용 포스터 원본 파일은 Supabase Storage 비공개 버킷(`recruitment-posters`)에 있으며, 요청 삭제·포스터 교체 시 이전 파일도 함께 제거합니다. 다운로드는 항상 백엔드 API를 거쳐 권한을 검증한 뒤 응답합니다.
+
+## 11. ATS 지원자 관리
+
+**기능 요약**: 외부 공개 지원 페이지 없이 HR이 채용공고별 지원자를 수동 등록하고, 전형 단계 변경과 이력을 관리합니다.
+
+**사용 테이블**: `applicants`, `applicant_stage_histories`
+
+**테이블별 역할**
+- `applicants`: 지원자 이름·이메일·전화번호·경력 요약·현재 전형 단계와 등록자(`created_by_id`).
+- `applicant_stage_histories`: 등록 시점(`from_stage=NULL` → `to_stage=APPLIED`)을 포함한 모든 전형 단계 변경 기록과 처리자.
+
+**핵심 관계**
+- `job_postings` 1:N `applicants`
+- `applicants` 1:N `applicant_stage_histories`
+- `employees` 1:N `applicants`(등록자), `employees` 1:N `applicant_stage_histories`(처리자)
+
+**핵심 제약조건**
+- `applicants.stage` DB `CHECK`: `APPLIED`, `SCREENING`, `INTERVIEW`, `OFFERED`, `HIRED`, `REJECTED`
+- `(job_posting_id, email)` UNIQUE로 같은 공고 내 이메일 중복 등록을 차단
+- `applicants.job_posting_id`는 `CASCADE`, `created_by_id`는 `RESTRICT`
+- `applicant_stage_histories.applicant_id`는 `CASCADE`, `actor_id`는 `RESTRICT`
+
+**주요 상태값**
+- 화면 표시명은 `APPLIED`="지원 접수", `SCREENING`="서류 검토", `INTERVIEW`="1차 면접", `OFFERED`="2차 면접", `HIRED`="채용 확정", `REJECTED`="불합격"이며, DB에 저장되는 값 자체는 변경되지 않았습니다.
+- `HIRED`, `REJECTED`는 종료 단계로 되돌릴 수 없고, `REJECTED` 처리에는 메모가 필수입니다.
+
+**삭제 및 이력 보존 정책**
+- 채용공고 삭제 시 `applicants`가 `CASCADE`로 함께 삭제되고, 지원자 삭제 시 `applicant_stage_histories`도 `CASCADE`로 함께 삭제됩니다.
+- `SUPER_ADMIN`, `HR_ADMIN`만 등록·수정·삭제·단계 변경이 가능하고, `TEAM_ADMIN`은 본인 부서 공고만 조회하며, `EMPLOYEE`는 지원자 API에 접근할 수 없습니다.
+
+## 12. 직원 매뉴얼
+
+**기능 요약**: 로그인 업무 절차부터 채용 요청까지 카테고리별 매뉴얼 본문과 이미지·PDF 자산을 제공합니다.
+
+**사용 테이블**: `manual_categories`, `manuals`, `manual_assets`
+
+**테이블별 역할**
+- `manual_categories`: 카테고리 이름·설명·표시 순서.
+- `manuals`: 제목·요약·본문·대상 역할(`target_roles`)·공개 상태·중요 고정 여부와 작성자/수정자.
+- `manual_assets`: 매뉴얼에 연결된 이미지 또는 PDF의 URL과 표시 순서.
+
+**핵심 관계**
 - `manual_categories` 1:N `manuals`
 - `manuals` 1:N `manual_assets`
-- `manuals.created_by`, `manuals.updated_by`는 작성·수정한 직원의 선택적 참조입니다.
+- `employees` 1:N `manuals`(작성자, 수정자 각각, 선택)
 
-공개 매뉴얼은 모든 인증된 직원이 읽을 수 있으며 초안은 `SUPER_ADMIN`, `HR_ADMIN`에게만
-노출됩니다. 초기 7개 카테고리와 15개 매뉴얼은 slug/name을 기준으로 갱신하므로 seed를 다시
-실행해도 중복 생성되지 않습니다.
+**핵심 제약조건**
+- `manual_categories.name` UNIQUE, `manuals.slug` UNIQUE
+- `manuals.category_id`는 `RESTRICT`(카테고리에 매뉴얼이 남아 있으면 삭제 불가)
+- `manual_assets.manual_id`는 `CASCADE`
+- `manuals.created_by`/`updated_by`는 `SET NULL`
 
-## Employee organization management (v0.6.0)
+**주요 상태값**
+- `manuals.status`: `DRAFT`, `PUBLISHED`
+- `manual_assets.asset_type`: `IMAGE`, `PDF`
+- `manuals.target_roles`에 포함 가능한 값: `SUPER_ADMIN`, `HR_ADMIN`, `TEAM_ADMIN`, `EMPLOYEE`
 
-`departments` has unique code/name and display ordering. `teams` represents the
-two development subteams (`DEV_SW`, `DEV_HW`) and belongs to a department.
-`employees` references its department, optional team, and optional manager with
-`RESTRICT` foreign keys. Employee list queries return department/team/manager
-summaries; employee deletion is implemented as `employment_status=INACTIVE`.
+**삭제 및 이력 보존 정책**
+- 매뉴얼 삭제 시 연결된 `manual_assets`가 함께 삭제됩니다(`cascade="all, delete-orphan"`).
+- 초안(`DRAFT`)은 `SUPER_ADMIN`, `HR_ADMIN`에게만 노출되고, 공개 매뉴얼(`PUBLISHED`)은 모든 인증된 직원이 조회할 수 있습니다.
 
-Database runtime is Supabase PostgreSQL only; SQLite is not a supported application database.
+## 13. 공통 데이터 규칙
 
-## Supabase Auth employee accounts (v0.6.2)
+- 모든 시각 컬럼은 PostgreSQL timezone-aware `timestamptz`를 사용하며 UTC로 저장하고 화면에서 지역 시간으로 표시합니다.
+- 대부분의 PK는 UUID 문자열이며, 업무 테이블은 `created_at`, `updated_at`을 기본으로 둡니다.
+- Soft delete를 일괄 적용하지 않습니다. 감사가 중요한 결재·근태 변경은 상태 변경/이력 테이블로 보존하고, 직원처럼 참조가 많은 기준 데이터는 비활성 플래그(`employment_status=INACTIVE`, `is_active` 등)로 처리합니다.
+- 상태값은 소수(`approval_documents.status`, `recruitment_requests.status`, `applicants.stage`)만 DB `CHECK` 제약으로 강제하고, 나머지는 Pydantic `Literal`과 `app/domain/` 정책 모듈에서 검증합니다.
+- 실제 운영 DB는 Supabase PostgreSQL 하나이며, 별도 fallback DB는 사용하지 않습니다.
 
-`employee_accounts` is the application-side link between a Supabase Auth user
-and exactly one `employees` record. `auth_user_id` and `employee_id` are both
-unique, which prevents duplicate links. The application role is stored in
-`employee_accounts.role`; it is intentionally separate from the employee's job
-role and is used by the upcoming JWT-based authorization layer.
+## 14. 향후 확장 계획
 
-The Auth seed reconciles all employee records on every run: it reuses Auth users
-by email, creates only missing Auth users, and synchronizes the account role and
-active flag. Seed passwords are read only from the environment and are never
-persisted or logged by the application.
+- **이력서 파일 첨부, 외부 공개 지원 페이지, 이메일 발송, 면접 일정 관리**: ATS 지원자 관리 MVP 범위에서 의도적으로 제외했습니다.
+- **AI 자동 평가/생성 이력**: 채용·매뉴얼 등에서 AI 결과를 저장하는 공통 테이블은 아직 만들지 않았습니다. 도입 시 업무별로 나누기보다 공통 테이블 하나로 시작하는 방향을 검토합니다.
+- **다일 휴가 기간 관리**: 현재 `attendance_records`는 하루 단위 상태만 관리합니다. 여러 날에 걸친 휴가를 별도 기간 단위로 관리하는 확장은 일별 근태 기록과 독립적으로 설계해, 기간이 나중에 정정되어도 과거 일별 기록이 보존되도록 하는 것을 전제로 검토합니다.
+- **알림 조회·읽음 처리**: `notifications` 테이블과 데이터는 이미 쌓이고 있지만, 조회·읽음 처리 API와 화면은 아직 구현하지 않았습니다.
 
-## Attendance records (v0.6.1)
+과거에 검토했던 더 상세한 초안(테이블 컬럼 후보, 관계 설계 근거 등)은 [`docs/archive/DATA_MODEL_LEGACY.md`](./archive/DATA_MODEL_LEGACY.md)에 보존되어 있습니다.
 
-`attendance_records` stores one daily work status per employee. The composite
-unique constraint on `(employee_id, work_date)` makes daily seed data idempotent.
-Long-lived employment status remains on `employees.employment_status`.
-Daily and employment-status reasons are separated into `reason_category`,
-`reason_summary`, and `private_note`. Attendance reasons use these fields on
-`attendance_records`; employment-status reasons use their `employment_status_*`
-counterparts on `employees`. The records also retain the reason registrant and time.
-`reason_summary` is visible to all users, while `private_note` for sick leave and
-long-term leave is returned only to administrators and HR managers.
+## 15. Migration 정보
 
-### Planned attendance extensions
-
-The current `AttendanceRecord.employee_id` and `work_date` unique pair is the
-stable parent for the next two tables; neither table is created in this change.
-
-- `attendance_change_histories` should reference `attendance_records.id` and
-  store the before/after status, reason fields, actor, and timestamp.
-- `employee_leave_periods` should reference `employees.id` and hold the start,
-  end, status reason, and approval metadata for multi-day leave.
-
-Daily records must remain independent from leave periods so a historical daily
-record can be preserved even when a leave period is later corrected.
-
-## 채용 포스터 메타데이터 (v0.5.7)
-
-`recruitment_requests`는 요청당 하나의 채용 포스터를 선택적으로 연결한다. `poster_original_name`, `poster_stored_name`, `poster_content_type`, `poster_size` 컬럼은 원본 파일명, 서버 내부 저장명, MIME 형식, 바이트 크기를 구분한다. 실제 파일은 프로토타입 로컬 개발 저장소에 두며, 요청 삭제 시 함께 제거한다. 생성된 `job_postings`는 연결된 채용 요청을 통해 이 메타데이터를 조회하므로 별도 중복 컬럼을 두지 않는다.
-
-## 공통 원칙
-
-- PostgreSQL의 timezone-aware `timestamptz`를 사용하고 서버/DB 기준 UTC 저장, 화면에서 지역 시간으로 표시한다.
-- 금액은 `NUMERIC(18,2)`, 할인율은 `NUMERIC(5,2)` 후보이며 Python `Decimal`과 대응한다.
-- PK는 초기 구현 시 UUID를 우선 검토한다. 모든 업무 테이블에 `created_at`, `updated_at`을 둔다.
-- Soft Delete를 일괄 적용하지 않는다. 감사가 중요한 결재·견적은 상태 변경으로 보존하고, 기준 데이터는 실제 요구가 생길 때 비활성 플래그를 검토한다.
-- 상태값은 Python Enum과 DB 제약의 균형을 migration에서 검토한다.
-- 실제 배포 대상은 Supabase PostgreSQL이다. 연결 정보가 없는 로컬 개발에서는 동일 ORM 모델의 파일 기반 SQLite를 fallback으로 사용하며 배포 DB로 사용하지 않는다.
-
-## 테이블 요약
-
-| 테이블 / 목적 | 주요 컬럼과 자료형 후보 | 키·제약·관계 | 상태·삭제·확장 |
-|---|---|---|---|
-| `departments` 조직 기준 | `id uuid`, `code varchar`, `name varchar`, timestamps | PK id, UQ code; employees 1:N | 물리 삭제 전 참조 확인; 계층 부서는 이후 |
-| `employees` 샘플 사용자·역할 | `id uuid`, `employee_no varchar`, `name`, `email`, `role varchar`, `department_id uuid`, `is_active bool`, timestamps | UQ employee_no/email, FK department RESTRICT | `ADMIN`은 전 부서 기안 가능, 그 외 역할은 소속 부서 기안; 비활성화 사용; 다중 역할은 이후 |
-| `notifications` 인앱 알림 | `id`, `recipient_id`, `type`, `message`, `related_type`, `related_id`, `read_at`, timestamps | FK employee CASCADE 정책은 구현 시 검토 | 읽음 상태; 실시간/채널 확장 |
-| `approval_documents` 공통 결재 | `id`, `document_type`, `title`, `content text`, `author_id`, `approver_id`, `status`, `decision_comment`, `submitted_at`, `processed_at`, `related_type`, `related_id`, timestamps | 직원 FK 2개; 관련 업무는 polymorphic 참조라 Service 무결성 필요. `(related_type,related_id)` index | 관리자만 상태와 관계없이 물리 삭제, 일반 역할은 삭제 불가; DRAFT/PENDING/APPROVED/REJECTED/CANCELLED; 다단계는 이후 |
-| `approval_histories` 변경 감사 | `id`, `approval_document_id`, `actor_id`, `action`, `from_status`, `to_status`, `comment`, `created_at` | FK approval/employee; 수정·삭제 금지 원칙 | 행동 이력; IP/메타데이터 이후 |
-| `recruitment_requests` 채용 요청 | `id`, `requester_id`, `department_id`, `position_title`, `headcount int`, `reason text`, `status`, `approval_document_id`, timestamps | FK 직원/부서/결재, UQ approval_document_id | DRAFT/PENDING/APPROVED/REJECTED/CANCELLED; 상태 보존 |
-| `job_postings` 승인 요청 기반 공고 | `id`, `recruitment_request_id`, `title`, `description`, `status`, timestamps | FK request, UQ recruitment_request_id(프로토타입 1:1) | DRAFT/OPEN/CLOSED; 다중 공고는 이후 |
-| `applicants` 공고 지원자 | `id`, `job_posting_id`, `name`, `contact`, `career_text`, `stage`, timestamps | FK posting; 실제 개인정보 금지, 프로토타입 중복 제약 생략 | APPLIED/SCREENING/INTERVIEW/OFFERED/HIRED/REJECTED; 삭제 대신 상태·가상 데이터 |
-| `customers` 고객 | `id`, `name`, `business_no_candidate`, `contact_name`, `contact_email`, timestamps | UQ는 샘플 데이터 정책 확정 후; opportunities 1:N | 초기 물리 삭제 제한; 주소/담당자 분리 이후 |
-| `products` 견적 상품 | `id`, `code`, `name`, `default_unit_price numeric`, `is_active`, timestamps | UQ code; items 1:N | 비활성화; 가격 이력 이후 |
-| `sales_opportunities` 영업기회 | `id`, `customer_id`, `owner_id`, `title`, `status`, timestamps | FK customer/employee; quotations 1:N | LEAD/QUALIFIED/PROPOSAL/WON/LOST 후보; 최소 단계만 구현 |
-| `quotations` 견적 헤더·합계 | `id`, `opportunity_id`, `owner_id`, `status`, `discount_rate numeric`, `discount_reason`, `subtotal numeric`, `discount_amount numeric`, `total_amount numeric`, `approval_document_id`, `valid_until date`, timestamps | FK opportunity/employee/approval, UQ approval_document_id nullable | DRAFT/APPROVAL_REQUIRED/PENDING_APPROVAL/APPROVED/REJECTED/CONFIRMED/CANCELLED; 삭제 대신 상태 |
-| `quotation_items` 견적 항목 스냅샷 | `id`, `quotation_id`, `product_id`, `product_name`, `quantity numeric`, `unit_price numeric`, `line_amount numeric`, timestamps | FK quotation CASCADE(초안 삭제 시), product RESTRICT; check 양수 | 상품명·가격 스냅샷; 세금은 이후 |
-| `ai_generations` 모든 AI 실행 | `id`, `feature_type`, `related_type`, `related_id`, `source_input jsonb/text`, `generated_output jsonb/text`, `final_output jsonb/text`, `provider`, `model_name`, `success bool`, `error_message`, timestamps | polymorphic 업무 참조는 Service 확인; 관련 복합 index | 삭제보다 감사 보존; token/비용/버전 이후 |
-
-## 핵심 관계
-
-- Department 1:N Employee, Employee 1:N 작성/결재 ApprovalDocument
-- ApprovalDocument 1:N ApprovalHistory
-- RecruitmentRequest 1:0..1 ApprovalDocument, 1:0..1 JobPosting, JobPosting 1:N Applicant
-- Customer 1:N SalesOpportunity 1:N Quotation 1:N QuotationItem; Product 1:N QuotationItem
-- Quotation 1:0..1 ApprovalDocument
-- 각 업무 엔티티 1:N AIGeneration은 `related_type/id`로 연결한다.
-
-## 설계 검토
-
-AI 기능별 별도 테이블은 컬럼과 조회 규칙이 반복되므로 프로토타입에서는 공통 `ai_generations`가 적절하다. 다형 참조는 DB FK를 직접 걸기 어렵다는 단점이 있어 Service 검증과 index가 필요하다. 결재의 관련 업무 참조도 같은 주의가 필요하며, 규모가 커지면 명시적 연결 테이블을 재검토한다.
-
-프로토타입에서는 조직 계층, 복수 역할, 지원 단계 이력 전용 테이블, 견적 버전·세금, 고객 담당자 분리, 일반화된 soft delete를 생략한다.
-
-## 현재 구현
-
-`20260730_0001_approval_flow.py`에서 `departments`, `employees`, `approval_documents`, `approval_histories`와 상태 CHECK, FK, 조회 index, 최초 샘플 조직 데이터를 생성한다. `20260730_0002_add_sample_departments.py`는 개발팀과 재무팀을 샘플 부서로 추가한다. `20260730_0003_make_project_owner_admin.py`는 샘플 프로젝트 운영자 김민성을 관리자로 전환한다. 나머지 표의 테이블은 아직 설계 상태다.
-## v0.5.0 구현 메모
-
-- 채용 요청 삭제는 관리자 전용이다. 요청과 1:1 공고, 연결된 결재 문서·이력, 관련 알림을 함께 물리 삭제한다.
-
-- 채용 요청은 요청 부서·요청자·결재자와 1개의 전자결재 문서를 연결한다.
-- 채용 요청 상태는 `DRAFT`, `PENDING_APPROVAL`, `APPROVED`, `REJECTED`, `POSTING_CREATED`이며, 결재 문서 상태와 분리한다.
-- 채용공고는 요청당 하나만 허용한다. 승인 처리에서 템플릿 초안을 생성한 뒤 요청 상태를 `POSTING_CREATED`로 기록한다.
-- `20260731_0004_recruitment_flow.py`는 결재 관련 업무 식별자, `notifications`, `recruitment_requests`, `job_postings`, 부서장 시연 직원을 추가한다.
+- 현재 Alembic head: `20260805_0015_ats_applicants.py`
+- Migration 파일 위치: `backend/migrations/versions/`
+- Migration별 작업 배경과 진행 기록은 이 문서가 아니라 [`UPDATELOG.md`](../UPDATELOG.md)를 기준으로 확인합니다.
+- 적용 명령: `cd backend && .\.venv\Scripts\alembic.exe upgrade head` (자세한 절차는 [`README.md`](../README.md#데이터베이스와-seed) 참고)

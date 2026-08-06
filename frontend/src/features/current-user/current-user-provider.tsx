@@ -3,25 +3,20 @@
 import {
   createContext,
   type ReactNode,
+  useCallback,
   useContext,
-  useEffect,
   useMemo,
   useState,
 } from "react";
 
 import { getEmployees } from "@/features/dashboard/api";
-import { fallbackEmployees } from "@/features/dashboard/mock-data";
-import {
-  getStoredEmployeeId,
-  setStoredEmployeeId,
-} from "@/storage/current-user-storage";
 import type { Employee } from "@/types/dashboard";
 
 interface CurrentUserContextValue {
   employees: Employee[];
   currentEmployee: Employee;
-  selectedId: string;
-  setSelectedId: (employeeId: string) => void;
+  authenticatedEmployeeId: string;
+  syncAuthenticatedEmployee: (employeeId: string, role: string) => Promise<boolean>;
   apiConnected: boolean;
   isLoadingCurrentUser: boolean;
 }
@@ -29,55 +24,53 @@ interface CurrentUserContextValue {
 const CurrentUserContext = createContext<CurrentUserContextValue | null>(null);
 
 export function CurrentUserProvider({ children }: { children: ReactNode }) {
-  const [employees, setEmployees] = useState<Employee[]>(fallbackEmployees);
-  const [selectedId, setSelectedIdState] = useState(fallbackEmployees[0].id);
+  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [authenticatedEmployeeId, setAuthenticatedEmployeeId] = useState("");
   const [apiConnected, setApiConnected] = useState(false);
-  const [isLoadingCurrentUser, setIsLoadingCurrentUser] = useState(true);
+  const [isLoadingCurrentUser, setIsLoadingCurrentUser] = useState(false);
+  const currentEmployee = employees.find((employee) => employee.id === authenticatedEmployeeId);
 
-  useEffect(() => {
-    const storedId = getStoredEmployeeId();
-
-    let active = true;
-    void getEmployees()
-      .then((result) => {
-        if (!active || result.length === 0) return;
-        setEmployees(result);
-        const validStored = result.some((employee) => employee.id === storedId);
-        setSelectedIdState(validStored && storedId ? storedId : result[0].id);
-        setApiConnected(true);
-      })
-      .catch(() => {
-        if (active) {
-          if (storedId && fallbackEmployees.some((employee) => employee.id === storedId)) {
-            setSelectedIdState(storedId);
-          }
-          setApiConnected(false);
-        }
-      })
-      .finally(() => {
-        if (active) setIsLoadingCurrentUser(false);
-      });
-    return () => {
-      active = false;
-    };
+  const syncAuthenticatedEmployee = useCallback(async (employeeId: string, role: string) => {
+    setIsLoadingCurrentUser(true);
+    try {
+      const result = await getEmployees();
+      const authenticatedEmployee = result.find((employee) => employee.id === employeeId);
+      if (!authenticatedEmployee) {
+        setEmployees([]);
+        setAuthenticatedEmployeeId("");
+        setApiConnected(false);
+        return false;
+      }
+      // employee-options returns employees.role (legacy job classification). Only the signed-in
+      // user's entry is patched with the real employee_accounts.role from /auth/me, since every
+      // permission check in the app reads currentEmployee.role expecting the RBAC value.
+      const patched = result.map((employee) =>
+        employee.id === employeeId ? { ...employee, role: role as Employee["role"] } : employee,
+      );
+      setEmployees(patched);
+      setAuthenticatedEmployeeId(employeeId);
+      setApiConnected(true);
+      return true;
+    } catch {
+      setEmployees([]);
+      setAuthenticatedEmployeeId("");
+      setApiConnected(false);
+      return false;
+    } finally {
+      setIsLoadingCurrentUser(false);
+    }
   }, []);
-
-  const currentEmployee =
-    employees.find((employee) => employee.id === selectedId) ?? employees[0];
 
   const value = useMemo(
     () => ({
       employees,
-      currentEmployee,
-      selectedId,
-      setSelectedId: (employeeId: string) => {
-        setSelectedIdState(employeeId);
-        setStoredEmployeeId(employeeId);
-      },
+      currentEmployee: currentEmployee as Employee,
+      authenticatedEmployeeId,
+      syncAuthenticatedEmployee,
       apiConnected,
       isLoadingCurrentUser,
     }),
-    [apiConnected, currentEmployee, employees, isLoadingCurrentUser, selectedId],
+    [apiConnected, authenticatedEmployeeId, currentEmployee, employees, isLoadingCurrentUser, syncAuthenticatedEmployee],
   );
 
   return (

@@ -3,21 +3,19 @@ from fastapi import HTTPException, status
 from app.core.config import Settings
 from app.repositories.approval_repository import ApprovalRepository
 from app.repositories.organization_repository import OrganizationRepository
+from app.repositories.recruitment_repository import RecruitmentRepository
 from app.schemas.common import (
     DashboardMetric,
     DashboardResponse,
-    DashboardTask,
     DepartmentResponse,
     EmployeeResponse,
 )
 
 _MODULE_ACCESS = {
-    "EMPLOYEE": ["전자결재"],
-    "DEPARTMENT_HEAD": ["전자결재", "ATS Lite"],
-    "HR_MANAGER": ["전자결재", "ATS Lite"],
-    "SALES_REP": ["전자결재", "CRM Lite"],
-    "SALES_MANAGER": ["전자결재", "CRM Lite"],
-    "ADMIN": ["전자결재", "ATS Lite", "CRM Lite", "관리"],
+    "EMPLOYEE": ["전자결재", "직원 매뉴얼"],
+    "TEAM_ADMIN": ["전자결재", "ATS Lite", "직원·조직 관리", "직원 매뉴얼"],
+    "HR_ADMIN": ["전자결재", "ATS Lite", "직원·조직 관리", "직원 매뉴얼"],
+    "SUPER_ADMIN": ["전자결재", "ATS Lite", "직원·조직 관리", "직원 매뉴얼"],
 }
 
 
@@ -26,10 +24,12 @@ class DashboardService:
         self,
         organization_repository: OrganizationRepository,
         approval_repository: ApprovalRepository,
+        recruitment_repository: RecruitmentRepository,
         settings: Settings,
     ) -> None:
         self.organization = organization_repository
         self.approvals = approval_repository
+        self.recruitment = recruitment_repository
         self.settings = settings
 
     def list_departments(self) -> list[DepartmentResponse]:
@@ -38,7 +38,7 @@ class DashboardService:
     def list_employees(self) -> list[EmployeeResponse]:
         return self.organization.list_employees()
 
-    def get_dashboard(self, employee_id: str) -> DashboardResponse:
+    def get_dashboard(self, employee_id: str, role: str) -> DashboardResponse:
         employee = self.organization.get_employee(employee_id)
         if employee is None:
             raise HTTPException(
@@ -49,7 +49,7 @@ class DashboardService:
         return DashboardResponse(
             source=self.settings.data_source,
             current_employee=employee,
-            accessible_modules=_MODULE_ACCESS[employee.role],
+            accessible_modules=_MODULE_ACCESS.get(role, []),
             metrics=[
                 DashboardMetric(
                     label="내 결재 대기",
@@ -58,39 +58,20 @@ class DashboardService:
                     tone="navy",
                 ),
                 DashboardMetric(
-                    label="진행 중 채용",
-                    value=3,
-                    helper="공고 2 · 지원자 4",
+                    label="내가 상신한 결재",
+                    value=self.approvals.count_pending_for_author(employee_id),
+                    helper="처리를 기다리는 문서",
                     tone="blue",
                 ),
                 DashboardMetric(
-                    label="승인 필요 견적",
-                    value=1,
-                    helper="할인 기준 초과",
+                    label="진행 중 채용",
+                    value=self.recruitment.count_postings(),
+                    helper="승인 후 생성된 채용공고",
                     tone="amber",
-                ),
-                DashboardMetric(
-                    label="읽지 않은 알림",
-                    value=4,
-                    helper="최근 24시간",
-                    tone="green",
                 ),
             ],
             recent_tasks=[
                 *self.approvals.list_recent_tasks(employee_id, limit=3),
-                DashboardTask(
-                    id="task-ats-001",
-                    category="ATS Lite",
-                    title="Backend 개발자 채용공고 초안",
-                    status="작성 중",
-                    owner="박지우",
-                ),
-                DashboardTask(
-                    id="task-crm-001",
-                    category="CRM Lite",
-                    title="한빛상사 12% 할인 견적",
-                    status="승인 필요",
-                    owner="이도윤",
-                ),
+                *self.recruitment.list_recent_tasks(employee_id, limit=2),
             ][:5],
         )

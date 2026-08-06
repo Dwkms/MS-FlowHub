@@ -29,7 +29,7 @@ export function JobPostingList() {
 
   return (
     <section className="content approval-page">
-      <div className="page-heading"><div><span className="section-kicker">ATS LITE</span><h1>채용공고</h1><p>승인된 채용 요청에서 생성된 내부 채용공고 초안입니다.</p></div><Link className="secondary-button" href="/recruitment-requests">채용 요청</Link></div>
+      <div className="page-heading"><div><span className="section-kicker">ATS LITE</span><h1>채용공고</h1><p>승인된 채용 요청에서 생성된 내부 채용공고 초안입니다.</p></div><div className="heading-actions"><Link className="secondary-button" href="/recruitment-requests">채용 요청</Link><Link className="primary-button" href="/applicants">지원자 관리</Link></div></div>
       <section className="panel approval-list-panel">
         {loading && <div className="state-box">채용공고를 불러오는 중입니다.</div>}
         {!loading && error && <div className="state-box error">{error}</div>}
