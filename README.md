@@ -5,8 +5,16 @@ MS FlowHub는 직원·조직 관리, 근태 상태, 전자결재, 채용 요청�
 
 > 변경 이력은 [UPDATELOG.md](./UPDATELOG.md), 오류 대응 방법은 [TROUBLESHOOTING.md](./TROUBLESHOOTING.md)에서 확인할 수 있습니다.
 
+## 배포된 환경
+
+- Frontend: https://ms-flowhub-frontend.onrender.com
+- Backend API: https://ms-flowhub.onrender.com (`/health`로 상태 확인)
+- 둘 다 Render Free 플랜이라 유휴 시 슬립 상태가 되며, 첫 접속에 콜드스타트로 수십 초가 걸릴 수 있습니다.
+- 배포 구성과 절차는 [DEPLOYMENT_PLAN.md](./docs/DEPLOYMENT_PLAN.md)를 참고하세요.
+
 ## 목차
 
+- [배포된 환경](#배포된-환경)
 - [현재 구현 상태](#현재-구현-상태)
 - [기술 구성](#기술-구성)
 - [역할과 권한](#역할과-권한)
