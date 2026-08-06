@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from app.api.dependencies import get_database_health
+from app.core import supabase_storage
 from app.db.base import Base
 from app.db.session import get_db_session
 from app.main import create_app
@@ -46,6 +47,29 @@ def seed_workflow_test_identities(session: Session) -> None:
                 job_title="Test fixture",
             )
         )
+
+
+@pytest.fixture(autouse=True)
+def fake_poster_storage(monkeypatch: pytest.MonkeyPatch) -> Generator[None, None, None]:
+    """Replace Supabase Storage calls with an in-memory fake so tests never hit the network."""
+    objects: dict[tuple[str, str], bytes] = {}
+
+    def fake_upload(bucket: str, object_path: str, content: bytes, content_type: str) -> None:
+        objects[(bucket, object_path)] = content
+
+    def fake_download(bucket: str, object_path: str) -> bytes:
+        try:
+            return objects[(bucket, object_path)]
+        except KeyError:
+            raise supabase_storage.StorageObjectNotFoundError(object_path) from None
+
+    def fake_delete(bucket: str, object_path: str) -> None:
+        objects.pop((bucket, object_path), None)
+
+    monkeypatch.setattr(supabase_storage, "upload_object", fake_upload)
+    monkeypatch.setattr(supabase_storage, "download_object", fake_download)
+    monkeypatch.setattr(supabase_storage, "delete_object", fake_delete)
+    yield
 
 
 @pytest.fixture

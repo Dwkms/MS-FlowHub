@@ -67,8 +67,6 @@ class EmployeeSummary(BaseModel):
     manager: EmployeeManagerSummary | None
     employment_status: str
     daily_work_status: str | None
-    has_employment_status_reason: bool
-    has_daily_work_reason: bool
     check_in_at: datetime | None
     check_out_at: datetime | None
     work_location: str
@@ -95,6 +93,21 @@ class StatusReasonDetail(BaseModel):
     period_end: date | None
     registered_by_name: str | None
     registered_at: datetime | None
+
+
+class AttendanceChangeHistoryItem(BaseModel):
+    id: str
+    work_date: date
+    before_work_status: str | None
+    after_work_status: str
+    before_reason_category: str | None
+    after_reason_category: str | None
+    before_reason_summary: str | None
+    after_reason_summary: str | None
+    before_private_note: str | None
+    after_private_note: str | None
+    changed_by_name: str | None
+    changed_at: datetime
 
 
 class AttendanceStatusUpdate(BaseModel):

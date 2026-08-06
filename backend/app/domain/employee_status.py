@@ -11,6 +11,7 @@ DAILY_WORK_STATUSES = (
     "AFTERNOON_HALF",
     "SICK_LEAVE",
     "TRAINING",
+    "OTHER",
     "OFF_WORK",
     "ABSENT",
 )

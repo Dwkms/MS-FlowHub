@@ -62,6 +62,23 @@ def test_request_rejects_invalid_approver(client: TestClient) -> None:
     assert response.status_code == 422
 
 
+def test_super_admin_can_approve_own_recruitment_request(client: TestClient) -> None:
+    set_authenticated_actor(client, "emp-head", role="SUPER_ADMIN")
+    payload = request_payload()
+    payload["approver_id"] = "emp-head"
+
+    created = client.post("/api/v1/recruitment-requests", json=payload)
+    assert created.status_code == 201
+    submitted = client.post(f"/api/v1/recruitment-requests/{created.json()['id']}/submit", json={})
+    approved = client.post(
+        f"/api/v1/approvals/{submitted.json()['approval_document_id']}/approve", json={}
+    )
+
+    assert submitted.status_code == 200
+    assert approved.status_code == 200
+    assert approved.json()["status"] == "APPROVED"
+
+
 def test_requester_can_upload_poster_without_actor_id(client: TestClient) -> None:
     request = create_draft(client)
 
@@ -133,6 +150,19 @@ def test_only_super_admin_can_delete_request(client: TestClient) -> None:
 
     assert forbidden.status_code == 403
     assert deleted.status_code == 204
+
+
+def test_super_admin_can_delete_linked_recruitment_approval(client: TestClient) -> None:
+    request = create_draft(client)
+    submitted = client.post(f"/api/v1/recruitment-requests/{request['id']}/submit", json={})
+    assert submitted.status_code == 200
+
+    set_authenticated_actor(client, "emp-head", role="SUPER_ADMIN")
+    deleted = client.delete(f"/api/v1/approvals/{submitted.json()['approval_document_id']}")
+    missing_request = client.get(f"/api/v1/recruitment-requests/{request['id']}")
+
+    assert deleted.status_code == 204
+    assert missing_request.status_code == 404
 
 
 def test_approval_processing_creates_job_posting(client: TestClient) -> None:

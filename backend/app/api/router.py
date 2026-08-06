@@ -35,4 +35,4 @@ def get_dashboard(
     service: DashboardServiceDependency,
     actor: AuthenticatedActor,
 ) -> DashboardResponse:
-    return service.get_dashboard(actor.employee_id)
+    return service.get_dashboard(actor.employee_id, actor.role)

@@ -1,4 +1,5 @@
 import logging
+from collections.abc import Sequence
 from datetime import UTC, date, datetime, time
 
 from fastapi import HTTPException, status
@@ -18,6 +19,7 @@ from app.models.auth import EmployeeAccount
 from app.models.organization import Department, Employee, Team
 from app.repositories.organization_repository import OrganizationRepository
 from app.schemas.employee import (
+    AttendanceChangeHistoryItem,
     AttendanceStatusUpdate,
     EmployeeCreate,
     EmployeeDetail,
@@ -166,6 +168,12 @@ class EmployeeService:
             )
         work_date = payload.work_date or date.today()
         record = self.repository.get_attendance_record(employee.id, work_date)
+        before_values = (
+            record.work_status if record else None,
+            record.reason_category if record else None,
+            record.reason_summary if record else None,
+            record.private_note if record else None,
+        )
         if record is None:
             record = self.repository.create_attendance_record(
                 employee.id, work_date, payload.work_status
@@ -201,8 +209,41 @@ class EmployeeService:
         else:
             record.check_in_at = None
             record.check_out_at = None
+        after_values = (
+            record.work_status,
+            record.reason_category,
+            record.reason_summary,
+            record.private_note,
+        )
+        if before_values != after_values:
+            # A newly created attendance record must exist before its audit row is inserted.
+            # The ORM models intentionally have no relationship collection, so flush ordering
+            # cannot be inferred from the two pending objects alone.
+            self.session.flush([record])
+            self.repository.create_attendance_change_history(
+                record,
+                before_work_status=before_values[0],
+                before_reason_category=before_values[1],
+                before_reason_summary=before_values[2],
+                before_private_note=before_values[3],
+                changed_by_id=actor.employee_id,
+            )
         self._commit()
         return self.detail(employee_id, actor)
+
+    def attendance_change_history(
+        self, employee_id: str, actor: ActorContext, work_date: date | None = None
+    ) -> Sequence[AttendanceChangeHistoryItem]:
+        self.detail(employee_id, actor)
+        items = self.repository.list_attendance_change_history(
+            employee_id, work_date or date.today()
+        )
+        if can_view_private_status_reasons(actor):
+            return items
+        return [
+            item.model_copy(update={"before_private_note": None, "after_private_note": None})
+            for item in items
+        ]
 
     def update_employment_status_reason(
         self, employee_id: str, actor: ActorContext, payload: EmploymentStatusReasonUpdate
@@ -240,13 +281,6 @@ class EmployeeService:
             status_code=status.HTTP_403_FORBIDDEN,
             detail="본인, 같은 팀 관리자 또는 권한 있는 관리자만 상태를 변경할 수 있습니다.",
         )
-
-    def _require_self_or_admin(self, actor_id: str, employee: Employee) -> None:
-        actor = self._require_employee(actor_id)
-        if actor.id != employee.id and actor.role != "ADMIN":
-            raise HTTPException(
-                status_code=403, detail="본인 또는 관리자만 상태 사유를 변경할 수 있습니다."
-            )
 
     def _can_view_private_status_reasons(self, viewer_id: str | None) -> bool:
         viewer = self.repository.get_employee_model(viewer_id) if viewer_id else None

@@ -4,6 +4,7 @@ import Image from "next/image";
 import { type FormEvent, useEffect, useState } from "react";
 
 import {
+  getAttendanceChangeHistory,
   getEmployee,
   getEmployeeDepartments,
   listEmployees,
@@ -12,6 +13,7 @@ import {
 } from "@/features/employees/api";
 import { useCurrentUser } from "@/features/current-user/current-user-provider";
 import type {
+  AttendanceChangeHistoryItem,
   Department,
   EmployeeDetail,
   EmployeePage,
@@ -34,6 +36,7 @@ const workLabels: Record<string, string> = {
   AFTERNOON_HALF: "오후 반차",
   SICK_LEAVE: "병가",
   TRAINING: "교육",
+  OTHER: "기타",
   OFF_WORK: "퇴근",
   ABSENT: "결근",
 };
@@ -86,6 +89,10 @@ function ReasonPanel({ title, status, reason }: { title: string; status: string;
   return <section className="status-detail-panel"><h3>{title} · {status}</h3><dl><div><dt>적용 기간</dt><dd>{formatPeriod(reason)}</dd></div><div><dt>공개 사유</dt><dd>{reason.reason_summary ?? "등록된 공개 사유가 없습니다."}</dd></div>{reason.private_note && <div><dt>비공개 상세</dt><dd>{reason.private_note}</dd></div>}<div><dt>등록자</dt><dd>{reason.registered_by_name ?? "-"}</dd></div><div><dt>등록일</dt><dd>{reason.registered_at ? new Intl.DateTimeFormat("ko-KR", { dateStyle: "medium", timeStyle: "short" }).format(new Date(reason.registered_at)) : "-"}</dd></div></dl></section>;
 }
 
+function AttendanceHistoryPanel({ items }: { items: AttendanceChangeHistoryItem[] }) {
+  return <aside className="attendance-history-panel"><div className="attendance-history-heading"><div><h3>근태 변경 이력</h3><p>선택한 날짜에 발생한 상태 변경</p></div><span>{items.length}건</span></div>{items.length === 0 ? <p className="attendance-history-empty">기록된 근태 변경 이력이 없습니다.</p> : <div className="attendance-history-scroll"><ol>{items.map((item) => <li key={item.id}><time>{new Intl.DateTimeFormat("ko-KR", { hour: "2-digit", minute: "2-digit", hour12: false }).format(new Date(item.changed_at))}</time><b>{workLabels[item.before_work_status ?? ""] ?? "초기 상태"} → {workLabels[item.after_work_status] ?? item.after_work_status}</b><span>{item.after_reason_summary ?? item.before_reason_summary ?? "사유 없음"}</span><small>변경자: {item.changed_by_name ?? "-"}</small></li>)}</ol></div>}</aside>;
+}
+
 export function EmployeeManagement() {
   const { currentEmployee } = useCurrentUser();
   const [data, setData] = useState<EmployeePage | null>(null);
@@ -99,10 +106,11 @@ export function EmployeeManagement() {
   const [reloadToken, setReloadToken] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<EmployeeDetail | null>(null);
+  const [attendanceHistory, setAttendanceHistory] = useState<AttendanceChangeHistoryItem[]>([]);
+  const [attendanceFormOpen, setAttendanceFormOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(true);
   const [draftWorkStatus, setDraftWorkStatus] = useState("WORKING");
-  const [workReasonCategory, setWorkReasonCategory] = useState("OTHER");
   const [workReasonSummary, setWorkReasonSummary] = useState("");
-  const [workPrivateNote, setWorkPrivateNote] = useState("");
   const [leaveReasonCategory, setLeaveReasonCategory] = useState("PERSONAL");
   const [leaveReasonSummary, setLeaveReasonSummary] = useState("");
   const [leavePrivateNote, setLeavePrivateNote] = useState("");
@@ -132,21 +140,40 @@ export function EmployeeManagement() {
 
   const resetPage = () => setPage(1);
   const openDetail = (employeeId: string) => {
+    setAttendanceHistory([]);
+    setAttendanceFormOpen(false);
+    setHistoryOpen(true);
     void getEmployee(employeeId).then((detail) => {
       setSelected(detail);
       setDraftWorkStatus(detail.daily_work_status ?? "WORKING");
-      setWorkReasonCategory(detail.daily_work_reason?.reason_category ?? "OTHER");
       setWorkReasonSummary(detail.daily_work_reason?.reason_summary ?? "");
-      setWorkPrivateNote(detail.daily_work_reason?.private_note ?? "");
       setLeaveReasonCategory(detail.employment_status_reason?.reason_category ?? "PERSONAL");
       setLeaveReasonSummary(detail.employment_status_reason?.reason_summary ?? "");
       setLeavePrivateNote(detail.employment_status_reason?.private_note ?? "");
+      return getAttendanceChangeHistory(employeeId, workDate);
+    }).then((items) => {
+      setAttendanceHistory(items);
     }).catch(() => setError("직원 상세 정보를 불러오지 못했습니다."));
   };
   const canEditSelected = Boolean(selected && (
-    ["SUPER_ADMIN", "HR_ADMIN", "TEAM_ADMIN", "ADMIN"].includes(currentEmployee.role)
+    ["SUPER_ADMIN", "HR_ADMIN"].includes(currentEmployee.role)
+    || (
+      currentEmployee.role === "TEAM_ADMIN"
+      && currentEmployee.team_code != null
+      && currentEmployee.team_code === selected.team_code
+    )
     || currentEmployee.id === selected.id
   ));
+  const requestCloseDetail = () => {
+    const hasOpenEditor = attendanceFormOpen || Boolean(
+      selected && canEditSelected && selected.employment_status === "ON_LEAVE"
+    );
+    if (hasOpenEditor && !window.confirm("작성 중인 내용이 사라집니다. 직원 상세를 닫을까요?")) {
+      return;
+    }
+    setSelected(null);
+    setAttendanceFormOpen(false);
+  };
   const showWorkReasonInputs = !normalWorkStatuses.has(draftWorkStatus);
   const workReasonRequired = requiredWorkReasonStatuses.has(draftWorkStatus);
 
@@ -157,12 +184,14 @@ export function EmployeeManagement() {
     try {
       const detail = await updateAttendanceStatus(selected.id, {
         work_status: draftWorkStatus,
-        reason_category: showWorkReasonInputs ? workReasonCategory : undefined,
         reason_summary: showWorkReasonInputs ? workReasonSummary || undefined : undefined,
-        private_note: showWorkReasonInputs ? workPrivateNote || undefined : undefined,
         work_date: workDate,
       });
       setSelected(detail);
+      const history = await getAttendanceChangeHistory(selected.id, workDate);
+      setAttendanceHistory(history);
+      setAttendanceFormOpen(false);
+      setHistoryOpen(true);
       setReloadToken((value) => value + 1);
       setError(null);
     } catch (caught) {
@@ -192,12 +221,22 @@ export function EmployeeManagement() {
     <div className="page-heading"><div><span className="section-kicker">EMPLOYEE MANAGEMENT</span><h1>직원 · 조직 관리</h1><p>조직과 직원 정보를 실제 DB 데이터로 조회합니다.</p></div><span className="employee-count">{data ? `${data.total}명` : "불러오는 중"}</span></div>
     {error && <div className="inline-alert error">{error}</div>}
     <section className="panel approval-list-panel"><div className="filter-bar employee-filter-bar"><input aria-label="직원 검색" value={search} onChange={(event) => { setSearch(event.target.value); resetPage(); }} placeholder="이름, 사번, 이메일, 담당 역할 검색" /><select aria-label="부서 필터" value={department} onChange={(event) => { setDepartment(event.target.value); resetPage(); }}><option value="">전체 부서</option>{departments.map((item) => <option key={item.id} value={item.code}>{item.name}</option>)}</select><select aria-label="재직 상태 필터" value={employmentStatus} onChange={(event) => { setEmploymentStatus(event.target.value); resetPage(); }}><option value="">전체 상태</option>{Object.entries(employmentLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select><select aria-label="근무 상태 필터" value={dailyWorkStatus} onChange={(event) => { setDailyWorkStatus(event.target.value); resetPage(); }}><option value="">전체 근무 상태</option>{Object.entries(workLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select><button className="secondary-button organization-chart-button" onClick={() => setChartOpen(true)}>조직도 보기</button></div>
-      {!data ? <div className="state-box">직원 데이터를 불러오는 중입니다.</div> : data.items.length === 0 ? <div className="state-box"><strong>검색 결과가 없습니다.</strong><p>검색어나 필터를 변경해 보세요.</p></div> : <><div className="employee-mobile-list"><div className="employee-mobile-head"><span>직원</span><span>직급</span><span>재직 상태</span><span>근무 상태</span></div>{data.items.map((item) => <div className="employee-mobile-row" key={item.id}><button className="employee-mobile-name" onClick={() => openDetail(item.id)}><span className={`team-avatar ${teamBadgeTone(item.team_code, item.team, item.department)}`}>{teamBadgeLabel(item.team_code, item.team, item.department)}</span><span><b>{item.name}</b><small>{item.team ?? item.department}</small></span></button><span className="employee-mobile-position">{item.position}</span><span className="status-with-info"><span className={`employment-badge ${item.employment_status.toLowerCase()}`}>{employmentLabels[item.employment_status]}</span>{item.has_employment_status_reason && <button className="reason-info-button" onClick={() => openDetail(item.id)} aria-label={`${item.name} 재직 상태 사유 보기`} title="상태 사유 보기">ⓘ</button>}</span><span className="status-with-info">{item.daily_work_status ? <><span className={`work-badge ${item.daily_work_status.toLowerCase()}`}>{workLabels[item.daily_work_status]}</span>{item.has_daily_work_reason && <button className="reason-info-button" onClick={() => openDetail(item.id)} aria-label={`${item.name} 근무 상태 사유 보기`} title="상태 사유 보기">ⓘ</button>}</> : <span className="empty-work-status">-</span>}</span></div>)}</div><div className="table-wrap employee-desktop-table"><table className="approval-table employee-table"><thead><tr><th>직원</th><th>부서 / 팀</th><th>직급</th><th>담당 역할</th><th>이메일</th><th>재직 상태</th><th>오늘 근무 상태</th><th>근무지</th></tr></thead><tbody>{data.items.map((item) => <tr key={item.id}><td><button className="employee-detail-button" onClick={() => openDetail(item.id)}><span className="mini-avatar">{item.name.slice(0, 1)}</span><b>{item.name}</b><small>{item.employee_no}</small></button></td><td>{item.department}<small>{item.team ?? "-"}</small></td><td>{item.position}</td><td>{item.job_title}</td><td>{item.email}</td><td><span className="status-with-info"><span className={`employment-badge ${item.employment_status.toLowerCase()}`}>{employmentLabels[item.employment_status]}</span>{item.has_employment_status_reason && <button className="reason-info-button" onClick={() => openDetail(item.id)} aria-label={`${item.name} 재직 상태 사유 보기`} title="상태 사유 보기">ⓘ</button>}</span></td><td>{item.daily_work_status ? <span className="status-with-info"><span className={`work-badge ${item.daily_work_status.toLowerCase()}`}>{workLabels[item.daily_work_status]}</span>{item.has_daily_work_reason && <button className="reason-info-button" onClick={() => openDetail(item.id)} aria-label={`${item.name} 근무 상태 사유 보기`} title="상태 사유 보기">ⓘ</button>}</span> : <span className="empty-work-status">-</span>}</td><td>{item.work_location}</td></tr>)}</tbody></table></div><div className="pager"><button disabled={page <= 1} onClick={() => setPage(page - 1)}>이전</button><span>{data.page} / {data.total_pages || 1}</span><button disabled={page >= data.total_pages} onClick={() => setPage(page + 1)}>다음</button></div></>}
+      {!data ? <div className="state-box">직원 데이터를 불러오는 중입니다.</div> : data.items.length === 0 ? <div className="state-box"><strong>검색 결과가 없습니다.</strong><p>검색어나 필터를 변경해 보세요.</p></div> : <><div className="employee-mobile-list"><div className="employee-mobile-head"><span>직원</span><span>직급</span><span>재직 상태</span><span>근무 상태</span></div>{data.items.map((item) => <div className="employee-mobile-row" key={item.id}><button className="employee-mobile-name" onClick={() => openDetail(item.id)}><span className={`team-avatar ${teamBadgeTone(item.team_code, item.team, item.department)}`}>{teamBadgeLabel(item.team_code, item.team, item.department)}</span><span><b>{item.name}</b><small>{item.team ?? item.department}</small></span></button><span className="employee-mobile-position">{item.position}</span><span className={`employment-badge ${item.employment_status.toLowerCase()}`}>{employmentLabels[item.employment_status]}</span>{item.daily_work_status ? <span className={`work-badge ${item.daily_work_status.toLowerCase()}`}>{workLabels[item.daily_work_status]}</span> : <span className="empty-work-status">-</span>}</div>)}</div><div className="table-wrap employee-desktop-table"><table className="approval-table employee-table"><thead><tr><th>직원</th><th>부서 / 팀</th><th>직급</th><th>담당 역할</th><th>이메일</th><th>재직 상태</th><th>오늘 근무 상태</th><th>근무지</th></tr></thead><tbody>{data.items.map((item) => <tr key={item.id}><td><button className="employee-detail-button" onClick={() => openDetail(item.id)}><span className="mini-avatar">{item.name.slice(0, 1)}</span><b>{item.name}</b><small>{item.employee_no}</small></button></td><td>{item.department}<small>{item.team ?? "-"}</small></td><td>{item.position}</td><td>{item.job_title}</td><td>{item.email}</td><td><span className={`employment-badge ${item.employment_status.toLowerCase()}`}>{employmentLabels[item.employment_status]}</span></td><td>{item.daily_work_status ? <span className={`work-badge ${item.daily_work_status.toLowerCase()}`}>{workLabels[item.daily_work_status]}</span> : <span className="empty-work-status">-</span>}</td><td>{item.work_location}</td></tr>)}</tbody></table></div><div className="pager"><button disabled={page <= 1} onClick={() => setPage(page - 1)}>이전</button><span>{data.page} / {data.total_pages || 1}</span><button disabled={page >= data.total_pages} onClick={() => setPage(page + 1)}>다음</button></div></>}
     </section>
-    {selected && <div className="modal-backdrop" onClick={() => setSelected(null)}><section className="employee-modal employee-status-modal" onClick={(event) => event.stopPropagation()}><button className="modal-close" onClick={() => setSelected(null)} aria-label="닫기">×</button><span className="mini-avatar large">{selected.name.slice(0, 1)}</span><h2>{selected.name} <small>{selected.employee_no}</small></h2><p>{selected.department}{selected.team ? ` · ${selected.team}` : ""} · {selected.position}</p><dl><div><dt>담당 역할</dt><dd>{selected.job_title}</dd></div><div><dt>재직 / 근무</dt><dd>{employmentLabels[selected.employment_status]} / {selected.daily_work_status ? workLabels[selected.daily_work_status] : "-"}</dd></div></dl>{selected.daily_work_reason && <ReasonPanel title="근무 상태 상세" status={workLabels[selected.daily_work_status ?? ""] ?? "-"} reason={selected.daily_work_reason} />}{selected.employment_status_reason && <ReasonPanel title="재직 상태 상세" status={employmentLabels[selected.employment_status]} reason={selected.employment_status_reason} />}
-      {canEditSelected && selected.employment_status === "ACTIVE" && <form className="status-reason-form" onSubmit={saveAttendance}><h3>오늘의 근무 상태</h3><select value={draftWorkStatus} onChange={(event) => setDraftWorkStatus(event.target.value)}>{Object.entries(workLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>{showWorkReasonInputs && <><select value={workReasonCategory} onChange={(event) => setWorkReasonCategory(event.target.value)}>{Object.entries(reasonCategories).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select><textarea value={workReasonSummary} onChange={(event) => setWorkReasonSummary(event.target.value)} placeholder={workReasonRequired ? "공개 사유를 입력해 주세요 (필수)" : "공개 사유를 입력할 수 있습니다 (선택)"} required={workReasonRequired} maxLength={200} /><textarea value={workPrivateNote} onChange={(event) => setWorkPrivateNote(event.target.value)} placeholder="비공개 상세: 관리자·인사담당자만 조회합니다 (선택)" maxLength={500} /></>}<button className="primary-button" disabled={saving}>{saving ? "저장 중" : "근무 상태 저장"}</button></form>}
-      {canEditSelected && selected.employment_status === "ON_LEAVE" && <form className="status-reason-form" onSubmit={saveLeaveReason}><h3>휴직 사유</h3><select value={leaveReasonCategory} onChange={(event) => setLeaveReasonCategory(event.target.value)}>{Object.entries(reasonCategories).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select><textarea value={leaveReasonSummary} onChange={(event) => setLeaveReasonSummary(event.target.value)} placeholder="공개 사유를 입력해 주세요 (필수)" required maxLength={200} /><textarea value={leavePrivateNote} onChange={(event) => setLeavePrivateNote(event.target.value)} placeholder="비공개 상세: 관리자·인사담당자만 조회합니다 (선택)" maxLength={500} /><button className="primary-button" disabled={saving}>{saving ? "저장 중" : "휴직 사유 저장"}</button></form>}
-    </section></div>}
+    {selected && <div className="modal-backdrop" onClick={requestCloseDetail}>
+      <section className={`employee-modal employee-status-modal ${historyOpen ? "history-open" : "history-closed"}`} onClick={(event) => event.stopPropagation()}>
+        <div className="employee-detail-main">
+          <div className="employee-detail-heading"><div><h2>직원 상세</h2><p>직원 기본 정보와 오늘의 근태 상태를 확인합니다.</p></div><button className="modal-close" onClick={requestCloseDetail} aria-label="닫기">×</button></div>
+          <div className="employee-profile"><span className="mini-avatar large">{selected.name.slice(0, 1)}</span><div><b>{selected.name}</b><p>{selected.position} · {selected.department}{selected.team ? ` · ${selected.team}` : ""} · {selected.employee_no}</p></div></div>
+          <section className="employee-attendance-summary"><div className="employee-attendance-heading"><h3>오늘의 근태</h3><time>{workDate}</time></div><div className="employee-current-status"><div><span>현재 근무 상태</span><strong>{selected.daily_work_status ? workLabels[selected.daily_work_status] : "미등록"}</strong></div><span className={`work-badge ${selected.daily_work_status?.toLowerCase() ?? ""}`}>{selected.daily_work_status ? "상태 등록" : "등록 필요"}</span></div></section>
+          <div className={`attendance-actions ${canEditSelected && selected.employment_status === "ACTIVE" ? "" : "single-action"}`}>{canEditSelected && selected.employment_status === "ACTIVE" && <button className="primary-button" type="button" onClick={() => setAttendanceFormOpen((open) => !open)}>{attendanceFormOpen ? "근무 상태 변경 닫기" : "근무 상태 변경"}</button>}<button className="secondary-button" type="button" onClick={() => setHistoryOpen((open) => !open)}>{historyOpen ? "변경 이력 닫기" : "변경 이력 보기"}</button></div>
+          {selected.employment_status_reason && <ReasonPanel title="재직 상태 상세" status={employmentLabels[selected.employment_status]} reason={selected.employment_status_reason} />}
+          {canEditSelected && selected.employment_status === "ACTIVE" && attendanceFormOpen && <form className="status-reason-form" onSubmit={saveAttendance}><h3>근무 상태 변경</h3><select value={draftWorkStatus} onChange={(event) => setDraftWorkStatus(event.target.value)}>{Object.entries(workLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>{showWorkReasonInputs && <textarea value={workReasonSummary} onChange={(event) => setWorkReasonSummary(event.target.value)} placeholder={workReasonRequired ? "공개 사유를 입력해 주세요 (필수)" : "공개 사유를 입력할 수 있습니다 (선택)"} required={workReasonRequired} maxLength={200} />}<button className="primary-button" disabled={saving}>{saving ? "저장 중" : "근무 상태 저장"}</button></form>}
+          {canEditSelected && selected.employment_status === "ON_LEAVE" && <form className="status-reason-form" onSubmit={saveLeaveReason}><h3>휴직 사유</h3><select value={leaveReasonCategory} onChange={(event) => setLeaveReasonCategory(event.target.value)}>{Object.entries(reasonCategories).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select><textarea value={leaveReasonSummary} onChange={(event) => setLeaveReasonSummary(event.target.value)} placeholder="공개 사유를 입력해 주세요 (필수)" required maxLength={200} /><textarea value={leavePrivateNote} onChange={(event) => setLeavePrivateNote(event.target.value)} placeholder="비공개 상세: 관리자·인사담당자만 조회합니다 (선택)" maxLength={500} /><button className="primary-button" disabled={saving}>{saving ? "저장 중" : "휴직 사유 저장"}</button></form>}
+        </div>
+        {historyOpen && <AttendanceHistoryPanel items={attendanceHistory} />}
+      </section>
+    </div>}
     {chartOpen && <div className="modal-backdrop chart-backdrop" onClick={() => setChartOpen(false)}><section className="organization-chart-modal" onClick={(event) => event.stopPropagation()}><div className="organization-chart-heading"><div><span className="section-kicker">ORGANIZATION CHART</span><h2>MS FlowHub 조직도</h2></div><button className="modal-close" onClick={() => setChartOpen(false)} aria-label="닫기">×</button></div><Image src="/organization-chart.png" alt="MS FlowHub 조직도" width={1536} height={1024} priority /></section></div>}
   </section>;
 }

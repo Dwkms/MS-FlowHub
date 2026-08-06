@@ -16,19 +16,13 @@ import {
   formatDateTime,
   statusLabels,
 } from "@/features/approvals/presentation";
+import { ApprovalActionPanel } from "@/features/approvals/approval-action-panel";
+import { ApprovalHistoryPanel } from "@/features/approvals/approval-history-panel";
 import { useCurrentUser } from "@/features/current-user/current-user-provider";
 import { getRecruitmentRequest } from "@/features/recruitment/api";
 import { RecruitmentPosterAttachment } from "@/features/recruitment/recruitment-poster-attachment";
 import type { ApprovalDocument } from "@/types/approval";
 import type { RecruitmentRequest } from "@/types/recruitment";
-
-const actionLabels: Record<string, string> = {
-  CREATED: "문서 작성",
-  UPDATED: "문서 수정",
-  SUBMITTED: "결재 요청",
-  APPROVED: "승인",
-  REJECTED: "반려",
-};
 
 export function ApprovalDetail() {
   const params = useParams<{ id: string }>();
@@ -113,7 +107,10 @@ export function ApprovalDetail() {
 
   async function deleteDocument() {
     if (!document) return;
-    if (!window.confirm("관리자 권한으로 이 문서를 삭제할까요? 삭제한 문서는 복구할 수 없습니다.")) {
+    const linkedRecruitmentMessage = document.related_type === "RECRUITMENT_REQUEST"
+      ? " 연결된 채용 요청과 채용공고도 함께 삭제됩니다."
+      : "";
+    if (!window.confirm(`관리자 권한으로 이 문서를 삭제할까요?${linkedRecruitmentMessage} 삭제한 문서는 복구할 수 없습니다.`)) {
       return;
     }
 
@@ -146,11 +143,18 @@ export function ApprovalDetail() {
 
   const canSubmit =
     document.status === "DRAFT" && document.author_id === currentEmployee.id;
+  const isAdmin = currentEmployee.role === "SUPER_ADMIN";
+  const canSelfDecideRecruitment =
+    isAdmin &&
+    document.related_type === "RECRUITMENT_REQUEST" &&
+    document.author_id === currentEmployee.id;
   const canDecide =
     document.status === "PENDING" &&
-    document.author_id !== currentEmployee.id
-    && (document.approver_id === currentEmployee.id || ["SUPER_ADMIN", "ADMIN"].includes(currentEmployee.role));
-  const canDelete = ["SUPER_ADMIN", "ADMIN"].includes(currentEmployee.role);
+    (canSelfDecideRecruitment || (
+      document.author_id !== currentEmployee.id &&
+      (document.approver_id === currentEmployee.id || isAdmin)
+    ));
+  const canDelete = isAdmin;
   const isCompleted =
     document.status === "APPROVED" || document.status === "REJECTED";
 
@@ -258,91 +262,10 @@ export function ApprovalDetail() {
             )}
           </section>
 
-          {(canSubmit || canDecide) && (
-            <section className="panel action-panel">
-              <h2>{canSubmit ? "결재 요청" : "결재 처리"}</h2>
-              {canSubmit && (
-                <>
-                  <label className="form-field full">
-                    <span>상신 의견</span>
-                    <textarea
-                      rows={3}
-                      value={comment}
-                      onChange={(event) => setComment(event.target.value)}
-                      placeholder="결재자에게 전달할 의견을 입력하세요 (선택)"
-                    />
-                  </label>
-                  <div className="form-actions">
-                    <button
-                      className="primary-button"
-                      disabled={processing}
-                      onClick={() => void processAction("submit")}
-                    >
-                      {processing ? "처리 중..." : "결재 요청"}
-                    </button>
-                  </div>
-                </>
-              )}
-              {canDecide && (
-                <>
-                  <label className="form-field full">
-                    <span>승인 의견</span>
-                    <textarea
-                      rows={2}
-                      value={comment}
-                      onChange={(event) => setComment(event.target.value)}
-                      placeholder="승인 의견을 입력하세요 (선택)"
-                    />
-                  </label>
-                  <label className="form-field full">
-                    <span>반려 사유 *</span>
-                    <textarea
-                      rows={3}
-                      value={rejectReason}
-                      onChange={(event) => setRejectReason(event.target.value)}
-                      placeholder="반려 시 반드시 사유를 입력하세요"
-                    />
-                  </label>
-                  <div className="form-actions">
-                    <button
-                      className="danger-button"
-                      disabled={processing}
-                      onClick={() => void processAction("reject")}
-                    >
-                      반려
-                    </button>
-                    <button
-                      className="primary-button"
-                      disabled={processing}
-                      onClick={() => void processAction("approve")}
-                    >
-                      승인
-                    </button>
-                  </div>
-                </>
-              )}
-            </section>
-          )}
+          <ApprovalActionPanel canSubmit={canSubmit} canDecide={canDecide} comment={comment} rejectReason={rejectReason} processing={processing} onCommentChange={setComment} onRejectReasonChange={setRejectReason} onProcess={(action) => void processAction(action)} />
         </div>
 
-        <aside className="panel history-panel">
-          <span className="section-kicker">HISTORY</span>
-          <h2>결재 처리 이력</h2>
-          <div className="history-list">
-            {document.histories.map((history) => (
-              <article key={history.id}>
-                <i />
-                <div>
-                  <strong>{actionLabels[history.action] ?? history.action}</strong>
-                  <p>
-                    {history.actor_name} · {formatDateTime(history.created_at)}
-                  </p>
-                  {history.comment && <blockquote>{history.comment}</blockquote>}
-                </div>
-              </article>
-            ))}
-          </div>
-        </aside>
+        <ApprovalHistoryPanel histories={document.histories} />
       </div>
     </section>
   );

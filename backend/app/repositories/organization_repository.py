@@ -9,10 +9,17 @@ from app.domain.employee_status import (
     NON_WORKING_EMPLOYMENT_STATUSES,
     NORMAL_WORK_STATUSES,
 )
-from app.models.organization import AttendanceRecord, Department, Employee, Team
+from app.models.organization import (
+    AttendanceChangeHistory,
+    AttendanceRecord,
+    Department,
+    Employee,
+    Team,
+)
 from app.schemas.common import DepartmentResponse as LegacyDepartmentResponse
 from app.schemas.common import EmployeeResponse
 from app.schemas.employee import (
+    AttendanceChangeHistoryItem,
     DepartmentResponse,
     EmployeeDetail,
     EmployeeManagerSummary,
@@ -31,16 +38,6 @@ _ROLE_LABELS = {
     "ADMIN": "관리자",
 }
 _SPECIAL_WORK_STATUSES = {"SICK_LEAVE", "MORNING_HALF", "AFTERNOON_HALF"}
-_EMPLOYMENT_STATUS_BY_NUMBER = {
-    "MS0018": "ON_LEAVE",
-    "MS0031": "SCHEDULED",
-    "MS0041": "RESIGNED",
-}
-_EMPLOYMENT_STATUS_REASON_BY_NUMBER = {
-    "MS0018": "개인 사정으로 휴직 중",
-    "MS0031": "입사 절차 진행 중",
-    "MS0041": "계약 기간 종료",
-}
 _SAMPLE_ATTENDANCE_REASONS = {
     "SICK_LEAVE": ("HEALTH", "감기 증상으로 휴식", "회복을 위해 병원 진료 후 휴식"),
     "MORNING_HALF": ("HEALTH", "오전 병원 진료", None),
@@ -170,19 +167,15 @@ class OrganizationRepository:
             )
             item.position, item.job_title, item.job_description = position, job_title, job_title
             item.employment_type = "REGULAR"
-            item.employment_status = _EMPLOYMENT_STATUS_BY_NUMBER.get(number, "ACTIVE")
-            item.employment_status_reason = _EMPLOYMENT_STATUS_REASON_BY_NUMBER.get(number)
-            item.employment_status_reason_category = "PERSONAL" if number == "MS0018" else None
-            item.employment_status_reason_summary = item.employment_status_reason
-            item.employment_status_private_note = (
-                "복귀 일정은 인사팀과 별도 협의" if number == "MS0018" else None
-            )
-            item.employment_status_reason_registered_by_id = item.id if item.id else None
-            item.employment_status_reason_registered_at = datetime.now(UTC)
-            item.employment_status_effective_from = (
-                date.today() if item.employment_status_reason else None
-            )
-            item.is_active = item.employment_status != "RESIGNED"
+            item.employment_status = "ACTIVE"
+            item.employment_status_reason = None
+            item.employment_status_reason_category = None
+            item.employment_status_reason_summary = None
+            item.employment_status_private_note = None
+            item.employment_status_reason_registered_by_id = None
+            item.employment_status_reason_registered_at = None
+            item.employment_status_effective_from = None
+            item.is_active = True
             item.work_location, item.phone_extension = "서울 본사", str(1000 + index)
             employees[number] = item
         self.session.flush()
@@ -256,8 +249,9 @@ class OrganizationRepository:
 
     def list_employees(self) -> list[EmployeeResponse]:
         rows = self.session.execute(
-            select(Employee, Department)
+            select(Employee, Department, Team)
             .join(Department, Employee.department_id == Department.id)
+            .outerjoin(Team, Employee.team_id == Team.id)
             .where(Employee.is_active.is_(True))
             .order_by(Employee.employee_no)
         ).all()
@@ -271,14 +265,16 @@ class OrganizationRepository:
                 position=e.position,
                 department_id=e.department_id,
                 department_name=d.name,
+                team_code=t.code if t else None,
             )
-            for e, d in rows
+            for e, d, t in rows
         ]
 
     def get_employee(self, employee_id: str) -> EmployeeResponse | None:
         row = self.session.execute(
-            select(Employee, Department)
+            select(Employee, Department, Team)
             .join(Department, Employee.department_id == Department.id)
+            .outerjoin(Team, Employee.team_id == Team.id)
             .where(Employee.id == employee_id, Employee.is_active.is_(True))
         ).one_or_none()
         return (
@@ -293,6 +289,7 @@ class OrganizationRepository:
                 position=row[0].position,
                 department_id=row[0].department_id,
                 department_name=row[1].name,
+                team_code=row[2].code if row[2] else None,
             )
         )
 
@@ -433,6 +430,68 @@ class OrganizationRepository:
         self.session.add(record)
         return record
 
+    def create_attendance_change_history(
+        self,
+        record: AttendanceRecord,
+        *,
+        before_work_status: str | None,
+        before_reason_category: str | None,
+        before_reason_summary: str | None,
+        before_private_note: str | None,
+        changed_by_id: str,
+    ) -> None:
+        from uuid import uuid4
+
+        self.session.add(
+            AttendanceChangeHistory(
+                id=str(uuid4()),
+                attendance_record_id=record.id,
+                before_work_status=before_work_status,
+                after_work_status=record.work_status,
+                before_reason_category=before_reason_category,
+                after_reason_category=record.reason_category,
+                before_reason_summary=before_reason_summary,
+                after_reason_summary=record.reason_summary,
+                before_private_note=before_private_note,
+                after_private_note=record.private_note,
+                changed_by_id=changed_by_id,
+            )
+        )
+
+    def list_attendance_change_history(
+        self, employee_id: str, work_date: date
+    ) -> list[AttendanceChangeHistoryItem]:
+        rows = self.session.execute(
+            select(AttendanceChangeHistory, Employee)
+            .join(
+                AttendanceRecord,
+                AttendanceChangeHistory.attendance_record_id == AttendanceRecord.id,
+            )
+            .outerjoin(Employee, AttendanceChangeHistory.changed_by_id == Employee.id)
+            .where(
+                AttendanceRecord.employee_id == employee_id,
+                AttendanceRecord.work_date == work_date,
+            )
+            .order_by(AttendanceChangeHistory.changed_at.desc())
+        ).all()
+        return [
+            AttendanceChangeHistoryItem(
+                id=history.id,
+                work_date=work_date,
+                before_work_status=history.before_work_status,
+                after_work_status=history.after_work_status,
+                before_reason_category=history.before_reason_category,
+                after_reason_category=history.after_reason_category,
+                before_reason_summary=history.before_reason_summary,
+                after_reason_summary=history.after_reason_summary,
+                before_private_note=history.before_private_note,
+                after_private_note=history.after_private_note,
+                changed_by_name=actor.name if actor else None,
+                changed_at=history.changed_at,
+            )
+            for history, actor in rows
+        ]
+
     def list_department_details(self) -> list[DepartmentResponse]:
         return [
             DepartmentResponse(id=d.id, code=d.code, name=d.name, description=d.description)
@@ -469,20 +528,12 @@ class OrganizationRepository:
             if manager
             else None,
             employment_status=employee.employment_status,
-            has_employment_status_reason=bool(
-                employee.employment_status_reason_summary or employee.employment_status_private_note
-            ),
             daily_work_status=(
                 None
                 if employee.employment_status in NON_WORKING_EMPLOYMENT_STATUSES
                 else attendance.work_status
                 if attendance
                 else None
-            ),
-            has_daily_work_reason=bool(
-                attendance
-                and attendance.work_status not in NORMAL_WORK_STATUSES
-                and (attendance.reason_summary or attendance.private_note)
             ),
             check_in_at=attendance.check_in_at if attendance else None,
             check_out_at=attendance.check_out_at if attendance else None,

@@ -29,7 +29,7 @@ export function ApprovalForm() {
     approverId && approverId !== currentEmployee.id
       ? approverId
       : approvers[0]?.id ?? "";
-  const canDraftForAnyDepartment = ["SUPER_ADMIN", "ADMIN"].includes(currentEmployee.role);
+  const canDraftForAnyDepartment = currentEmployee.role === "SUPER_ADMIN";
   const availableDepartments = canDraftForAnyDepartment
     ? departments
     : departments.filter((department) => department.id === currentEmployee.department_id);

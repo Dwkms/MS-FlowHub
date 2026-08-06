@@ -148,6 +148,17 @@ class ApprovalRepository:
         )
         return self.session.scalar(statement) or 0
 
+    def count_pending_for_author(self, employee_id: str) -> int:
+        statement = (
+            select(func.count())
+            .select_from(ApprovalDocument)
+            .where(
+                ApprovalDocument.author_id == employee_id,
+                ApprovalDocument.status == "PENDING",
+            )
+        )
+        return self.session.scalar(statement) or 0
+
     def list_recent_tasks(self, employee_id: str, limit: int = 3) -> list[DashboardTask]:
         statement = (
             select(ApprovalDocument, Employee)

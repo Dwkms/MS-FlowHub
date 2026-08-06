@@ -105,6 +105,10 @@ class ApprovalService:
         if actor.role not in {"SUPER_ADMIN", "ADMIN"}:
             raise HTTPException(status_code=403, detail="관리자만 문서를 삭제할 수 있습니다.")
 
+        if document.related_type == "RECRUITMENT_REQUEST" and document.related_id:
+            self.recruitment.delete_request(document.related_id, actor)
+            return
+
         self.approvals.delete(document)
         self.session.commit()
 
@@ -174,6 +178,11 @@ class ApprovalService:
     def _require_decision_permission(self, document: ApprovalDocument, actor: ActorContext) -> None:
         self._require_status(document, "PENDING", "결재 대기 문서만 처리할 수 있습니다.")
         if actor.employee_id == document.author_id:
+            if (
+                actor.role in {"SUPER_ADMIN", "ADMIN"}
+                and document.related_type == "RECRUITMENT_REQUEST"
+            ):
+                return
             raise HTTPException(
                 status_code=403, detail="작성자는 본인 문서를 승인하거나 반려할 수 없습니다."
             )

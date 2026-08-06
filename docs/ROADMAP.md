@@ -1,14 +1,50 @@
 # Roadmap
 
-## Next implementation phase (updated 2026-08-01)
+> 기준일: 2026-08-05. 실제 작업 우선순위와 일정은 MS FlowHub Jira 보드·타임라인에서 관리합니다. 아래 날짜별 계획은 초기 기준선 기록이며, 완료 여부를 현재 구현 상태로 해석하지 않습니다.
 
-1. Supabase Auth JWT verification and employee-account mapping
-2. Attendance change history and multi-day leave periods
-3. Manager/HR approval workflow for leave requests
-4. Production deployment, Supabase Storage, CI/CD, and E2E verification
-5. Jira-based schedule and work-item tracking
-6. Dashboard milestone, access-module, and administrator-context content cleanup
-7. Employee manual MVP (implemented: text manual, image summary, role-based management)
+## 현재 구현 완료 범위
+
+- Supabase Auth/JWT 기반 로그인·세션·역할 검증
+- 직원·조직 관리, 근태 상태·사유, 반응형 조직도
+- 근태 변경 이력, 직원 상세 화면의 상태 변경·이력 조회 UX
+- 전자결재 작성·상신·승인·반려·이력
+- 채용 요청·포스터(Supabase Storage 저장)·승인 후 채용공고 생성, 지원자 관리·전형 이력
+- 실제 업무 데이터 기반 대시보드와 직원 매뉴얼 MVP
+- Backend pytest, Frontend lint/typecheck/build, Playwright E2E 기반
+
+## 현재 미구현 또는 보류 범위
+
+- 알림 조회·읽음 처리 화면/API(상단 종 아이콘은 비활성)
+- AI 생성 기능
+- 다일 휴가, CI/CD·운영 배포, 공통 오류 응답 형식
+- ATS·Storage 전환 관련 Playwright E2E 시나리오 추가(현재는 Backend pytest와 수동 검증만 완료)
+
+## Next implementation phase (updated 2026-08-05)
+
+1. CI/CD 기본 구성과 운영 배포 검증
+2. 다일 휴가 및 휴가 승인 흐름
+3. 공통 오류 응답 형식 정리(낮은 우선순위)
+
+## Jira 보드·타임라인 업데이트안 (2026-08-05)
+
+### 완료로 이동
+
+| 작업 | 연결 에픽 | 시작일 | 완료일 | 핵심 결과 |
+|---|---|---:|---:|---|
+| 대시보드 실제 업무 데이터 및 결재·채용 정리 | 대시보드·알림 | 2026-08-04 | 2026-08-04 | 고정 지표 제거, 실제 결재·채용공고 수 연동, 카드 이동, 결재 삭제·자기 결재 예외 보완 |
+| 문서·명세 현재 구현 정합화 | QA·배포·문서화 | 2026-08-04 | 2026-08-04 | README·API·데이터 모델·로드맵 정리, CRM 범위 제거 |
+| 근태 변경 이력 및 직원 상세 UX | 직원·조직 관리 | 2026-08-04 | 2026-08-04 | 이력 migration·권한 마스킹, 상세 2열 UI, 이력 스크롤, 작성 중 닫기 확인 |
+| ATS 지원자 관리 MVP | 채용 관리 | 2026-08-05 | 2026-08-05 | 지원자·전형 이력 migration, 역할별 API, 목록·상세·등록·단계 변경 화면 |
+| 채용 포스터 Supabase Storage 전환 | QA·배포·문서화 | 2026-08-05 | 2026-08-05 | 로컬 저장 제거, 비공개 버킷 연동, 기존 포스터 이관, 가짜 Storage로 pytest 격리 |
+
+### 다음 작업 — 의존 순서
+
+| 작업 | 연결 에픽 | 우선순위 | 시작일 | 목표 완료일 | 예상 |
+|---|---|---|---:|---:|---|
+| CI/CD·운영 배포 기본 구성 | QA·배포·문서화 | 높음 | 2026-08-06 | 2026-08-06 | 3~5시간 |
+| 공통 오류 응답 형식 | QA·배포·문서화 | 낮음 | 미정 | 미정 | AX 자동화 이후 검토 |
+
+ATS 지원자 관리 MVP는 완료됐다. 착수 전 세부 범위·권한 기획은 [archive/ATS_APPLICANT_MVP_PLAN.md](./archive/ATS_APPLICANT_MVP_PLAN.md), 실제 구현 기준은 [DATA_MODEL.md](./DATA_MODEL.md)를 참고한다.
 
 ## 현재 상태 요약 (2026-08-01)
 
@@ -69,16 +105,6 @@
 - 지연 시 제거: 공고 검색·필터, 지원자 부가 필드
 - 다음 단계 진입 조건: AI 없이도 채용 핵심 데이터 흐름 동작
 
-## 2026-08-10 ~ 2026-08-12 — CRM·견적 Lite
-
-- 구현 기능: 고객, 상품, 기회, 견적, 할인 기준·결재, 승인 후 확정
-- 완료 조건: 서버 재계산과 10% 경계 분기, 미승인 확정 차단
-- 테스트 항목: Decimal 계산, 10%/10% 초과, 결재 연동, rollback
-- 배울 개념: Decimal/NUMERIC, 집계, 설정값, 복합 트랜잭션
-- 위험 요소: 금액·상태 규칙과 UI를 3일 안에 함께 구현
-- 지연 시 제거: 영업기회 상태의 부가 단계, 상품 관리 편집
-- 다음 단계 진입 조건: AI 없이 영업 시나리오의 승인·확정 완료
-
 ## 2026-08-13 — 공통 AI
 
 - 구현 기능: MockAIProvider, 실제 Provider 인터페이스, 7개 요약·초안 기능
@@ -101,8 +127,8 @@
 
 ## 2026-08-15 — 시연과 버퍼
 
-- 구현 기능: 채용·영업 시연, 체크리스트, 스크린샷/영상, 버퍼
-- 완료 조건: 초기화된 시연 데이터로 두 흐름 재현
+- 구현 기능: 채용·전자결재 시연, 체크리스트, 스크린샷/영상, 버퍼
+- 완료 조건: 초기화된 시연 데이터로 핵심 흐름 재현
 - 테스트 항목: 시연 리허설과 복구 절차
 - 배울 개념: 기술 설명, 데모 스크립트, 한계 공개
 - 위험 요소: 원격 DB/네트워크와 당일 수정
@@ -111,5 +137,5 @@
 
 ## 지연 시 전체 우선순위
 
-유지: 전자결재 규칙, 승인 기반 공고, 할인 승인 기반 확정, Mock AI, 핵심 테스트.  
-우선 제거: 실제 LLM 구현체 → 부가 검색/필터 → 대시보드 통계 → UI polish → 부가 ATS/CRM 필드. 전체 일정은 임의로 변경하지 않는다.
+유지: 전자결재 규칙, 승인 기반 공고, 핵심 테스트.
+우선 제거: 실제 LLM 구현체 → 부가 검색/필터 → UI polish → 부가 ATS 필드. 전체 일정은 Jira 기준으로 관리한다.

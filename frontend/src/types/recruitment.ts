@@ -67,3 +67,53 @@ export interface JobPosting {
   created_at: string;
   updated_at: string;
 }
+
+export type ApplicantStage =
+  | "APPLIED"
+  | "SCREENING"
+  | "INTERVIEW"
+  | "OFFERED"
+  | "HIRED"
+  | "REJECTED";
+
+export interface ApplicantStageHistory {
+  id: string;
+  from_stage: ApplicantStage | null;
+  to_stage: ApplicantStage;
+  note: string | null;
+  actor_id: string;
+  actor_name: string;
+  created_at: string;
+}
+
+export interface Applicant {
+  id: string;
+  job_posting_id: string;
+  job_posting_title: string;
+  request_department_id: string;
+  request_department_name: string;
+  name: string;
+  email: string;
+  phone: string | null;
+  career_summary: string;
+  stage: ApplicantStage;
+  created_by_id: string;
+  created_by_name: string;
+  created_at: string;
+  updated_at: string;
+  stage_histories: ApplicantStageHistory[];
+}
+
+export interface ApplicantInput {
+  name: string;
+  email: string;
+  phone?: string | null;
+  career_summary?: string;
+}
+
+export interface ApplicantUpdateInput {
+  name?: string;
+  email?: string;
+  phone?: string | null;
+  career_summary?: string;
+}

@@ -27,6 +27,7 @@ class EmployeeResponse(BaseModel):
     position: str
     department_id: str
     department_name: str
+    team_code: str | None = None
 
 
 class DashboardMetric(BaseModel):

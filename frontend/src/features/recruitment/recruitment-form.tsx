@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 
 import { useCurrentUser } from "@/features/current-user/current-user-provider";
 import { getDepartments } from "@/features/dashboard/api";
-import { fallbackDepartments } from "@/features/dashboard/mock-data";
 import {
   createRecruitmentRequest,
   uploadRecruitmentPoster,
@@ -23,12 +22,13 @@ function isRecruitmentApprover(position: string | undefined) {
 export function RecruitmentForm() {
   const router = useRouter();
   const { currentEmployee, employees } = useCurrentUser();
-  const [departments, setDepartments] = useState<Department[]>(fallbackDepartments);
+  const [departments, setDepartments] = useState<Department[]>([]);
   const [departmentId, setDepartmentId] = useState(currentEmployee.department_id);
-  const [approverId, setApproverId] = useState("emp-hr");
+  const [approverId, setApproverId] = useState("");
   const [posterFile, setPosterFile] = useState<File | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [departmentError, setDepartmentError] = useState<string | null>(null);
   const [form, setForm] = useState({
     positionTitle: "",
     headcount: "1",
@@ -47,12 +47,15 @@ export function RecruitmentForm() {
   )
     ? departmentId
     : (availableDepartments[0]?.id ?? currentEmployee.department_id);
+  const canSelectSelfAsApprover = currentEmployee.role === "SUPER_ADMIN";
   const approvers = useMemo(
     () =>
       employees.filter(
-        (item) => item.id !== currentEmployee.id && isRecruitmentApprover(item.position),
+        (item) =>
+          (canSelectSelfAsApprover || item.id !== currentEmployee.id) &&
+          isRecruitmentApprover(item.position),
       ),
-    [employees, currentEmployee.id],
+    [canSelectSelfAsApprover, currentEmployee.id, employees],
   );
   const selectedApproverId = approvers.some((employee) => employee.id === approverId)
     ? approverId
@@ -60,8 +63,11 @@ export function RecruitmentForm() {
 
   useEffect(() => {
     void getDepartments()
-      .then((result) => setDepartments(result.length > 0 ? result : fallbackDepartments))
-      .catch(() => setDepartments(fallbackDepartments));
+      .then((result) => {
+        setDepartments(result);
+        setDepartmentError(result.length > 0 ? null : "요청할 수 있는 부서 정보가 없습니다.");
+      })
+      .catch(() => setDepartmentError("부서 정보를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요."));
   }, []);
 
   useEffect(() => {
@@ -91,7 +97,7 @@ export function RecruitmentForm() {
   async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError(null);
-    if (!form.positionTitle.trim() || !form.reason.trim() || !form.responsibilities.trim() || !selectedApproverId) {
+    if (departmentError || !selectedDepartmentId || !form.positionTitle.trim() || !form.reason.trim() || !form.responsibilities.trim() || !selectedApproverId) {
       setError("필수 항목을 모두 입력해 주세요.");
       return;
     }
@@ -125,11 +131,11 @@ export function RecruitmentForm() {
     <section className="content approval-page">
       <div className="page-heading"><div><span className="section-kicker">NEW RECRUITMENT REQUEST</span><h1>채용 요청 작성</h1><p>저장한 요청은 상세 화면에서 전자결재로 상신합니다.</p></div></div>
       <form className="panel approval-form" onSubmit={(event) => void save(event)}>
-        {error && <div className="inline-alert error">{error}</div>}
+        {(error || departmentError) && <div className="inline-alert error">{error ?? departmentError}</div>}
         <div className="form-grid">
           <label className="form-field"><span>모집 직무 *</span><input value={form.positionTitle} onChange={(event) => change("positionTitle", event.target.value)} /></label>
           <label className="form-field"><span>모집 인원 *</span><input type="number" min="1" value={form.headcount} onChange={(event) => change("headcount", event.target.value)} /></label>
-          <label className="form-field"><span>요청 부서 *</span><select value={selectedDepartmentId} disabled={!canSelectDepartment} onChange={(event) => setDepartmentId(event.target.value)}>{availableDepartments.map((item) => <option value={item.id} key={item.id}>{item.name}</option>)}</select>{!canSelectDepartment && <small className="file-help">현재 역할은 소속 부서로만 요청할 수 있습니다.</small>}</label>
+          <label className="form-field"><span>요청 부서 *</span><select value={selectedDepartmentId} disabled={Boolean(departmentError) || !canSelectDepartment} onChange={(event) => setDepartmentId(event.target.value)}>{availableDepartments.map((item) => <option value={item.id} key={item.id}>{item.name}</option>)}</select>{!canSelectDepartment && !departmentError && <small className="file-help">현재 역할은 소속 부서로만 요청할 수 있습니다.</small>}</label>
           <label className="form-field"><span>결재자 *</span><select value={approverId} onChange={(event) => setApproverId(event.target.value)}>{approvers.map((item) => <option value={item.id} key={item.id}>{item.name} · {item.role_label}</option>)}</select></label>
           <label className="form-field"><span>고용 형태 *</span><input value={form.employmentType} onChange={(event) => change("employmentType", event.target.value)} /></label>
           <label className="form-field"><span>경력 수준 *</span><input value={form.experienceLevel} onChange={(event) => change("experienceLevel", event.target.value)} /></label>

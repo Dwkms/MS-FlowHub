@@ -125,3 +125,26 @@ class AttendanceRecord(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
     )
+
+
+class AttendanceChangeHistory(Base):
+    __tablename__ = "attendance_change_histories"
+
+    id: Mapped[str] = mapped_column(String(50), primary_key=True)
+    attendance_record_id: Mapped[str] = mapped_column(
+        ForeignKey("attendance_records.id", ondelete="CASCADE"), nullable=False
+    )
+    before_work_status: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    after_work_status: Mapped[str] = mapped_column(String(30), nullable=False)
+    before_reason_category: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    after_reason_category: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    before_reason_summary: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    after_reason_summary: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    before_private_note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    after_private_note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    changed_by_id: Mapped[str] = mapped_column(
+        ForeignKey("employees.id", ondelete="RESTRICT"), nullable=False
+    )
+    changed_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )

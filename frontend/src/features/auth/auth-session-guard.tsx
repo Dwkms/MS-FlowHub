@@ -10,9 +10,9 @@ import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
 export function AuthSessionGuard({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { setSelectedId } = useCurrentUser();
+  const { syncAuthenticatedEmployee } = useCurrentUser();
   const isPublicPage = pathname === "/login" || pathname === "/change-password";
-  const [ready, setReady] = useState(isPublicPage);
+  const [authenticatedPath, setAuthenticatedPath] = useState<string | null>(null);
 
   useEffect(() => {
     if (isPublicPage) {
@@ -29,10 +29,16 @@ export function AuthSessionGuard({ children }: { children: ReactNode }) {
         return;
       }
       try {
-        const employeeId = await getAuthenticatedEmployee();
+        const { employeeId, role } = await getAuthenticatedEmployee();
         if (!active) return;
-        setSelectedId(employeeId);
-        setReady(true);
+        const employeeLoaded = await syncAuthenticatedEmployee(employeeId, role);
+        if (!employeeLoaded) {
+          await client.auth.signOut();
+          if (active) router.replace("/login");
+          return;
+        }
+        if (!active) return;
+        setAuthenticatedPath(pathname);
       } catch {
         await client.auth.signOut();
         if (active) router.replace("/login");
@@ -40,14 +46,17 @@ export function AuthSessionGuard({ children }: { children: ReactNode }) {
     };
     void applySession();
     const { data: listener } = client.auth.onAuthStateChange((_event, session) => {
-      if (!session) router.replace("/login");
+      if (!session) {
+        setAuthenticatedPath(null);
+        router.replace("/login");
+      }
     });
     return () => {
       active = false;
       listener.subscription.unsubscribe();
     };
-  }, [isPublicPage, pathname, router, setSelectedId]);
+  }, [isPublicPage, pathname, router, syncAuthenticatedEmployee]);
 
-  if (isPublicPage || ready) return <>{children}</>;
+  if (isPublicPage || authenticatedPath === pathname) return <>{children}</>;
   return <main className="auth-loading">세션을 확인하는 중입니다.</main>;
 }

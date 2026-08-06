@@ -1,5 +1,5 @@
 import { apiGet, apiRequest } from "@/lib/api-client";
-import type { Department, EmployeeDetail, EmployeePage, OrganizationNode } from "@/types/employee";
+import type { AttendanceChangeHistoryItem, Department, EmployeeDetail, EmployeePage } from "@/types/employee";
 
 export type EmployeeFilters = {
   page: number;
@@ -17,6 +17,8 @@ export function listEmployees(filters: EmployeeFilters): Promise<EmployeePage> {
   return apiGet<EmployeePage>(`/api/v1/employees?${query}`);
 }
 export const getEmployee = (id: string) => apiGet<EmployeeDetail>(`/api/v1/employees/${id}`);
+export const getAttendanceChangeHistory = (id: string, workDate: string) =>
+  apiGet<AttendanceChangeHistoryItem[]>(`/api/v1/employees/${id}/attendance-history?work_date=${workDate}`);
 export const updateAttendanceStatus = (
   employeeId: string,
   payload: {
@@ -43,5 +45,4 @@ export const updateEmploymentStatusReason = (
     `/api/v1/employees/${employeeId}/employment-status-reason`,
     { method: "PATCH", body: payload },
   );
-export const getOrganization = () => apiGet<OrganizationNode>("/api/v1/organization");
 export const getEmployeeDepartments = () => apiGet<Department[]>("/api/v1/departments");

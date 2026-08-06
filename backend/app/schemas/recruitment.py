@@ -10,6 +10,7 @@ RecruitmentStatus = Literal[
     "REJECTED",
     "POSTING_CREATED",
 ]
+ApplicantStage = Literal["APPLIED", "SCREENING", "INTERVIEW", "OFFERED", "HIRED", "REJECTED"]
 
 
 class RecruitmentBaseModel(BaseModel):
@@ -81,3 +82,50 @@ class JobPostingResponse(BaseModel):
     status: str
     created_at: datetime
     updated_at: datetime
+
+
+class ApplicantCreate(RecruitmentBaseModel):
+    name: str = Field(min_length=1, max_length=100)
+    email: str = Field(min_length=3, max_length=255)
+    phone: str | None = Field(default=None, max_length=30)
+    career_summary: str = Field(default="", max_length=5000)
+
+
+class ApplicantUpdate(RecruitmentBaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=100)
+    email: str | None = Field(default=None, min_length=3, max_length=255)
+    phone: str | None = Field(default=None, max_length=30)
+    career_summary: str | None = Field(default=None, max_length=5000)
+
+
+class ApplicantStageUpdate(RecruitmentBaseModel):
+    stage: ApplicantStage
+    note: str | None = Field(default=None, max_length=2000)
+
+
+class ApplicantStageHistoryResponse(BaseModel):
+    id: str
+    from_stage: ApplicantStage | None
+    to_stage: ApplicantStage
+    note: str | None
+    actor_id: str
+    actor_name: str
+    created_at: datetime
+
+
+class ApplicantResponse(BaseModel):
+    id: str
+    job_posting_id: str
+    job_posting_title: str
+    request_department_id: str
+    request_department_name: str
+    name: str
+    email: str
+    phone: str | None
+    career_summary: str
+    stage: ApplicantStage
+    created_by_id: str
+    created_by_name: str
+    created_at: datetime
+    updated_at: datetime
+    stage_histories: list[ApplicantStageHistoryResponse] = Field(default_factory=list)
