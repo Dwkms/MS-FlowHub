@@ -65,13 +65,15 @@ MS FlowHub는 직원·조직 관리, 근태 상태, 전자결재, 채용 요청�
 - 최근 업무에는 전자결재와 채용 요청만 표시
 - 상단 알림 아이콘은 알림 조회·읽음 처리 기능 구현 전까지 비활성 상태
 
-### 직원 매뉴얼 MVP
+### 직원 매뉴얼과 FAQ
 
-- 카테고리, 목록 검색, 중요 문서 상단 고정, 최근 수정일 표시
-- 텍스트 본문과 이미지·PDF URL 자산을 함께 제공하는 상세 화면
-- `SUPER_ADMIN`, `HR_ADMIN`의 매뉴얼·카테고리 관리
+- 각 매뉴얼이 설명하는 실제 앱 화면을 캡처해 카드 대표 이미지로 사용하는 이미지 중심 목록
+- 제목·내용 검색과 카테고리 필터, 카드 이미지 확대 보기(ESC·바깥 클릭으로 닫기)
+- 직원 이용 가이드 PDF 다운로드
+- `SUPER_ADMIN`, `HR_ADMIN`의 매뉴얼·카테고리 작성·수정·삭제 (카드의 편집 아이콘은 관리자에게만 노출)
 - `TEAM_ADMIN`, `EMPLOYEE`의 공개 매뉴얼 조회
-- 7개 카테고리와 15개 초기 매뉴얼 Seed
+- 6개 카테고리와 9개 핵심 매뉴얼 Seed (PDF 가이드 구조에 맞춰 정리)
+- 별도 FAQ 화면(`/faq`)에서 자주 묻는 질문 18개를 Accordion으로 확인하며, 인증된 모든 역할이 조회 가능
 
 ## 기술 구성
 
@@ -156,8 +158,9 @@ cd backend
 .\.venv\Scripts\python.exe -m app.scripts.seed_organization
 .\.venv\Scripts\python.exe -m app.scripts.seed_auth_accounts
 
-# 직원 매뉴얼
+# 직원 매뉴얼과 FAQ
 .\.venv\Scripts\python.exe -m app.scripts.seed_manuals
+.\.venv\Scripts\python.exe -m app.scripts.seed_faqs
 ```
 
 Seed는 반복 실행해도 중복 생성되지 않도록 작성되어 있습니다. E2E는 테스트 시작 전에 전용 계정을 만들고 종료 후 자동으로 삭제합니다.
@@ -230,6 +233,7 @@ MS FlowHub/
 - [프로젝트 명세](./docs/PROJECT_SPEC.md)
 - [설계 결정 기록](./docs/DECISIONS.md)
 - [배포 기획 (Render)](./docs/DEPLOYMENT_PLAN.md)
+- [CI 구성·E2E 확장 기획](./docs/CI_E2E_PLAN.md)
 - [AI 확장 설계 (미구현)](./docs/AI_DESIGN.md)
 - [업데이트 로그](./UPDATELOG.md)
 

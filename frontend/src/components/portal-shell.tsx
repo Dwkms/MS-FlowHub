@@ -14,6 +14,7 @@ const navigation = [
   { label: "ATS Lite", href: "/recruitment-requests", glyph: "⌕" },
   { label: "직원 · 부서", href: "/employees", glyph: "♟" },
   { label: "직원 매뉴얼", href: "/manuals", glyph: "▤" },
+  { label: "FAQ", href: "/faq", glyph: "?" },
 ];
 
 export function PortalShell({ children }: { children: ReactNode }) {

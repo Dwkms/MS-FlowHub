@@ -57,3 +57,12 @@ export interface ManualInput {
   status: ManualStatus;
   assets: ManualAssetInput[];
 }
+
+export interface ManualFaq {
+  id: string;
+  category: string;
+  question: string;
+  answer: string;
+  related_manual_id: string | null;
+  display_order: number;
+}

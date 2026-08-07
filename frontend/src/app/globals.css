@@ -487,14 +487,35 @@ a { color: inherit; text-decoration: none; }
 
 .manual-list-panel { padding: 22px; }
 .manual-card-grid { display: grid; gap: 16px; grid-template-columns: repeat(3, minmax(0, 1fr)); margin-top: 20px; }
-.manual-card { border: 1px solid #e4e9f0; border-radius: 10px; color: inherit; display: flex; flex-direction: column; overflow: hidden; text-decoration: none; transition: box-shadow .15s, transform .15s; }
+.manual-card { border: 1px solid #e4e9f0; border-radius: 10px; color: inherit; display: flex; flex-direction: column; overflow: hidden; position: relative; transition: box-shadow .15s, transform .15s; }
 .manual-card:hover { box-shadow: 0 10px 24px rgba(37, 59, 91, .12); transform: translateY(-2px); }
-.manual-card-image { background: #f4f7fb; height: 126px; overflow: hidden; }.manual-card-image img { height: 100%; object-fit: cover; width: 100%; }
-.manual-card-body { display: flex; flex: 1; flex-direction: column; padding: 17px; }.manual-card-tags { display: flex; gap: 6px; }.manual-card-tags span { background: #edf2f8; border-radius: 12px; color: #62728a; font-size: 9px; font-weight: 700; padding: 4px 7px; }.manual-card-tags .manual-pin { background: #fff1d9; color: #a66c22; }
-.manual-card h2 { color: #2f4058; font-size: 14px; margin: 12px 0 8px; }.manual-card p { color: #677385; font-size: 11px; line-height: 1.7; margin: 0; }.manual-card-footer { border-top: 1px solid #edf0f4; color: #88919e; display: flex; font-size: 9px; gap: 8px; justify-content: space-between; margin-top: auto; padding-top: 14px; }.manual-card-footer time { white-space: nowrap; }
-.manual-detail-grid { align-items: start; display: grid; gap: 16px; grid-template-columns: minmax(0, 1.7fr) minmax(260px, .8fr); }.manual-document { overflow: hidden; }.manual-meta { display: grid; grid-template-columns: repeat(3, 1fr); margin: 0; padding: 21px 24px; }.manual-meta div { border-right: 1px solid var(--line); padding: 0 14px; }.manual-meta div:first-child { padding-left: 0; }.manual-meta div:last-child { border-right: 0; }.manual-meta dt { color: #9199a5; font-size: 9px; margin-bottom: 6px; }.manual-meta dd { color: #39495f; font-size: 11px; font-weight: 700; margin: 0; }
-.manual-content { border-top: 1px solid var(--line); padding: 25px; }.manual-content h2, .manual-files h2, .manual-summary-panel h2, .manual-asset-editor h2 { color: #35465e; font-size: 14px; margin: 0 0 13px; }.manual-content p { color: #475466; font-size: 12px; line-height: 1.95; margin: 0; min-height: 220px; white-space: pre-wrap; }.manual-files { border-top: 1px solid var(--line); padding: 20px 25px; }.manual-files a { color: #2d66ba; font-size: 11px; font-weight: 700; }
-.manual-summary-panel { padding: 21px; }.manual-summary-panel h2 { margin-top: 6px; }.manual-summary-panel > p { color: #7c8795; font-size: 11px; }.manual-summary-image { background: #f6f8fb; border: 1px solid #e2e8f0; border-radius: 8px; cursor: pointer; margin-top: 12px; overflow: hidden; padding: 0; text-align: left; width: 100%; }.manual-summary-image img { display: block; height: auto; width: 100%; }.manual-summary-image span { color: #53749d; display: block; font-size: 10px; font-weight: 700; padding: 9px 10px; }
+/* 카드 이미지는 PDF 이용 가이드 페이지 전체를 담으므로 잘라내지 않고 비율을 유지한다. */
+.manual-card-image { background: #f4f7fb; border: 0; border-bottom: 1px solid #eef1f5; cursor: zoom-in; display: block; padding: 0; width: 100%; }
+.manual-card-image img { display: block; height: auto; object-fit: contain; width: 100%; }
+.manual-card-edit { align-items: center; background: rgba(255, 255, 255, .93); border: 1px solid #dbe2ec; border-radius: 7px; color: #4a5f7d; display: flex; font-size: 13px; height: 28px; justify-content: center; position: absolute; right: 10px; text-decoration: none; top: 10px; width: 28px; z-index: 2; }
+.manual-card-edit:hover { background: #fff; color: #2f67c8; }
+.manual-card-body { display: flex; flex: 1; flex-direction: column; padding: 17px; }
+.manual-card h2 { color: #2f4058; font-size: 14px; margin: 0 0 8px; }.manual-card p { color: #677385; font-size: 11px; line-height: 1.7; margin: 0; }
+.manual-zoom-backdrop { padding: 24px; }
+.manual-zoom { background: white; border-radius: 12px; display: flex; flex-direction: column; max-height: 92vh; max-width: 1180px; overflow: hidden; width: 100%; }
+.manual-zoom-heading { align-items: center; border-bottom: 1px solid var(--line); display: flex; justify-content: space-between; padding: 16px 20px; }
+.manual-zoom-heading h2 { color: #26374f; font-size: 15px; margin: 0; }
+.manual-zoom img { display: block; height: auto; max-width: 100%; object-fit: contain; overflow: auto; width: 100%; }
+.faq-category-nav { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 24px; }
+.faq-category-nav button { background: #eef2f8; border: 0; border-radius: 999px; color: #45597a; cursor: pointer; font-size: 11px; font-weight: 700; padding: 7px 14px; }
+.faq-category-nav button:hover { background: #e0e9f6; color: #2f67c8; }
+.faq-category-nav button.active { background: #2f67c8; color: white; }
+.faq-group { scroll-margin-top: 20px; }
+.faq-group-title { color: #1c3355; font-size: 15px; margin: 40px 0 0; }
+.faq-group:first-of-type .faq-group-title { margin-top: 30px; }
+.faq-list { border-top: 1px solid #e7ecf2; margin-top: 14px; }
+.faq-item { border-bottom: 1px solid #e7ecf2; }
+.faq-question { align-items: flex-start; background: transparent; border: 0; color: #2c3e57; cursor: pointer; display: flex; font-size: 13px; font-weight: 700; gap: 14px; justify-content: space-between; line-height: 1.6; padding: 22px 4px; text-align: left; width: 100%; }
+.faq-question:hover { color: #2f67c8; }
+.faq-question em { color: #7d93b4; font-style: normal; margin-right: 4px; }
+.faq-question i { color: #98a5b8; flex: 0 0 auto; font-size: 10px; font-style: normal; }
+.faq-item.open .faq-question { color: #23558f; }
+.faq-answer { color: #56657b; font-size: 12px; line-height: 2; padding: 0 30px 24px 4px; white-space: pre-wrap; }
 .manual-form { padding: 26px; }.manual-role-field { border: 0; padding: 0; }.manual-role-field legend { color: #596273; font-size: 10px; font-weight: 700; margin-bottom: 7px; padding: 0; }.manual-role-field div { display: flex; flex-wrap: wrap; gap: 13px; }.manual-role-field label, .manual-pin-field { color: #566276; font-size: 11px; }.manual-role-field input, .manual-pin-field input { accent-color: #3569af; margin-right: 4px; }.manual-pin-field { border-top: 1px solid #eef1f4; padding-top: 15px; }
 .manual-asset-editor { border-top: 1px solid var(--line); display: grid; gap: 11px; margin-top: 24px; padding-top: 20px; }.manual-asset-editor > div > p { color: #84909e; font-size: 10px; margin: 0; }.manual-asset-row { align-items: center; display: grid; gap: 8px; grid-template-columns: 105px minmax(160px, 1fr) minmax(120px, .55fr) auto; }.manual-asset-row input, .manual-asset-row select { min-width: 0; }
 
@@ -509,7 +530,6 @@ a { color: inherit; text-decoration: none; }
   .grid { grid-template-columns: 1fr; }
   .approval-detail-grid { grid-template-columns: 1fr; }
   .manual-card-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .manual-detail-grid { grid-template-columns: 1fr; }
   .employee-layout { grid-template-columns: 1fr; }
   .applicant-layout { grid-template-columns: 1fr; }
   .organization-chart-button { margin-left: 0; }
@@ -536,7 +556,7 @@ a { color: inherit; text-decoration: none; }
   .sidebar nav {
     display: grid !important;
     flex: 1;
-    grid-template-columns: repeat(5, minmax(0, 1fr));
+    grid-template-columns: repeat(6, minmax(0, 1fr));
     min-width: 0;
     overflow: hidden;
   }
@@ -618,8 +638,11 @@ a { color: inherit; text-decoration: none; }
   .job-posting-hero dl { gap: 14px; width: 100%; }
   .poster-attachment { grid-template-columns: 1fr; }
   .manual-card-grid { grid-template-columns: 1fr; }
-  .manual-meta { grid-template-columns: 1fr; }.manual-meta div { border-bottom: 1px solid var(--line); border-right: 0; padding: 10px 0; }.manual-meta div:last-child { border-bottom: 0; }
-  .manual-card-footer { align-items: flex-start; flex-direction: column; }
+  .manual-zoom-backdrop { padding: 12px; }
+  .faq-question { font-size: 12px; padding: 18px 2px; }
+  .faq-answer { font-size: 11px; padding: 0 8px 20px 2px; }
+  .faq-category-nav button { font-size: 10px; padding: 6px 11px; }
+  .faq-group-title { font-size: 13px; margin-top: 30px; }
   .manual-asset-row { grid-template-columns: 1fr; }
   .poster-preview { height: auto; max-height: 260px; }
   .image-preview-backdrop { padding: 16px; }
