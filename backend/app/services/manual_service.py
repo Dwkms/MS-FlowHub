@@ -13,6 +13,7 @@ from app.schemas.manual import (
     ManualCategoryUpdate,
     ManualCreate,
     ManualDetail,
+    ManualFaqResponse,
     ManualListItem,
     ManualUpdate,
 )
@@ -162,3 +163,16 @@ class ManualService:
                 for asset in sorted(manual.assets, key=lambda value: value.display_order)
             ],
         )
+
+    def list_faqs(self) -> list[ManualFaqResponse]:
+        return [
+            ManualFaqResponse(
+                id=faq.id,
+                category=faq.category,
+                question=faq.question,
+                answer=faq.answer,
+                related_manual_id=faq.related_manual_id,
+                display_order=faq.display_order,
+            )
+            for faq in self.manuals.list_published_faqs()
+        ]

@@ -25,8 +25,8 @@
 ## 3. 현재 데이터베이스 요약
 
 - 운영 DB는 **Supabase PostgreSQL 전용**입니다. SQLite 등 다른 런타임 DB는 사용하지 않습니다.
-- 현재 Alembic head는 `20260805_0015_ats_applicants.py`이며, 총 15개 migration이 적용되어 있습니다.
-- 스키마는 `public` 한 곳에 총 **16개 테이블**(`alembic_version` 포함)로 구성됩니다.
+- 현재 Alembic head는 `20260807_0016_manual_faqs.py`이며, 총 16개 migration이 적용되어 있습니다.
+- 스키마는 `public` 한 곳에 총 **17개 테이블**(`alembic_version` 포함)로 구성됩니다.
 - 프론트엔드는 Supabase 업무 테이블에 직접 접근하지 않고, 항상 FastAPI 백엔드를 거칩니다.
 - DB 레벨 `CHECK` 제약이 걸린 상태값은 `approval_documents.status`, `recruitment_requests.status`, `applicants.stage` 3곳뿐이며, 그 외 상태값(근태 상태, 직원 재직 상태, 매뉴얼 상태 등)은 애플리케이션 레이어(Pydantic `Literal`, `app/domain/employee_status.py`)에서 검증합니다.
 
@@ -39,7 +39,7 @@
 | 전자결재 | 2 | `approval_documents`, `approval_histories` | 구현됨 |
 | 채용 요청·채용공고 | 3 | `recruitment_requests`, `job_postings`, `notifications` | 구현됨 |
 | ATS 지원자 관리 | 2 | `applicants`, `applicant_stage_histories` | 구현됨 |
-| 직원 매뉴얼 | 3 | `manual_categories`, `manuals`, `manual_assets` | 구현됨 |
+| 직원 매뉴얼 | 4 | `manual_categories`, `manuals`, `manual_assets`, `manual_faqs` | 구현됨 |
 | 마이그레이션 관리 | 1 | `alembic_version` | Alembic 내부 관리 |
 
 ## 5. 전체 테이블 목록
@@ -62,6 +62,7 @@
 | `manual_categories` | 직원 매뉴얼 | 매뉴얼 카테고리 | - |
 | `manuals` | 직원 매뉴얼 | 매뉴얼 본문 | `category_id` → `manual_categories.id`, `created_by`/`updated_by` → `employees.id` |
 | `manual_assets` | 직원 매뉴얼 | 매뉴얼 이미지·PDF 자산 | `manual_id` → `manuals.id` |
+| `manual_faqs` | 직원 매뉴얼 | 자주 묻는 질문과 답변 | `related_manual_id` → `manuals.id` (선택) |
 | `alembic_version` | 마이그레이션 관리 | Alembic 현재 head 기록 | - |
 
 ## 6. 핵심 관계도
@@ -88,6 +89,7 @@ erDiagram
     APPLICANTS ||--o{ APPLICANT_STAGE_HISTORIES : "logs"
     MANUAL_CATEGORIES ||--o{ MANUALS : "groups"
     MANUALS ||--o{ MANUAL_ASSETS : "attaches"
+    MANUALS ||--o{ MANUAL_FAQS : "referenced by"
     EMPLOYEES ||--o{ MANUALS : "writes"
 ```
 
@@ -246,11 +248,13 @@ erDiagram
 **테이블별 역할**
 - `manual_categories`: 카테고리 이름·설명·표시 순서.
 - `manuals`: 제목·요약·본문·대상 역할(`target_roles`)·공개 상태·중요 고정 여부와 작성자/수정자.
-- `manual_assets`: 매뉴얼에 연결된 이미지 또는 PDF의 URL과 표시 순서.
+- `manual_assets`: 매뉴얼에 연결된 이미지 또는 PDF의 URL과 표시 순서. 목록 화면의 카드 대표 이미지가 여기서 나오며, 현재는 매뉴얼별로 해당 기능의 실제 화면을 캡처한 `/manuals/screens/*.png`를 가리킵니다.
+- `manual_faqs`: 자주 묻는 질문과 답변, 카테고리, 표시 순서, 공개 여부. 특정 매뉴얼과 선택적으로 연결할 수 있습니다.
 
 **핵심 관계**
 - `manual_categories` 1:N `manuals`
 - `manuals` 1:N `manual_assets`
+- `manuals` 1:0..N `manual_faqs` (`related_manual_id`, 선택적 연결)
 - `employees` 1:N `manuals`(작성자, 수정자 각각, 선택)
 
 **핵심 제약조건**
@@ -258,11 +262,17 @@ erDiagram
 - `manuals.category_id`는 `RESTRICT`(카테고리에 매뉴얼이 남아 있으면 삭제 불가)
 - `manual_assets.manual_id`는 `CASCADE`
 - `manuals.created_by`/`updated_by`는 `SET NULL`
+- `manual_faqs.related_manual_id`는 `SET NULL`(매뉴얼이 삭제돼도 FAQ 자체는 남습니다)
 
 **주요 상태값**
 - `manuals.status`: `DRAFT`, `PUBLISHED`
 - `manual_assets.asset_type`: `IMAGE`, `PDF`
 - `manuals.target_roles`에 포함 가능한 값: `SUPER_ADMIN`, `HR_ADMIN`, `TEAM_ADMIN`, `EMPLOYEE`
+- `manual_faqs.is_published`: 공개 FAQ만 `GET /api/v1/faqs` 응답에 포함됩니다.
+
+**UI 참고**: 목록 화면은 이미지 중심 카드로 단순화되어 있고 매뉴얼 상세 페이지는 제공하지 않습니다. `manuals.content`, `slug`, `target_roles`는 화면에 노출되지 않지만 관리자 편집과 향후 RAG 검색을 위해 그대로 보존합니다.
+
+**Seed 구성**: 직원 이용 가이드 PDF의 기능 구조에 맞춰 6개 카테고리와 9개 핵심 매뉴얼로 정리되어 있습니다. 통합 전 매뉴얼의 본문은 핵심만 추려 남은 매뉴얼의 `content`에 합쳤으므로 RAG가 검색할 문장은 유지됩니다. `seed_manuals`는 `REMOVED_MANUAL_SLUGS`와 `REMOVED_CATEGORY_IDS`로 통합된 과거 데이터를 정리하며, 카테고리는 소속 매뉴얼이 없을 때만 삭제합니다.
 
 **삭제 및 이력 보존 정책**
 - 매뉴얼 삭제 시 연결된 `manual_assets`가 함께 삭제됩니다(`cascade="all, delete-orphan"`).
@@ -287,7 +297,7 @@ erDiagram
 
 ## 15. Migration 정보
 
-- 현재 Alembic head: `20260805_0015_ats_applicants.py`
+- 현재 Alembic head: `20260807_0016_manual_faqs.py`
 - Migration 파일 위치: `backend/migrations/versions/`
 - Migration별 작업 배경과 진행 기록은 이 문서가 아니라 [`UPDATELOG.md`](../UPDATELOG.md)를 기준으로 확인합니다.
 - 적용 명령: `cd backend && .\.venv\Scripts\alembic.exe upgrade head` (자세한 절차는 [`README.md`](../README.md#데이터베이스와-seed) 참고)

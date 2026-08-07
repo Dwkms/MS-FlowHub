@@ -101,3 +101,12 @@ class ManualDetail(ManualListItem):
     content: str
     created_at: datetime
     assets: list[ManualAssetResponse]
+
+
+class ManualFaqResponse(BaseModel):
+    id: str
+    category: str
+    question: str
+    answer: str
+    related_manual_id: str | None
+    display_order: int

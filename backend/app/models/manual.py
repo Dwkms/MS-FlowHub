@@ -57,6 +57,27 @@ class Manual(Base):
     )
 
 
+class ManualFaq(Base):
+    __tablename__ = "manual_faqs"
+    __table_args__ = (Index("ix_manual_faqs_published_order", "is_published", "display_order"),)
+
+    id: Mapped[str] = mapped_column(String(50), primary_key=True)
+    category: Mapped[str] = mapped_column(String(100), nullable=False)
+    question: Mapped[str] = mapped_column(String(300), nullable=False)
+    answer: Mapped[str] = mapped_column(Text, nullable=False)
+    related_manual_id: Mapped[str | None] = mapped_column(
+        ForeignKey("manuals.id", ondelete="SET NULL")
+    )
+    display_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    is_published: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )
+
+
 class ManualAsset(Base):
     __tablename__ = "manual_assets"
     __table_args__ = (Index("ix_manual_assets_manual_display", "manual_id", "display_order"),)

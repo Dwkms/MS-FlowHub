@@ -2,6 +2,7 @@ import { apiDelete, apiGet, apiRequest } from "@/lib/api-client";
 import type {
   ManualCategory,
   ManualDetail,
+  ManualFaq,
   ManualInput,
   ManualListItem,
 } from "@/types/manual";
@@ -32,4 +33,8 @@ export function updateManual(slug: string, input: Partial<ManualInput>): Promise
 
 export function deleteManual(slug: string): Promise<void> {
   return apiDelete(`/api/v1/manuals/${slug}`);
+}
+
+export function listFaqs(): Promise<ManualFaq[]> {
+  return apiGet<ManualFaq[]>("/api/v1/faqs");
 }

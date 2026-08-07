@@ -14,7 +14,8 @@
 | 전자결재 | `GET/POST /approvals`, `GET/PATCH/DELETE /approvals/{id}`, `POST /approvals/{id}/submit`, `POST /approvals/{id}/approve`, `POST /approvals/{id}/reject` | 초안·상신·승인·반려·이력. 연결 채용 요청 결재 삭제 시 관련 데이터 함께 정리 |
 | 채용 요청·공고 | `GET/POST/DELETE /recruitment-requests`, `GET /recruitment-requests/{id}`, `POST /recruitment-requests/{id}/submit`, `POST /recruitment-requests/{id}/poster`, `GET /recruitment-requests/{id}/poster`, `POST /recruitment-requests/{id}/job-posting`, `GET /job-postings` | 채용 요청·포스터·결재 연동·승인 후 공고 생성 |
 | ATS 지원자 | `GET /applicants`, `POST /job-postings/{id}/applicants`, `GET/PATCH/DELETE /applicants/{id}`, `POST /applicants/{id}/stage` | 채용공고별 지원자 등록·검색·상세·단계 이력 관리 |
-| 직원 매뉴얼 | `GET/POST/PATCH/DELETE /manuals`, `GET /manuals/{slug}`, `GET/POST/PATCH/DELETE /manuals/categories` | 공개 매뉴얼 조회와 관리자 작성·수정·삭제 |
+| 직원 매뉴얼 | `GET/POST/PATCH/DELETE /manuals`, `GET /manuals/{slug}`, `GET/POST/PATCH/DELETE /manuals/categories` | 공개 매뉴얼 조회와 관리자 작성·수정·삭제. `GET /manuals/{slug}`는 관리자 편집 화면에서 기존 값을 불러올 때 사용합니다 |
+| FAQ | `GET /faqs` | 공개 FAQ 목록. 인증된 모든 역할이 조회하며 `display_order` 오름차순으로 반환합니다 |
 
 알림 레코드는 채용 요청 흐름에서 내부적으로 생성되지만, 알림 조회·읽음 처리 API와 화면은 현재 범위에 포함되지 않습니다.
 

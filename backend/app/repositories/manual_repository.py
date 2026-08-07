@@ -3,7 +3,7 @@ from uuid import uuid4
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session, selectinload
 
-from app.models.manual import Manual, ManualAsset, ManualCategory
+from app.models.manual import Manual, ManualAsset, ManualCategory, ManualFaq
 from app.schemas.manual import ManualAssetInput
 
 
@@ -92,3 +92,12 @@ class ManualRepository:
     @staticmethod
     def _asset_values(asset: ManualAssetInput) -> dict:
         return asset.model_dump()
+
+    def list_published_faqs(self) -> list[ManualFaq]:
+        return list(
+            self.session.scalars(
+                select(ManualFaq)
+                .where(ManualFaq.is_published.is_(True))
+                .order_by(ManualFaq.display_order, ManualFaq.id)
+            )
+        )

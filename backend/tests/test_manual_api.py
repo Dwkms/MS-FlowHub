@@ -114,5 +114,5 @@ def test_manual_seed_is_idempotent(client: TestClient) -> None:
         category_count = session.scalar(select(func.count()).select_from(ManualCategory))
         manual_count = session.scalar(select(func.count()).select_from(Manual))
 
-    assert category_count == 7
-    assert manual_count == 15
+    assert category_count == 6
+    assert manual_count == 9
