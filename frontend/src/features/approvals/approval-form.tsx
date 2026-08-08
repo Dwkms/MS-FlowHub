@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { createApproval, submitApproval } from "@/features/approvals/api";
 import { useCurrentUser } from "@/features/current-user/current-user-provider";
 import { getDepartments } from "@/features/dashboard/api";
+import { isManagerLevelApprover } from "@/lib/approver-policy";
 import type { DocumentType } from "@/types/approval";
 import type { Department } from "@/types/dashboard";
 
@@ -22,7 +23,7 @@ export function ApprovalForm() {
   const [error, setError] = useState<string | null>(null);
 
   const approvers = useMemo(
-    () => employees.filter((employee) => employee.id !== currentEmployee.id),
+    () => employees.filter((employee) => employee.id !== currentEmployee.id && isManagerLevelApprover(employee.position)),
     [currentEmployee.id, employees],
   );
   const effectiveApproverId =
@@ -157,6 +158,7 @@ export function ApprovalForm() {
                 </option>
               ))}
             </select>
+            <small className="file-help">팀장급 이상만 결재자로 지정할 수 있습니다.</small>
           </label>
           <label className="form-field full">
             <span>내용 *</span>

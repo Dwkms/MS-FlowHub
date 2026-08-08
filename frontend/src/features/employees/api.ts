@@ -1,5 +1,5 @@
 import { apiGet, apiRequest } from "@/lib/api-client";
-import type { AttendanceChangeHistoryItem, Department, EmployeeDetail, EmployeePage } from "@/types/employee";
+import type { AttendanceChangeHistoryItem, Department, EmployeeDetail, EmployeePage, OrganizationNode } from "@/types/employee";
 
 export type EmployeeFilters = {
   page: number;
@@ -46,3 +46,4 @@ export const updateEmploymentStatusReason = (
     { method: "PATCH", body: payload },
   );
 export const getEmployeeDepartments = () => apiGet<Department[]>("/api/v1/departments");
+export const getOrganization = () => apiGet<OrganizationNode>("/api/v1/employees/organization");

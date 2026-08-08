@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 
 import { useCurrentUser } from "@/features/current-user/current-user-provider";
 import { getDepartments } from "@/features/dashboard/api";
+import { isManagerLevelApprover } from "@/lib/approver-policy";
 import {
   createRecruitmentRequest,
   uploadRecruitmentPoster,
@@ -13,12 +14,6 @@ import type { Department } from "@/types/dashboard";
 
 const MAX_POSTER_SIZE = 5 * 1024 * 1024;
 const POSTER_TYPES = ["image/jpeg", "image/png", "image/webp", "application/pdf"];
-const APPROVER_POSITION_KEYWORDS = ["팀장", "부장", "이사", "대표"];
-
-function isRecruitmentApprover(position: string | undefined) {
-  return APPROVER_POSITION_KEYWORDS.some((keyword) => position?.includes(keyword));
-}
-
 export function RecruitmentForm() {
   const router = useRouter();
   const { currentEmployee, employees } = useCurrentUser();
@@ -53,7 +48,7 @@ export function RecruitmentForm() {
       employees.filter(
         (item) =>
           (canSelectSelfAsApprover || item.id !== currentEmployee.id) &&
-          isRecruitmentApprover(item.position),
+          isManagerLevelApprover(item.position),
       ),
     [canSelectSelfAsApprover, currentEmployee.id, employees],
   );

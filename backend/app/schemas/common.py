@@ -46,9 +46,24 @@ class DashboardTask(BaseModel):
     href: str | None = None
 
 
+class DashboardBreakdownItem(BaseModel):
+    label: str
+    value: int
+
+
+class DashboardAnalytics(BaseModel):
+    approval_by_status: list[DashboardBreakdownItem]
+    average_approval_processing_hours: float | None
+    applicant_by_stage: list[DashboardBreakdownItem]
+    recruitment_request_count: int
+    attendance_by_status: list[DashboardBreakdownItem]
+    today_attendance_unregistered_count: int
+
+
 class DashboardResponse(BaseModel):
     source: Literal["local", "supabase"]
     current_employee: EmployeeResponse
     accessible_modules: list[str]
     metrics: list[DashboardMetric]
     recent_tasks: list[DashboardTask]
+    analytics: DashboardAnalytics | None = None

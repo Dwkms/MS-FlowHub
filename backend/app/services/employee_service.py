@@ -43,12 +43,11 @@ class EmployeeService:
     def list(self, actor: ActorContext, **filters: object) -> PaginatedEmployeeResponse:
         if actor.role not in {SUPER_ADMIN, HR_ADMIN, "ADMIN", "HR_MANAGER"}:
             if actor.role == TEAM_ADMIN:
-                team_id = self._require_employee(actor.employee_id).team_id
-                if team_id is None:
-                    raise HTTPException(
-                        status_code=403, detail="팀 관리자에게 연결된 팀이 없습니다."
-                    )
-                filters["visible_team_id"] = team_id
+                manager = self._require_employee(actor.employee_id)
+                if manager.team_id:
+                    filters["visible_team_id"] = manager.team_id
+                else:
+                    filters["visible_department_id"] = manager.department_id
             else:
                 filters["visible_employee_id"] = actor.employee_id
         return self.repository.list_employee_page(**filters)
@@ -63,7 +62,7 @@ class EmployeeService:
         if viewer is not None and viewer.role not in {SUPER_ADMIN, HR_ADMIN, "ADMIN", "HR_MANAGER"}:
             if viewer.role == TEAM_ADMIN:
                 viewer_employee = self._require_employee(viewer.employee_id)
-                if viewer_employee.team_id is None or viewer_employee.team_id != item.team_id:
+                if not self._is_visible_to_team_manager(viewer_employee, item):
                     raise HTTPException(
                         status_code=403, detail="다른 팀 직원 조회 권한이 없습니다."
                     )
@@ -275,12 +274,18 @@ class EmployeeService:
             return
         if actor.role == TEAM_ADMIN:
             actor_employee = self._require_employee(actor.employee_id)
-            if actor_employee.team_id and actor_employee.team_id == employee.team_id:
+            if self._is_visible_to_team_manager(actor_employee, employee):
                 return
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="본인, 같은 팀 관리자 또는 권한 있는 관리자만 상태를 변경할 수 있습니다.",
         )
+
+    @staticmethod
+    def _is_visible_to_team_manager(manager: Employee, employee: Employee | EmployeeDetail) -> bool:
+        if manager.team_id:
+            return manager.team_id == employee.team_id
+        return manager.department_id == employee.department_id
 
     def _can_view_private_status_reasons(self, viewer_id: str | None) -> bool:
         viewer = self.repository.get_employee_model(viewer_id) if viewer_id else None

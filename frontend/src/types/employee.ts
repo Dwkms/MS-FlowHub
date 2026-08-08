@@ -24,3 +24,4 @@ export interface EmployeeDetail extends EmployeeSummary {
 }
 export interface EmployeePage { items: EmployeeSummary[]; page: number; page_size: number; total: number; total_pages: number }
 export interface Department { id: string; code: string; name: string; description: string | null }
+export interface OrganizationNode { id: string; employee_no: string; name: string; position: string; department: string; team: string | null; children: OrganizationNode[] }

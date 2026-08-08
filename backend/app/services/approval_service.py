@@ -1,6 +1,7 @@
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
+from app.domain.recruitment_policy import is_recruitment_approver
 from app.models.approval import ApprovalDocument
 from app.repositories.approval_repository import ApprovalRepository
 from app.repositories.organization_repository import OrganizationRepository
@@ -46,6 +47,7 @@ class ApprovalService:
     def create(self, payload: ApprovalCreate, actor: ActorContext) -> ApprovalResponse:
         author = self._require_employee(actor.employee_id)
         approver = self._require_employee(payload.approver_id)
+        self._require_manager_level_approver(approver.position)
         if self.organization.get_department(payload.department_id) is None:
             raise HTTPException(status_code=400, detail="기안 부서를 찾을 수 없습니다.")
         if (
@@ -84,7 +86,8 @@ class ApprovalService:
                     status_code=400, detail="기안자의 소속 부서만 선택할 수 있습니다."
                 )
         if "approver_id" in changes:
-            self._require_employee(changes["approver_id"])
+            approver = self._require_employee(changes["approver_id"])
+            self._require_manager_level_approver(approver.position)
             if changes["approver_id"] == document.author_id:
                 raise HTTPException(status_code=400, detail="작성자와 결재자는 같을 수 없습니다.")
         for field, value in changes.items():
@@ -171,6 +174,13 @@ class ApprovalService:
         return employee
 
     @staticmethod
+    def _require_manager_level_approver(position: str) -> None:
+        if not is_recruitment_approver(position):
+            raise HTTPException(
+                status_code=422, detail="결재자는 팀장급 이상만 지정할 수 있습니다."
+            )
+
+    @staticmethod
     def _require_status(document: ApprovalDocument, expected: str, message: str) -> None:
         if document.status != expected:
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=message)
@@ -196,6 +206,8 @@ class ApprovalService:
             )
 
     def _is_same_team(self, first_employee_id: str, second_employee_id: str) -> bool:
-        first = self._require_employee(first_employee_id)
-        second = self._require_employee(second_employee_id)
+        first = self.organization.get_employee_model(first_employee_id)
+        second = self.organization.get_employee_model(second_employee_id)
+        if first is None or second is None:
+            return False
         return first.team_id is not None and first.team_id == second.team_id

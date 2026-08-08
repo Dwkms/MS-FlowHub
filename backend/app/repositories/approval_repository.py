@@ -10,7 +10,7 @@ from app.schemas.approval import (
     ApprovalHistoryResponse,
     ApprovalResponse,
 )
-from app.schemas.common import DashboardTask
+from app.schemas.common import DashboardBreakdownItem, DashboardTask
 
 
 class ApprovalRepository:
@@ -158,6 +158,30 @@ class ApprovalRepository:
             )
         )
         return self.session.scalar(statement) or 0
+
+    def get_status_breakdown(self) -> list[DashboardBreakdownItem]:
+        statement = (
+            select(ApprovalDocument.status, func.count())
+            .group_by(ApprovalDocument.status)
+            .order_by(ApprovalDocument.status)
+        )
+        return [
+            DashboardBreakdownItem(label=status, value=count)
+            for status, count in self.session.execute(statement)
+        ]
+
+    def get_average_processing_hours(self) -> float | None:
+        statement = select(ApprovalDocument.submitted_at, ApprovalDocument.processed_at).where(
+            ApprovalDocument.submitted_at.is_not(None),
+            ApprovalDocument.processed_at.is_not(None),
+        )
+        durations = [
+            (processed_at - submitted_at).total_seconds() / 3600
+            for submitted_at, processed_at in self.session.execute(statement)
+        ]
+        if not durations:
+            return None
+        return round(sum(durations) / len(durations), 1)
 
     def list_recent_tasks(self, employee_id: str, limit: int = 3) -> list[DashboardTask]:
         statement = (

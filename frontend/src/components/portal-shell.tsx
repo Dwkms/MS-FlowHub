@@ -55,7 +55,7 @@ export function PortalShell({ children }: { children: ReactNode }) {
             >
               <BellIcon />
             </button>
-            <div className="authenticated-user"><span className="avatar">{currentEmployee.name.slice(0, 1)}</span><span><small>현재 사용자</small><b>{currentEmployee.name} · {currentEmployee.role_label}</b></span></div>
+            <div className="authenticated-user"><span className="avatar">{currentEmployee.name.slice(0, 1)}</span><span><small>현재 사용자</small><b>{currentEmployee.name}</b></span></div>
           </div>
         </header>
         {children}

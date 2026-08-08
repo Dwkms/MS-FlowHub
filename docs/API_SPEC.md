@@ -33,7 +33,7 @@
 일반 직원은 모든 지원자 API를 호출할 수 없습니다. 같은 공고에 동일 이메일을 등록하면 `409`, 종료 단계
 지원자를 변경하면 `409`, 불합격 단계에 메모가 없으면 `422`를 반환합니다.
 
-## 대시보드 실제 업무 데이터 (v0.7.1)
+## 대시보드 실제 업무 데이터 (v0.7.2)
 
 `GET /api/v1/dashboard`는 Bearer 토큰으로 확인한 현재 직원 기준으로 다음 데이터를 반환합니다.
 
@@ -41,6 +41,11 @@
 - **내가 상신한 결재**: 현재 직원이 기안자이며 처리 대기 중인 전자결재 문서 수
 - **진행 중 채용**: 시스템에 생성된 채용공고 수
 - **최근 업무**: 현재 직원과 관련된 전자결재 및 채용 요청 목록
+
+`SUPER_ADMIN`, `HR_ADMIN` 응답에는 추가로 `analytics`가 포함됩니다. 전자결재 상태별 건수,
+평균 결재 처리 시간(상신~처리), 지원자 전형별 건수, 전체 채용 요청 수, 당일 근태 상태별
+건수와 활성 직원 중 당일 근태 미등록 인원 수를 실제 업무 테이블에서 읽어 반환합니다. `TEAM_ADMIN`, `EMPLOYEE`의 `analytics`는
+`null`로 반환해 조직 전체 업무 현황을 노출하지 않습니다.
 
 현재 범위에 없는 기능의 안내용 고정값은 반환하지 않습니다.
 
@@ -76,7 +81,9 @@ not an `actor_id` field.
 Approval approval and rejection also require the bearer header. Approval accepts
 an optional `comment` and rejection requires a `comment`; both resolve the
 acting employee from the token instead of an `actor_id` field. Only the assigned
-approver or a `SUPER_ADMIN` can process a pending approval.
+approver, a `SUPER_ADMIN`, or a `TEAM_ADMIN` handling a same-team author's document can
+process a pending approval. The document author cannot process their own document; the
+existing self-processing exception is limited to a `SUPER_ADMIN` recruitment request.
 
 Approval creation, draft update, deletion, and listing require the bearer header
 as well. Creation records the token owner as the author, draft update uses that
@@ -84,6 +91,8 @@ owner for author validation and history, and deletion is limited to `SUPER_ADMIN
 Lists return all documents to `SUPER_ADMIN` and only author-or-approver related
 documents to other users. These endpoints no longer accept `author_id`, `actor_id`,
 or `employee_id` as an identity source.
+일반 전자결재의 결재자는 직급에 `팀장`, `부장`, `이사`, `대표` 중 하나가 포함된 직원만 지정할 수
+있으며, 생성과 임시 저장 문서 수정 모두에서 서버가 검증합니다.
 
 All recruitment request and job posting endpoints now require the bearer header.
 The token owner becomes the requester, and these APIs no longer accept
@@ -125,6 +134,10 @@ Employee status endpoints resolve the actor from the Bearer token through the AP
 dependency layer. The service receives an `ActorContext` (employee ID and role),
 rather than querying request parameters or making authorization decisions in the Router.
 
+For employee organization and attendance management, a `TEAM_ADMIN` with a `team_id`
+is limited to that part. A department leader without a `team_id` is limited to employees
+in the leader's department.
+
 ## Recruitment Poster (v0.5.7)
 
 ## Recruitment request selection rules
@@ -133,8 +146,8 @@ rather than querying request parameters or making authorization decisions in the
   employee position contains team leader, department head, director, or CEO
   level (`팀장`, `부장`, `이사`, `대표`). The rule is enforced by the backend.
 - 일반 직원은 자신을 채용 요청 결재자로 지정하거나 자신의 요청을 처리할 수 없습니다. `SUPER_ADMIN`은 채용 요청에 한해 본인을 결재자로 지정하고 처리할 수 있습니다.
-- The executive department (`EXEC`) is retained for CEO organization ownership,
-  but cannot be selected as a recruitment request department.
+- The CEO is shown without a department or team (`-`) and cannot be selected as a
+  recruitment request department.
 - Employee option labels use the real department name for department heads,
   for example `개발팀장` and `마케팅팀장`, rather than the generic `부서장`.
 

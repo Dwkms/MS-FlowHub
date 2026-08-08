@@ -91,7 +91,7 @@ MS FlowHub는 직원·조직 관리, 근태 상태, 전자결재, 채용 요청�
 |---|---|
 | `SUPER_ADMIN` | 전체 직원·조직 관리, 역할 변경, 모든 결재 처리, 매뉴얼 관리 |
 | `HR_ADMIN` | 직원·조직·근태 관리, 비공개 사유 조회, 매뉴얼 관리 |
-| `TEAM_ADMIN` | 같은 팀의 허용된 직원 상태 관리와 지정 결재 처리 |
+| `TEAM_ADMIN` | 소속 파트가 있으면 같은 파트, 파트 미소속 부서장이면 소속 부서의 직원 상태 관리와 지정 결재 처리 |
 | `EMPLOYEE` | 본인 범위 조회·근태 상태 등록·결재 문서 작성·공개 매뉴얼 조회 |
 
 권한은 프론트엔드 표시뿐 아니라 FastAPI 서비스와 의존성에서 다시 검증합니다.
@@ -157,6 +157,9 @@ cd backend
 # 직원·조직과 Auth 계정
 .\.venv\Scripts\python.exe -m app.scripts.seed_organization
 .\.venv\Scripts\python.exe -m app.scripts.seed_auth_accounts
+
+# 기존 계정에 영향 없이 QA파트 3명만 계정·권한 연결
+.\.venv\Scripts\python.exe -m app.scripts.provision_qa_part_accounts
 
 # 직원 매뉴얼과 FAQ
 .\.venv\Scripts\python.exe -m app.scripts.seed_manuals

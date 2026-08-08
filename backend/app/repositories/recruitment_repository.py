@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.models.organization import Department, Employee
 from app.models.recruitment import Applicant, ApplicantStageHistory, JobPosting, RecruitmentRequest
-from app.schemas.common import DashboardTask
+from app.schemas.common import DashboardBreakdownItem, DashboardTask
 from app.schemas.recruitment import (
     ApplicantResponse,
     ApplicantStageHistoryResponse,
@@ -145,6 +145,21 @@ class RecruitmentRepository:
 
     def count_postings(self) -> int:
         statement = select(func.count()).select_from(JobPosting)
+        return self.session.scalar(statement) or 0
+
+    def get_applicant_stage_breakdown(self) -> list[DashboardBreakdownItem]:
+        statement = (
+            select(Applicant.stage, func.count())
+            .group_by(Applicant.stage)
+            .order_by(Applicant.stage)
+        )
+        return [
+            DashboardBreakdownItem(label=stage, value=count)
+            for stage, count in self.session.execute(statement)
+        ]
+
+    def count_recruitment_requests(self) -> int:
+        statement = select(func.count()).select_from(RecruitmentRequest)
         return self.session.scalar(statement) or 0
 
     def list_recent_tasks(self, employee_id: str, limit: int = 2) -> list[DashboardTask]:

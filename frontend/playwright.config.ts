@@ -13,6 +13,8 @@ const backendCommand =
 export default defineConfig({
   testDir: "./e2e",
   fullyParallel: false,
+  // 동일한 E2E 계정과 데이터의 상태 변경이 서로 겹치지 않도록 프로젝트도 순차 실행한다.
+  workers: 1,
   forbidOnly: Boolean(process.env.CI),
   retries: 0,
   reporter: [["list"], ["html", { open: "never" }]],
@@ -23,7 +25,10 @@ export default defineConfig({
     trace: "retain-on-failure",
     screenshot: "only-on-failure",
   },
-  projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
+  projects: [
+    { name: "desktop-chromium", use: { ...devices["Desktop Chrome"] } },
+    { name: "mobile-chromium", use: { ...devices["Pixel 7"] } },
+  ],
   webServer: [
     {
       command: backendCommand,

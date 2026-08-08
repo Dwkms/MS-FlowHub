@@ -13,7 +13,7 @@ from app.db.session import get_db_session
 from app.main import create_app
 from app.models import approval, auth, manual, notification, organization, recruitment  # noqa: F401
 from app.models.auth import EmployeeAccount
-from app.models.organization import Department, Employee
+from app.models.organization import Department, Employee, Team
 from app.repositories.organization_repository import OrganizationRepository
 
 
@@ -28,6 +28,15 @@ def seed_workflow_test_identities(session: Session) -> None:
                 display_order=90,
             )
         )
+    session.add(
+        Team(
+            id="team-product",
+            code="PRODUCT_TEAM",
+            name="Product Team",
+            department_id="dept-product",
+            display_order=90,
+        )
+    )
     for employee_id, number, role, department_id in (
         ("emp-head", "TEST001", "ADMIN", "dept-product"),
         ("emp-hr", "TEST002", "HR_MANAGER", "dept-hr"),
@@ -43,7 +52,16 @@ def seed_workflow_test_identities(session: Session) -> None:
                 email=f"{employee_id}@test.local",
                 role=role,
                 department_id=department_id,
-                position="인사팀장" if employee_id == "emp-hr" else "Tester",
+                team_id="team-product" if employee_id in {"emp-head", "emp-product-head"} else None,
+                position=(
+                    "대표이사"
+                    if employee_id == "emp-head"
+                    else "인사팀장"
+                    if employee_id == "emp-hr"
+                    else "영업팀장"
+                    if employee_id == "emp-sales-head"
+                    else "Tester"
+                ),
                 job_title="Test fixture",
             )
         )

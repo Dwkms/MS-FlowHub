@@ -16,8 +16,8 @@ from app.models.organization import (
     Employee,
     Team,
 )
+from app.schemas.common import DashboardBreakdownItem, EmployeeResponse
 from app.schemas.common import DepartmentResponse as LegacyDepartmentResponse
-from app.schemas.common import EmployeeResponse
 from app.schemas.employee import (
     AttendanceChangeHistoryItem,
     DepartmentResponse,
@@ -55,9 +55,21 @@ _DEPARTMENTS = [
     ("MKT", "마케팅팀", 3),
     ("HR", "인사팀", 4),
     ("PLAN", "기획팀", 5),
-    ("QA", "QA팀", 6),
+    ("CS", "CS팀", 6),
 ]
-_TEAMS = [("DEV_SW", "SW개발파트", "DEV", 1), ("DEV_HW", "HW개발파트", "DEV", 2)]
+_TEAMS = [
+    ("DEV_SW", "SW개발팀", "DEV", 1),
+    ("DEV_HW", "HW개발팀", "DEV", 2),
+    ("DEV_QA", "QA팀", "DEV", 3),
+    ("MKT_1", "마케팅1팀", "MKT", 1),
+    ("MKT_2", "마케팅2팀", "MKT", 2),
+    ("HR_1", "인사1팀", "HR", 1),
+    ("HR_2", "인사2팀", "HR", 2),
+    ("PLAN_1", "기획1팀", "PLAN", 1),
+    ("PLAN_2", "기획2팀", "PLAN", 2),
+    ("CS_1", "CS1팀", "CS", 1),
+]
+_EXECUTIVE_DEPARTMENT_CODE = "EXEC"
 _EMPLOYEES = [
     ("김민성", "EXEC", None, "대표이사", "회사 경영 및 주요 의사결정", None),
     ("박준혁", "DEV", None, "팀장", "개발 조직 총괄 및 기술 의사결정", "MS0001"),
@@ -100,17 +112,46 @@ _EMPLOYEES = [
     ("오하린", "PLAN", None, "주임", "서비스 데이터 분석", "MS0032"),
     ("서동현", "PLAN", None, "주임", "UX 정책 및 화면 설계", "MS0032"),
     ("윤가은", "PLAN", None, "사원", "사용자 조사 및 기획 문서 작성", "MS0032"),
-    ("김태윤", "QA", None, "팀장", "QA 전략 및 품질관리 총괄", "MS0001"),
-    ("박소연", "QA", None, "선임", "SW 테스트 계획 및 품질 검증", "MS0042"),
-    ("이준혁", "QA", None, "주임", "웹 및 모바일 기능 테스트", "MS0042"),
-    ("한예린", "QA", None, "주임", "테스트 자동화 및 회귀 테스트", "MS0042"),
-    ("강민호", "QA", None, "사원", "HW 제품 및 연동 기능 테스트", "MS0042"),
+    ("김태윤", "CS", None, "팀장", "고객지원 운영 및 VOC 관리 총괄", "MS0001"),
+    ("박소연", "CS", None, "선임", "고객 문의 분석 및 지원 프로세스 개선", "MS0042"),
+    ("이준혁", "CS", None, "주임", "제품 사용 문의 및 장애 접수 대응", "MS0042"),
+    ("한예린", "CS", None, "주임", "고객 안내 콘텐츠 및 반복 문의 관리", "MS0042"),
+    ("강민호", "CS", None, "사원", "고객 요청 접수 및 처리 현황 관리", "MS0042"),
+    ("최다은", "DEV", "DEV_QA", "파트장", "QA 전략 및 테스트 품질 관리", "MS0002"),
+    ("정하윤", "DEV", "DEV_QA", "선임", "기능·회귀 테스트와 결함 분석", "MS0047"),
+    ("유민재", "DEV", "DEV_QA", "사원", "테스트 자동화와 배포 전 검증", "MS0047"),
 ]
 
 
 class OrganizationRepository:
     def __init__(self, session: Session) -> None:
         self.session = session
+
+    def get_today_attendance_breakdown(self) -> list[DashboardBreakdownItem]:
+        statement = (
+            select(AttendanceRecord.work_status, func.count())
+            .where(AttendanceRecord.work_date == date.today())
+            .group_by(AttendanceRecord.work_status)
+            .order_by(AttendanceRecord.work_status)
+        )
+        return [
+            DashboardBreakdownItem(label=status, value=count)
+            for status, count in self.session.execute(statement)
+        ]
+
+    def count_today_attendance_unregistered(self) -> int:
+        registered_statement = (
+            select(func.count())
+            .select_from(AttendanceRecord)
+            .join(Employee, Employee.id == AttendanceRecord.employee_id)
+            .where(AttendanceRecord.work_date == date.today(), Employee.is_active.is_(True))
+        )
+        active_employee_statement = (
+            select(func.count()).select_from(Employee).where(Employee.is_active.is_(True))
+        )
+        active_employee_count = self.session.scalar(active_employee_statement) or 0
+        registered_count = self.session.scalar(registered_statement) or 0
+        return max(active_employee_count - registered_count, 0)
 
     def seed_sample_organization(self) -> None:
         departments: dict[str, Department] = {}
@@ -149,21 +190,23 @@ class OrganizationRepository:
         for index, (name, department_code, team_code, position, job_title, _) in enumerate(
             _EMPLOYEES, 1
         ):
-            number = f"MS{index:04d}"
+            number = self._employee_no_for_seed_index(index)
             item = self.session.scalar(select(Employee).where(Employee.employee_no == number))
             if item is None:
                 item = Employee(
                     id=f"emp-ms{index:04d}",
                     employee_no=number,
                     name=name,
-                    email=f"ms{index:04d}@msflowhub.test",
-                    role=self._role_for(index),
+                    email=f"ms{number[2:]}@msflowhub.test",
+                    role=self._role_for(number),
                 )
                 self.session.add(item)
-            item.name, item.email = name, f"ms{index:04d}@msflowhub.test"
+            item.name = name
             item.department_id, item.team_id = (
                 departments[department_code].id,
-                teams[team_code].id if team_code else None,
+                teams[self._team_code_for_seed_index(index, team_code)].id
+                if self._team_code_for_seed_index(index, team_code)
+                else None,
             )
             item.position, item.job_title, item.job_description = position, job_title, job_title
             item.employment_type = "REGULAR"
@@ -180,8 +223,9 @@ class OrganizationRepository:
             employees[number] = item
         self.session.flush()
         for index, (_, _, _, _, _, manager_no) in enumerate(_EMPLOYEES, 1):
-            employees[f"MS{index:04d}"].manager_id = (
-                employees[manager_no].id if manager_no else None
+            number = self._employee_no_for_seed_index(index)
+            employees[number].manager_id = (
+                employees[self._remap_seed_employee_no(manager_no)].id if manager_no else None
             )
         self._seed_today_attendance(employees)
 
@@ -230,20 +274,52 @@ class OrganizationRepository:
                 record.check_out_at = None
 
     @staticmethod
-    def _role_for(index: int) -> str:
-        if index == 1:
+    def _role_for(employee_no: str) -> str:
+        if employee_no == "MS0001":
             return "ADMIN"
-        if index in {2, 12, 22, 32, 42}:
-            return "DEPARTMENT_HEAD"
-        if index == 3:
+        if employee_no in {"MS0002", "MS0015", "MS0025", "MS0035", "MS0045"}:
             return "DEPARTMENT_HEAD"
         return "EMPLOYEE"
+
+    @staticmethod
+    def _employee_no_for_seed_index(index: int) -> str:
+        if 12 <= index <= 46:
+            index += 3
+        elif 47 <= index <= 49:
+            index -= 35
+        return f"MS{index:04d}"
+
+    @classmethod
+    def _remap_seed_employee_no(cls, employee_no: str) -> str:
+        return cls._employee_no_for_seed_index(int(employee_no.removeprefix("MS")))
+
+    @staticmethod
+    def _team_code_for_seed_index(index: int, team_code: str | None) -> str | None:
+        if team_code:
+            return team_code
+        if 12 <= index <= 16:
+            return "MKT_1"
+        if 17 <= index <= 21:
+            return "MKT_2"
+        if 22 <= index <= 26:
+            return "HR_1"
+        if 27 <= index <= 31:
+            return "HR_2"
+        if 32 <= index <= 36:
+            return "PLAN_1"
+        if 37 <= index <= 41:
+            return "PLAN_2"
+        if 42 <= index <= 46:
+            return "CS_1"
+        return None
 
     def list_departments(self) -> list[LegacyDepartmentResponse]:
         return [
             LegacyDepartmentResponse(id=d.id, code=d.code, name=d.name)
             for d in self.session.scalars(
-                select(Department).order_by(Department.display_order)
+                select(Department)
+                .where(Department.code != _EXECUTIVE_DEPARTMENT_CODE)
+                .order_by(Department.display_order)
             ).all()
         ]
 
@@ -264,7 +340,7 @@ class OrganizationRepository:
                 role_label=self._role_label(e, d),
                 position=e.position,
                 department_id=e.department_id,
-                department_name=d.name,
+                department_name=self._display_department_name(d),
                 team_code=t.code if t else None,
             )
             for e, d, t in rows
@@ -288,7 +364,7 @@ class OrganizationRepository:
                 role_label=self._role_label(row[0], row[1]),
                 position=row[0].position,
                 department_id=row[0].department_id,
-                department_name=row[1].name,
+                department_name=self._display_department_name(row[1]),
                 team_code=row[2].code if row[2] else None,
             )
         )
@@ -323,6 +399,7 @@ class OrganizationRepository:
         position: str | None,
         visible_employee_id: str | None = None,
         visible_team_id: str | None = None,
+        visible_department_id: str | None = None,
     ) -> PaginatedEmployeeResponse:
         target_date = work_date or date.today()
         statement: Select = (
@@ -362,6 +439,8 @@ class OrganizationRepository:
             statement = statement.where(Employee.id == visible_employee_id)
         if visible_team_id:
             statement = statement.where(Employee.team_id == visible_team_id)
+        if visible_department_id:
+            statement = statement.where(Employee.department_id == visible_department_id)
         total = self.session.scalar(select(func.count()).select_from(statement.subquery())) or 0
         rows = self.session.execute(
             statement.order_by(Employee.employee_no).offset((page - 1) * page_size).limit(page_size)
@@ -496,7 +575,9 @@ class OrganizationRepository:
         return [
             DepartmentResponse(id=d.id, code=d.code, name=d.name, description=d.description)
             for d in self.session.scalars(
-                select(Department).order_by(Department.display_order)
+                select(Department)
+                .where(Department.code != _EXECUTIVE_DEPARTMENT_CODE)
+                .order_by(Department.display_order)
             ).all()
         ]
 
@@ -513,7 +594,7 @@ class OrganizationRepository:
             employee_no=employee.employee_no,
             name=employee.name,
             email=employee.email,
-            department=department.name,
+            department=self._display_department_name(department),
             department_code=department.code,
             team=team.name if team else None,
             team_code=team.code if team else None,
@@ -580,8 +661,9 @@ class OrganizationRepository:
 
     def organization_tree(self) -> OrganizationNode:
         rows = self.session.execute(
-            select(Employee, Department)
+            select(Employee, Department, Team)
             .join(Department, Employee.department_id == Department.id)
+            .outerjoin(Team, Employee.team_id == Team.id)
             .order_by(Employee.employee_no)
         ).all()
         nodes = {
@@ -590,13 +672,14 @@ class OrganizationRepository:
                 employee_no=e.employee_no,
                 name=e.name,
                 position=e.position,
-                department=d.name,
+                department=self._display_department_name(d),
+                team=t.name if t else None,
                 children=[],
             )
-            for e, d in rows
+            for e, d, t in rows
         }
         root: OrganizationNode | None = None
-        for employee, _ in rows:
+        for employee, _, _ in rows:
             node = nodes[employee.id]
             if employee.manager_id is None:
                 root = node
@@ -605,3 +688,7 @@ class OrganizationRepository:
         if root is None:
             raise ValueError("Organization root employee is missing")
         return root
+
+    @staticmethod
+    def _display_department_name(department: Department) -> str:
+        return "-" if department.code == _EXECUTIVE_DEPARTMENT_CODE else department.name
