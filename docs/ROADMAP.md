@@ -1,5 +1,31 @@
 # Roadmap
 
+> 최신 정리: 2026-08-08. 현재 구현 상태와 Jira 반영 대상은 아래 "2026-08-08 Jira 정리"를 기준으로 한다. 이전 일정 기록은 당시 계획 기준선으로 보존한다.
+
+## 2026-08-08 Jira 정리
+
+### 완료 처리 대상
+
+| 작업 | 결과 | 검증 |
+|---|---|---|
+| CI/CD 기본 구성 | GitHub Actions CI와 수동 실행 E2E workflow를 분리하고, Windows 의존 E2E 실행 경로를 정리 | Backend Ruff/pytest, Frontend lint/typecheck/build, Playwright E2E |
+| 관리자 업무 현황 대시보드 | 실제 결재·채용·근태 집계 API와 관리자 전용 업무 현황 UI 구현 | Backend pytest, Frontend build |
+| 전자결재 권한·오류 수정 | 팀장급 이상 결재자 제한, SUPER_ADMIN/관리자 처리 규칙 보완, TEAM_ADMIN 승인 500 오류 수정 | 승인 API 테스트, E2E 승인 시나리오 |
+| 조직 개편 | QA팀을 개발팀 QA팀으로 편성하고 기존 QA팀을 CS팀으로 전환, 팀 구조·직원번호 재배치 | Alembic migration 0017~0020, 직원·조직 API 테스트 |
+| 직원·조직 관리 UX | 상단 사용자 이름 표기 통일, 대표이사 부서/팀 표기 정리, 조직도 팝업과 최신 조직도 이미지 반영 | 데스크톱·모바일 E2E 조직도 로드 확인 |
+| 크로스플랫폼 회귀 검증 | Playwright를 데스크톱 Chromium과 Pixel 7에서 순차 실행하도록 안정화 | E2E 14개 통과 |
+
+### 진행 또는 의사결정 대상
+
+| 작업 | 상태 | 다음 조치 |
+|---|---|---|
+| GitHub Actions 실행 결과 확인 | 진행 중 | `b9fd0bf` push로 실행된 CI의 결과를 GitHub Actions에서 확인 |
+| Render 배포 게이트 | 결정 필요 | Auto-Deploy 유지 또는 CI 통과 후 Deploy Hook 호출 방식 결정 |
+| 대시보드 데이터 운영 정책 | 결정 필요 | 적은 실데이터를 유지할지, 검증용 업무 데이터를 추가할지 결정 |
+| 파트장 계정 권한 부여 | 결정 필요 | SW/HW/CS 파트장에게 TEAM_ADMIN 권한을 실제로 부여할지 결정 |
+| 알림과 공통 오류 응답 | 미착수 | 상단 알림과 표준 오류 응답 형식 설계·구현 |
+| ATS·Storage E2E 확대 | 미착수 | 지원자 관리와 첨부파일 Storage 흐름을 Playwright 시나리오에 추가 |
+
 > 기준일: 2026-08-05. 실제 작업 우선순위와 일정은 MS FlowHub Jira 보드·타임라인에서 관리합니다. 아래 날짜별 계획은 초기 기준선 기록이며, 완료 여부를 현재 구현 상태로 해석하지 않습니다.
 
 ## 현재 구현 완료 범위
