@@ -101,7 +101,7 @@ erDiagram
 
 **테이블별 역할**
 - `departments`: 부서 코드·이름·설명·표시 순서.
-- `teams`: 부서에 속한 하위 팀(개발팀 산하 `DEV_SW`/`DEV_HW` 등).
+- `teams`: 부서에 속한 하위 파트(개발팀 산하 `DEV_SW`/`DEV_HW`/`DEV_QA` 등).
 - `employees`: 사번·이름·이메일·직급·담당 업무·재직 상태·근무 위치 등 직원 기준 정보와 상급자(`manager_id`) 참조.
 - `employee_accounts`: Supabase Auth `auth_user_id`와 `employees.id`를 1:1로 연결하고, 애플리케이션 권한 `role`과 활성 여부를 보관.
 
@@ -121,6 +121,13 @@ erDiagram
 - `employees.employment_status`: `ACTIVE`, `ON_LEAVE`, `SCHEDULED`, `RESIGNED`
 - `employee_accounts.role`: `SUPER_ADMIN`, `HR_ADMIN`, `TEAM_ADMIN`, `EMPLOYEE`
 - `employees.employment_type`: 문자열 컬럼이며 현재 기본값 `REGULAR`만 사용, 별도 enum 제약 없음
+
+**조직 운영 기준**
+- 대표이사는 조직 최상단에 두며 화면·조직도에서는 부서와 팀을 `-`로 표시한다. 내부 참조용 `EXEC` 부서는 부서 목록에 노출하지 않는다.
+- 개발팀은 SW개발팀, HW개발팀, QA팀으로 구성한다. QA팀의 테스트·품질 업무는 개발팀 내에서 운영한다.
+- 마케팅팀·인사팀·기획팀은 각각 1팀과 2팀으로, CS팀은 인원 규모에 맞춰 CS1팀 하나로 운영한다.
+- 기존 독립 QA팀은 CS팀으로 전환해 고객 문의·장애 접수·VOC 운영을 담당한다.
+- `TEAM_ADMIN`은 `team_id`가 있으면 해당 파트, `team_id`가 없으면 소속 부서 범위의 직원 정보를 조회하고 근태 상태를 관리한다.
 
 **삭제 및 이력 보존 정책**
 - 직원 삭제는 물리 삭제가 아니라 `employment_status=INACTIVE` 전환으로 처리(레코드 보존).

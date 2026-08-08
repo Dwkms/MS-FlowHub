@@ -5,6 +5,7 @@ from app.repositories.approval_repository import ApprovalRepository
 from app.repositories.organization_repository import OrganizationRepository
 from app.repositories.recruitment_repository import RecruitmentRepository
 from app.schemas.common import (
+    DashboardAnalytics,
     DashboardMetric,
     DashboardResponse,
     DepartmentResponse,
@@ -17,6 +18,7 @@ _MODULE_ACCESS = {
     "HR_ADMIN": ["전자결재", "ATS Lite", "직원·조직 관리", "직원 매뉴얼"],
     "SUPER_ADMIN": ["전자결재", "ATS Lite", "직원·조직 관리", "직원 매뉴얼"],
 }
+_ANALYTICS_ROLES = {"SUPER_ADMIN", "HR_ADMIN"}
 
 
 class DashboardService:
@@ -74,4 +76,15 @@ class DashboardService:
                 *self.approvals.list_recent_tasks(employee_id, limit=3),
                 *self.recruitment.list_recent_tasks(employee_id, limit=2),
             ][:5],
+            analytics=self._get_analytics() if role in _ANALYTICS_ROLES else None,
+        )
+
+    def _get_analytics(self) -> DashboardAnalytics:
+        return DashboardAnalytics(
+            approval_by_status=self.approvals.get_status_breakdown(),
+            average_approval_processing_hours=self.approvals.get_average_processing_hours(),
+            applicant_by_stage=self.recruitment.get_applicant_stage_breakdown(),
+            recruitment_request_count=self.recruitment.count_recruitment_requests(),
+            attendance_by_status=self.organization.get_today_attendance_breakdown(),
+            today_attendance_unregistered_count=self.organization.count_today_attendance_unregistered(),
         )

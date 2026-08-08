@@ -16,11 +16,12 @@ from app.models.organization import Employee
 
 ROLE_BY_EMPLOYEE_NO = {
     "MS0001": "SUPER_ADMIN",
-    "MS0022": "HR_ADMIN",
+    "MS0025": "HR_ADMIN",
     "MS0002": "TEAM_ADMIN",
+    "MS0015": "TEAM_ADMIN",
+    "MS0035": "TEAM_ADMIN",
+    "MS0045": "TEAM_ADMIN",
     "MS0012": "TEAM_ADMIN",
-    "MS0032": "TEAM_ADMIN",
-    "MS0042": "TEAM_ADMIN",
 }
 
 
@@ -110,6 +111,67 @@ def sync_employee_accounts(
             )
             session.add(account)
             accounts_by_employee_id[employee.id] = account
+            continue
+
+        account.auth_user_id = auth_user_id
+        account.role = role
+        account.is_active = employee.employment_status == "ACTIVE"
+
+
+def sync_selected_employee_accounts(
+    session: Session,
+    employee_nos: set[str],
+    auth_users: dict[str, str],
+    password: str,
+    create_auth_user: Callable[[str, str], str] = _create_auth_user,
+) -> None:
+    """Create or update links only for explicitly selected employees.
+
+    Existing Auth user passwords are never changed. This is safe for adding a
+    small group to an environment that already has active employee accounts.
+    """
+    employees = session.scalars(
+        select(Employee)
+        .where(Employee.employee_no.in_(employee_nos))
+        .order_by(Employee.employee_no)
+    ).all()
+    found_employee_nos = {employee.employee_no for employee in employees}
+    missing_employee_nos = employee_nos - found_employee_nos
+    if missing_employee_nos:
+        raise RuntimeError(f"Employees not found: {', '.join(sorted(missing_employee_nos))}")
+
+    employee_ids = [employee.id for employee in employees]
+    accounts_by_employee_id = {
+        account.employee_id: account
+        for account in session.scalars(
+            select(EmployeeAccount).where(EmployeeAccount.employee_id.in_(employee_ids))
+        ).all()
+    }
+    accounts_by_auth_user_id = {
+        account.auth_user_id: account for account in session.scalars(select(EmployeeAccount)).all()
+    }
+    for employee in employees:
+        auth_user_id = auth_users.get(employee.email)
+        if auth_user_id is None:
+            auth_user_id = create_auth_user(employee.email, password)
+            auth_users[employee.email] = auth_user_id
+
+        linked_account = accounts_by_auth_user_id.get(auth_user_id)
+        if linked_account is not None and linked_account.employee_id != employee.id:
+            raise RuntimeError("The Auth user is already linked to another employee.")
+
+        role = ROLE_BY_EMPLOYEE_NO.get(employee.employee_no, "EMPLOYEE")
+        account = accounts_by_employee_id.get(employee.id)
+        if account is None:
+            session.add(
+                EmployeeAccount(
+                    id=f"account-{employee.id}",
+                    auth_user_id=auth_user_id,
+                    employee_id=employee.id,
+                    role=role,
+                    is_active=employee.employment_status == "ACTIVE",
+                )
+            )
             continue
 
         account.auth_user_id = auth_user_id

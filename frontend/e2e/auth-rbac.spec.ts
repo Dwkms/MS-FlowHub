@@ -21,7 +21,7 @@ async function login(page: Page, credentials: Credentials): Promise<void> {
   await page.getByLabel("비밀번호").fill(credentials.password);
   await page.getByRole("button", { name: "로그인", exact: true }).click();
   await expect(page).toHaveURL(/\/$/);
-  await expect(page.getByText("Backend API 연결됨")).toBeVisible();
+  await expect(page.locator(".connection.ok")).toHaveCount(1);
 }
 
 async function logout(page: Page): Promise<void> {
@@ -66,7 +66,7 @@ test.describe("테스트 전용 인증 계정", () => {
   test("로그인, 새로고침 세션 유지, 로그아웃을 확인한다", async ({ page }) => {
     await login(page, account("E2E_EMPLOYEE"));
     await page.reload();
-    await expect(page.getByText("Backend API 연결됨")).toBeVisible();
+    await expect(page.locator(".connection.ok")).toHaveCount(1);
     await logout(page);
   });
 
@@ -74,13 +74,17 @@ test.describe("테스트 전용 인증 계정", () => {
     await login(page, account("E2E_EMPLOYEE"));
     await page.goto("/employees");
     await expect(page.getByRole("heading", { name: "직원 · 조직 관리" })).toBeVisible();
-    await expect(page.locator(".employee-table tbody tr")).toHaveCount(1);
+    await expect(
+      page.locator(".employee-desktop-table:visible tbody tr, .employee-mobile-list:visible .employee-mobile-row"),
+    ).toHaveCount(1);
     await logout(page);
 
     await login(page, account("E2E_SUPER_ADMIN"));
     await page.goto("/employees");
     await expect(page.getByRole("heading", { name: "직원 · 조직 관리" })).toBeVisible();
-    await expect(page.locator(".employee-table tbody tr")).not.toHaveCount(0);
+    await expect(
+      page.locator(".employee-desktop-table:visible tbody tr, .employee-mobile-list:visible .employee-mobile-row"),
+    ).not.toHaveCount(0);
   });
 
   test("직원 검색과 부서·재직·근무 상태 필터를 적용한다", async ({ page }) => {
@@ -92,8 +96,20 @@ test.describe("테스트 전용 인증 계정", () => {
     await page.getByLabel("재직 상태 필터").selectOption("ACTIVE");
     await page.getByLabel("근무 상태 필터").selectOption("WORKING");
     await expect(
-      page.locator(".employee-table").or(page.getByText("검색 결과가 없습니다.")),
+      page.locator(".employee-desktop-table:visible, .employee-mobile-list:visible").or(page.getByText("검색 결과가 없습니다.")),
     ).toBeVisible();
+  });
+
+  test("직원 화면에서 최신 조직도 이미지를 표시한다", async ({ page }) => {
+    await login(page, account("E2E_SUPER_ADMIN"));
+    await page.goto("/employees");
+    await page.getByRole("button", { name: "조직도 보기" }).click();
+    const chart = page.getByRole("img", { name: "MS FlowHub 조직도" });
+    await expect(chart).toBeVisible();
+    await expect(chart).toHaveAttribute("src", /organization-chart-20260808-v3\.png/);
+    await expect
+      .poll(() => chart.evaluate((image: HTMLImageElement) => image.naturalWidth))
+      .toBeGreaterThan(0);
   });
 
   test("일반 직원이 작성한 전자결재를 SUPER_ADMIN이 승인한다", async ({ page }) => {

@@ -33,6 +33,7 @@ E2E_ACCOUNTS = (
         "email": "e2e-super-admin@msflowhub.test",
         "employee_role": "ADMIN",
         "account_role": "SUPER_ADMIN",
+        "position": "대표",
         "password_setting": "e2e_auth_super_admin_password",
     },
 )
@@ -59,7 +60,7 @@ def sync_e2e_auth_accounts(
                 email=spec["email"],
                 role=spec["employee_role"],
                 department_id=department.id,
-                position="E2E 테스트",
+                position=spec.get("position", "E2E 테스트"),
                 job_title="Playwright 자동화 테스트",
             )
             session.add(employee)
@@ -70,6 +71,7 @@ def sync_e2e_auth_accounts(
             employee.role = spec["employee_role"]
             employee.department_id = department.id
             employee.team_id = None
+            employee.position = spec.get("position", "E2E 테스트")
             employee.is_active = True
             employee.employment_status = "ACTIVE"
 

@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { ArrowIcon } from "@/components/icons";
 import { useCurrentUser } from "@/features/current-user/current-user-provider";
 import { getDashboard } from "@/features/dashboard/api";
+import { DashboardAnalytics } from "@/features/dashboard/dashboard-analytics";
 import { DashboardMetrics } from "@/features/dashboard/dashboard-metrics";
 import type { DashboardData } from "@/types/dashboard";
 
@@ -78,7 +79,7 @@ export function DashboardPortal() {
         </div>
       </div>
 
-      <DashboardMetrics metrics={dashboard.metrics} />
+      {dashboard.analytics ? <DashboardAnalytics analytics={dashboard.analytics} metrics={dashboard.metrics} /> : <DashboardMetrics metrics={dashboard.metrics} />}
 
       <div className="grid">
         <section className="panel tasks-panel">

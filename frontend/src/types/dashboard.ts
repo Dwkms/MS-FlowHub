@@ -47,10 +47,25 @@ export interface DashboardTask {
   href?: string | null;
 }
 
+export interface DashboardBreakdownItem {
+  label: string;
+  value: number;
+}
+
+export interface DashboardAnalytics {
+  approval_by_status: DashboardBreakdownItem[];
+  average_approval_processing_hours: number | null;
+  applicant_by_stage: DashboardBreakdownItem[];
+  recruitment_request_count: number;
+  attendance_by_status: DashboardBreakdownItem[];
+  today_attendance_unregistered_count: number;
+}
+
 export interface DashboardData {
   source: "local" | "supabase";
   current_employee: Employee;
   accessible_modules: string[];
   metrics: DashboardMetric[];
   recent_tasks: DashboardTask[];
+  analytics: DashboardAnalytics | null;
 }

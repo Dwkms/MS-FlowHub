@@ -4,15 +4,17 @@ from app.api.dependencies import get_authenticated_actor
 from app.security.identity import ActorContext
 
 
-def set_authenticated_actor(client: TestClient, employee_id: str) -> None:
+def set_authenticated_actor(client: TestClient, employee_id: str, role: str | None = None) -> None:
     client.app.dependency_overrides[get_authenticated_actor] = lambda: ActorContext(
         employee_id=employee_id,
-        role="SUPER_ADMIN" if employee_id == "emp-head" else "EMPLOYEE",
+        role=role or ("SUPER_ADMIN" if employee_id == "emp-head" else "EMPLOYEE"),
         auth_user_id=f"auth-{employee_id}",
     )
 
 
-def create_draft(client: TestClient, *, author_id: str = "emp-head") -> dict:
+def create_draft(
+    client: TestClient, *, author_id: str = "emp-head", approver_id: str | None = None
+) -> dict:
     set_authenticated_actor(client, author_id)
     response = client.post(
         "/api/v1/approvals",
@@ -21,7 +23,7 @@ def create_draft(client: TestClient, *, author_id: str = "emp-head") -> dict:
             "document_type": "GENERAL",
             "content": "Request a laptop for development work.",
             "department_id": "dept-product" if author_id == "emp-head" else "dept-hr",
-            "approver_id": "emp-hr" if author_id == "emp-head" else "emp-sales",
+            "approver_id": approver_id or ("emp-hr" if author_id == "emp-head" else "emp-head"),
         },
     )
     assert response.status_code == 201
@@ -43,6 +45,32 @@ def test_author_can_update_draft_without_actor_id(client: TestClient) -> None:
     assert response.status_code == 200
     assert response.json()["title"] == "Updated request"
     assert response.json()["histories"][-1]["actor_id"] == "emp-head"
+
+
+def test_general_employee_cannot_be_selected_as_approver(client: TestClient) -> None:
+    set_authenticated_actor(client, "emp-head")
+
+    response = client.post(
+        "/api/v1/approvals",
+        json={
+            "title": "Invalid approver request",
+            "document_type": "GENERAL",
+            "content": "A general employee cannot approve this document.",
+            "department_id": "dept-product",
+            "approver_id": "emp-sales",
+        },
+    )
+
+    assert response.status_code == 422
+    assert response.json()["detail"] == "결재자는 팀장급 이상만 지정할 수 있습니다."
+
+
+def test_draft_cannot_change_approver_to_general_employee(client: TestClient) -> None:
+    draft = create_draft(client)
+
+    response = client.patch(f"/api/v1/approvals/{draft['id']}", json={"approver_id": "emp-sales"})
+
+    assert response.status_code == 422
 
 
 def test_non_author_cannot_update_draft(client: TestClient) -> None:
@@ -140,6 +168,52 @@ def test_submit_and_approve_flow_uses_authenticated_actors(client: TestClient) -
     assert submit_response.status_code == 200
     assert approve_response.status_code == 200
     assert approve_response.json()["histories"][-1]["actor_id"] == "emp-hr"
+
+
+def test_super_admin_can_approve_other_employees_document(client: TestClient) -> None:
+    draft = create_draft(client, author_id="emp-hr", approver_id="emp-sales-head")
+    submitted = client.post(f"/api/v1/approvals/{draft['id']}/submit", json={})
+    set_authenticated_actor(client, "emp-head", role="SUPER_ADMIN")
+
+    response = client.post(f"/api/v1/approvals/{draft['id']}/approve", json={})
+
+    assert submitted.status_code == 200
+    assert response.status_code == 200
+
+
+def test_hr_admin_can_approve_assigned_document(client: TestClient) -> None:
+    draft = create_draft(client, approver_id="emp-hr")
+    submitted = client.post(f"/api/v1/approvals/{draft['id']}/submit", json={})
+    set_authenticated_actor(client, "emp-hr", role="HR_ADMIN")
+
+    response = client.post(f"/api/v1/approvals/{draft['id']}/approve", json={})
+
+    assert submitted.status_code == 200
+    assert response.status_code == 200
+
+
+def test_team_admin_can_approve_same_team_document(client: TestClient) -> None:
+    draft = create_draft(client, approver_id="emp-hr")
+    submitted = client.post(f"/api/v1/approvals/{draft['id']}/submit", json={})
+    set_authenticated_actor(client, "emp-product-head", role="TEAM_ADMIN")
+
+    response = client.post(f"/api/v1/approvals/{draft['id']}/approve", json={})
+
+    assert submitted.status_code == 200
+    assert response.status_code == 200
+
+
+def test_team_admin_can_reject_assigned_document(client: TestClient) -> None:
+    draft = create_draft(client, approver_id="emp-sales-head")
+    submitted = client.post(f"/api/v1/approvals/{draft['id']}/submit", json={})
+    set_authenticated_actor(client, "emp-sales-head", role="TEAM_ADMIN")
+
+    response = client.post(
+        f"/api/v1/approvals/{draft['id']}/reject", json={"comment": "보완이 필요합니다."}
+    )
+
+    assert submitted.status_code == 200
+    assert response.status_code == 200
 
 
 def test_author_cannot_approve_own_document_even_as_super_admin(client: TestClient) -> None:

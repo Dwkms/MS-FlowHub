@@ -43,7 +43,7 @@ def test_list_employees_returns_paginated_organization_seed(client: TestClient) 
 
     assert response.status_code == 200
     payload = response.json()
-    assert payload["total"] == 51
+    assert payload["total"] == 54
     assert payload["items"][0]["employee_no"] == "MS0001"
 
 
@@ -51,9 +51,59 @@ def test_list_departments_returns_organization_departments(client: TestClient) -
     response = client.get("/api/v1/departments")
 
     assert response.status_code == 200
-    assert {"EXEC", "DEV", "MKT", "HR", "PLAN", "QA"} <= {
+    assert {"DEV", "MKT", "HR", "PLAN", "CS"} <= {
         department["code"] for department in response.json()
     }
+
+
+def test_department_manager_can_list_entire_department(client: TestClient) -> None:
+    client.app.dependency_overrides[get_authenticated_actor] = lambda: ActorContext(
+        employee_id="emp-ms0002", role="TEAM_ADMIN", auth_user_id="auth-dev-manager"
+    )
+
+    response = client.get("/api/v1/employees?page_size=100")
+
+    assert response.status_code == 200
+    assert response.json()["total"] == 13
+    assert {item["team_code"] for item in response.json()["items"]} >= {
+        "DEV_SW",
+        "DEV_HW",
+        "DEV_QA",
+    }
+
+
+def test_part_manager_can_list_only_own_part(client: TestClient) -> None:
+    client.app.dependency_overrides[get_authenticated_actor] = lambda: ActorContext(
+        employee_id="emp-ms0047", role="TEAM_ADMIN", auth_user_id="auth-qa-manager"
+    )
+
+    response = client.get("/api/v1/employees?page_size=100")
+
+    assert response.status_code == 200
+    assert response.json()["total"] == 3
+    assert {item["team_code"] for item in response.json()["items"]} == {"DEV_QA"}
+
+
+def test_other_team_managers_can_list_only_their_teams(client: TestClient) -> None:
+    manager_scopes = (
+        ("emp-ms0012", "MKT_1", 5),
+        ("emp-ms0032", "PLAN_1", 5),
+        ("emp-ms0042", "CS_1", 5),
+    )
+    for employee_id, team_code, expected_total in manager_scopes:
+        client.app.dependency_overrides[get_authenticated_actor] = lambda employee_id=employee_id: (
+            ActorContext(
+                employee_id=employee_id,
+                role="TEAM_ADMIN",
+                auth_user_id=f"auth-{employee_id}",
+            )
+        )
+
+        response = client.get("/api/v1/employees?page_size=100")
+
+        assert response.status_code == 200
+        assert response.json()["total"] == expected_total
+        assert {item["team_code"] for item in response.json()["items"]} == {team_code}
 
 
 def test_dashboard_reflects_selected_employee_access(client: TestClient) -> None:
@@ -72,6 +122,23 @@ def test_dashboard_reflects_selected_employee_access(client: TestClient) -> None
         "진행 중 채용",
     ]
     assert "CRM Lite" not in payload["accessible_modules"]
+    assert payload["analytics"]["approval_by_status"] == []
+    assert payload["analytics"]["applicant_by_stage"] == []
+    assert payload["analytics"]["recruitment_request_count"] == 0
+    assert payload["analytics"]["average_approval_processing_hours"] is None
+    assert payload["analytics"]["attendance_by_status"]
+    assert payload["analytics"]["today_attendance_unregistered_count"] == 5
+
+
+def test_dashboard_hides_organization_analytics_from_employee(client: TestClient) -> None:
+    client.app.dependency_overrides[get_authenticated_actor] = lambda: ActorContext(
+        employee_id="emp-ms0003", role="EMPLOYEE", auth_user_id="auth-employee"
+    )
+
+    response = client.get("/api/v1/dashboard")
+
+    assert response.status_code == 200
+    assert response.json()["analytics"] is None
 
 
 def test_dashboard_requires_bearer_auth(client: TestClient) -> None:

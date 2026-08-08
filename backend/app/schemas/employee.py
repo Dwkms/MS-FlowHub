@@ -138,6 +138,7 @@ class OrganizationNode(BaseModel):
     name: str
     position: str
     department: str
+    team: str | None
     children: list["OrganizationNode"] = []
 
 
