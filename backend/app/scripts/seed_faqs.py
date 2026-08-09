@@ -6,6 +6,32 @@ from sqlalchemy.orm import Session
 from app.db.session import SessionLocal
 from app.models.manual import ManualFaq
 
+# FAQ id_suffix -> 함께 안내할 매뉴얼 slug. 답변 아래 "자세히 보기"로 연결된다.
+# 적절한 매뉴얼이 없으면 넣지 않는다. 관련 없는 매뉴얼을 걸면 안내가 오히려 헷갈린다.
+RELATED_MANUAL_SLUGS = {
+    "login-how": "login-and-password",
+    "login-password-change": "login-and-password",
+    "login-session-expired": "login-and-password",
+    "employee-search": "employee-search",
+    "employee-org-chart": "organization-chart",
+    "attendance-change-status": "work-status-and-reason",
+    "attendance-private-reason": "work-status-and-reason",
+    "attendance-history": "work-status-and-reason",
+    "attendance-leave-request": "work-status-and-reason",
+    "approval-create": "approval-create-submit",
+    "approval-attachment": "approval-create-submit",
+    "approval-no-approve-button": "approval-decision-history",
+    "approval-rejection-reason": "approval-decision-history",
+    "recruitment-create": "recruitment-request-to-posting",
+    "recruitment-posting-created": "recruitment-request-to-posting",
+    "applicant-stage-change": "applicant-stage-management",
+    "applicant-stage-rollback": "applicant-stage-management",
+    "permission-missing-menu": "dashboard-overview",
+    "permission-401": "login-and-password",
+    "general-features": "dashboard-overview",
+    # permission-403: 권한 부족 오류를 다루는 매뉴얼이 없어 연결하지 않는다.
+}
+
 # (id_suffix, category, question, answer)
 FAQS = [
     (
@@ -137,6 +163,32 @@ FAQS = [
         "401 오류가 표시됩니다.",
         "로그인 정보가 없거나 세션이 만료된 경우 발생할 수 있습니다.\n다시 로그인한 뒤 이용하세요.",
     ),
+    # display_order는 아래 목록 순서에서 나온다. 새 항목을 중간에 끼우면 기존 FAQ의 순번이
+    # 모두 밀리므로, 추가 항목은 목록 끝에 붙인다.
+    (
+        "general-features",
+        "일반",
+        "MS FlowHub에서 어떤 기능을 사용할 수 있나요?",
+        "업무 홈 대시보드, 직원·조직 조회와 조직도, 근태 기록, 전자결재,"
+        " 채용 요청과 ATS Lite를 사용할 수 있습니다.\n"
+        "표시되는 메뉴와 사용할 수 있는 기능은 계정의 역할과 소속에 따라 다릅니다.",
+    ),
+    (
+        "attendance-leave-request",
+        "근태·휴가",
+        "연차·반차는 어떻게 신청하나요?",
+        "별도의 신청서를 올리거나 사전 승인을 받는 절차는 없습니다.\n"
+        "「직원 · 부서」에서 본인의 직원 상세를 열고 「근무 상태 변경」에서 연차 또는"
+        " 오전·오후 반차를 선택해 저장하면 해당 날짜에 기록됩니다.",
+    ),
+    (
+        "approval-attachment",
+        "전자결재",
+        "전자결재 문서에 파일을 첨부할 수 있나요?",
+        "전자결재 문서는 파일 첨부를 지원하지 않습니다. 제목과 내용으로만 작성합니다.\n"
+        "파일 첨부는 채용 요청의 채용 포스터에서만 사용할 수 있으며"
+        " 전자결재 문서와는 다른 기능입니다.",
+    ),
 ]
 
 
@@ -151,6 +203,8 @@ def seed_faqs(session: Session) -> int:
         faq.category = category
         faq.question = question
         faq.answer = answer
+        manual_slug = RELATED_MANUAL_SLUGS.get(suffix)
+        faq.related_manual_id = f"manual-{manual_slug}" if manual_slug else None
         faq.display_order = order
         faq.is_published = True
     return len(FAQS)
