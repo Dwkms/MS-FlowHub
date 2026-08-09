@@ -3,7 +3,7 @@ from sqlalchemy import func, select
 
 from app.api.dependencies import get_authenticated_actor
 from app.models.manual import ManualFaq
-from app.scripts.seed_faqs import seed_faqs
+from app.scripts.seed_faqs import FAQS, seed_faqs
 from app.security.identity import ActorContext
 
 
@@ -33,7 +33,7 @@ def test_every_authenticated_role_can_read_faqs(client: TestClient) -> None:
         response = client.get("/api/v1/faqs")
         assert response.status_code == 200, role
         payload = response.json()
-        assert len(payload) == 18
+        assert len(payload) == len(FAQS)
         assert payload[0]["display_order"] < payload[-1]["display_order"]
         assert {"id", "category", "question", "answer"} <= set(payload[0])
 
@@ -49,7 +49,7 @@ def test_unpublished_faq_is_hidden(client: TestClient) -> None:
     set_actor(client, "EMPLOYEE")
     questions = [item["id"] for item in client.get("/api/v1/faqs").json()]
     assert "manual-faq-login-how" not in questions
-    assert len(questions) == 17
+    assert len(questions) == len(FAQS) - 1
 
 
 def test_faq_seed_is_idempotent(client: TestClient) -> None:
@@ -61,4 +61,4 @@ def test_faq_seed_is_idempotent(client: TestClient) -> None:
         session.commit()
         total = session.scalar(select(func.count()).select_from(ManualFaq))
 
-    assert total == 18
+    assert total == len(FAQS)
