@@ -90,7 +90,11 @@ export function ManualList() {
           >
             <img src={manual.thumbnail_url} alt={manual.title} />
           </button>}
-          <div className="manual-card-body"><h2>{manual.title}</h2><p>{manual.summary}</p></div>
+          <div className="manual-card-body">
+            <h2><Link className="manual-card-link" href={`/manuals/${manual.slug}`}>{manual.title}</Link></h2>
+            <p>{manual.summary}</p>
+            <Link className="text-link" href={`/manuals/${manual.slug}`}>자세히 보기</Link>
+          </div>
         </article>)}
       </div>}
     </section>
