@@ -5,9 +5,11 @@ from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
 from app.db.session import check_database_connection, get_db_session
+from app.domain.ax_search import KeywordSearcher
 from app.models.organization import Employee
 from app.repositories.approval_repository import ApprovalRepository
 from app.repositories.auth_repository import AuthRepository
+from app.repositories.ax_repository import AxRepository
 from app.repositories.manual_repository import ManualRepository
 from app.repositories.notification_repository import NotificationRepository
 from app.repositories.organization_repository import OrganizationRepository
@@ -23,6 +25,7 @@ from app.security.permissions import (
 from app.security.supabase_auth import get_supabase_auth_user_id
 from app.services.approval_service import ApprovalService
 from app.services.auth_service import AuthService
+from app.services.ax_service import AxService
 from app.services.dashboard_service import DashboardService
 from app.services.employee_service import EmployeeService
 from app.services.manual_service import ManualService
@@ -126,6 +129,11 @@ def get_recruitment_service(session: DatabaseSession) -> RecruitmentService:
 
 def get_manual_service(session: DatabaseSession) -> ManualService:
     return ManualService(session=session, repository=ManualRepository(session))
+
+
+def get_ax_service(session: DatabaseSession) -> AxService:
+    # v1은 키워드 검색기 하나뿐이다. v2에서 임베딩 검색기로 바꿀 때 이 한 줄만 바뀐다.
+    return AxService(session=session, repository=AxRepository(session), searcher=KeywordSearcher())
 
 
 def _build_recruitment_service(session: Session) -> RecruitmentService:

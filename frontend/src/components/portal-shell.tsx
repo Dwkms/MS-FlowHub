@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { type ReactNode, useState } from "react";
 
 import { BellIcon, FlowMark } from "@/components/icons";
+import { AxAssistant } from "@/features/ax/ax-assistant";
 import { useCurrentUser } from "@/features/current-user/current-user-provider";
 import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
 
@@ -60,6 +61,7 @@ export function PortalShell({ children }: { children: ReactNode }) {
         </header>
         {children}
       </main>
+      <AxAssistant />
     </div>
   );
 }
