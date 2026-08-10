@@ -1,3 +1,11 @@
 """SQLAlchemy ORM models."""
 
-from app.models import approval, auth, manual, notification, organization, recruitment  # noqa: F401
+from app.models import (  # noqa: F401
+    approval,
+    auth,
+    ax,
+    manual,
+    notification,
+    organization,
+    recruitment,
+)
