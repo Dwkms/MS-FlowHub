@@ -173,26 +173,24 @@ npm run lint; npm run typecheck; npm run build
 
 ## 이어서 할 일 (2026-08-12 오후 중단 지점)
 
-### 0) 지금 미커밋 상태
+### 0) PR 머지 후 로컬 정리 — 먼저 할 것
 
-Prompt 5 수동 검수 중 찾은 결함 6건과 개선 3건이 **커밋되지 않은 채** 있습니다. 먼저 커밋하세요.
+수동 검수에서 찾은 결함·개선은 **커밋·푸시 완료**했습니다(`d0dadd8`, 브랜치
+`fix/ai-review-findings`). PR만 만들어 머지하면 됩니다.
 
 ```
-결함  ① 오류 메시지에 API 키 echo 가능        (dependencies.py)
-     ② 테스트가 로컬 .env로 실제 API 호출     (conftest.py, dependencies.py)
-     ③ AI가 빈 필드를 메타데이터로 채움        (ai_prompts.py)
-     ④ 프롬프트 규칙 ↔ 스키마 충돌            (schemas/ai.py: expected_effect)
-     ⑤ ValidationError를 요청 실패로 오분류    (claude_provider.py)
-     ⑥ 안내 문구에 적용 후 제목이 들어감       (job-posting-draft-panel.tsx)
-
-개선  · SUPER_ADMIN 사용자당 한도 면제 (전역 한도는 유지)
-     · 한도 초과 메시지에 실제 한도·해제 시점 표기
-     · 짧은 입력 사전 차단 (프론트+백엔드, 호출 비용 절약)
-     · AI 생성 대기 안내 문구
-     · 채용 요청 화면에 "공고 문구는 승인 후" 안내
-
-검증  ruff 통과 · pytest 162 passed · 프론트 lint/typecheck/build 통과
+https://github.com/Dwkms/MS-FlowHub/pull/new/fix/ai-review-findings
 ```
+
+머지 후:
+
+```powershell
+git switch master
+git pull --ff-only
+git branch -d fix/ai-review-findings
+```
+
+미커밋으로 남는 것은 `docs/JIRA_UPDATE_2026-08-08.md` 하나뿐입니다(표 자동정렬, 내용 변경 0).
 
 ### 1) 기능 1 — 세션 자동 로그아웃 (보안)
 
