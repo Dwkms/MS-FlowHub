@@ -4,7 +4,7 @@
 
 ## 한 줄 요약
 
-**Prompt 0~3 완료.** 공통 AI 기반, 전자결재 AI 초안, 채용공고 AI 초안이 동작합니다(Mock 기준). 다음은 **Prompt 5(Feature Freeze 판정)**. 포스터(Prompt 4)는 Freeze 밖으로 뺐습니다.
+**Prompt 0~3 완료.** 공통 AI 기반, 전자결재 AI 초안, 채용공고 AI 초안이 동작하며 **실제 `claude-opus-5` 호출까지 검증했습니다.** 다음은 **Prompt 5(Feature Freeze 판정)**. 포스터(Prompt 4)는 Freeze 밖으로 뺐습니다.
 
 ## ⚠ 지금 바로 이어서 할 일
 
@@ -17,18 +17,21 @@ git pull --ff-only
 git branch -d feat/ai-approval-draft
 ```
 
-### 2) 실제 Claude 호출 검증 (아직 0회)
+### 2) 실제 Claude 호출 검증 — **완료 (2026-08-12)**
 
-**전체 작업에서 가장 큰 미검증 항목입니다.** 지금까지 모든 테스트는 Mock으로만 돌았습니다.
+전자결재·채용공고 초안 모두 `claude-opus-5`로 실호출에 성공했습니다. `messages.parse()`에
+`output_config`와 `output_format`을 함께 넘기는 조합도 코드 수정 없이 통과했습니다.
 
+재확인이 필요하면 앱을 띄우지 않고 스크립트로 됩니다(DB에 쓰지 않고 일일 한도도 소모하지 않음).
+
+```powershell
+cd backend
+.\.venv\Scripts\python.exe -m app.scripts.try_ai_draft
+.\.venv\Scripts\python.exe -m app.scripts.try_ai_draft --feature job-posting
 ```
-Console: Auto-reload OFF → 크레딧 $5 → Spend limit $10 → 사용량 알림 50/80%
-backend/.env:  AI_PROVIDER=claude  /  AI_API_KEY=sk-ant-...
-앱 실행 → /approvals/new → [AI 초안 생성] 1회
-→ "샘플 응답" 배지가 사라지면 성공
-```
 
-특히 `app/domain/claude_provider.py`에서 `messages.parse()`에 `output_config={"effort": "low"}`와 `output_format=schema`를 **함께** 넘기는 조합이 실호출로만 확인됩니다. 실패해도 앱은 죽지 않고 `success=false`로 떨어지지만, 그러면 "AI가 안 되는" 상태가 됩니다.
+**실측 비용**: 전자결재 약 19원, 채용공고 약 24원(건당). 설계 추정치의 약 1/5이며,
+`effort: low`가 예상보다 간결하게 쓰는 것이 원인입니다. 충전한 $5로 약 300회 쓸 수 있습니다.
 
 ### 3) Prompt 5 착수 (Feature Freeze 판정)
 
@@ -119,7 +122,7 @@ SELECT SUM(input_tokens)*5/1e6 + SUM(output_tokens)*25/1e6 AS usd
 FROM ai_generations WHERE created_at >= now() - interval '30 days';
 ```
 
-예상 사용량은 월 20~40회(개발은 Mock, 실호출은 검증·시연뿐) → **월 $2 안팎**입니다.
+예상 사용량은 월 20~40회(개발은 Mock, 실호출은 검증·시연뿐) → 실측 기준 **월 500~1,000원**입니다.
 
 ## 파일 지도
 
@@ -134,6 +137,7 @@ FROM ai_generations WHERE created_at >= now() - interval '30 days';
 | `app/repositories/ai_generation_repository.py` | 기록, 최근 24시간 카운트 |
 | `app/models/ai_generation.py` | `ai_generations` |
 | `app/api/ai.py` | AI 라우터 |
+| `app/scripts/try_ai_draft.py` | 실호출 수동 확인 도구(앱·DB 없이 Provider만 호출) |
 | `frontend/src/features/ai/` | API 모듈, 초안 패널 |
 
 ## 알아둘 상태
