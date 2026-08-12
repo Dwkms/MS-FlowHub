@@ -3,6 +3,9 @@ import type {
   ApprovalDraftOutput,
   ApprovalDraftRequest,
   ApprovalDraftResponse,
+  JobPostingDraftOutput,
+  JobPostingDraftRequest,
+  JobPostingDraftResponse,
 } from "@/types/ai";
 
 export function createApprovalDraft(
@@ -14,10 +17,19 @@ export function createApprovalDraft(
   });
 }
 
+export function createJobPostingDraft(
+  payload: JobPostingDraftRequest,
+): Promise<JobPostingDraftResponse> {
+  return apiRequest<JobPostingDraftResponse>("/api/v1/ai/job-posting-drafts", {
+    method: "POST",
+    body: payload,
+  });
+}
+
 /** 사용자가 수정해 실제로 적용한 최종본을 기록한다. AI 최초 결과는 덮어쓰지 않는다. */
 export function recordFinalOutput(
   generationId: string,
-  finalOutput: ApprovalDraftOutput,
+  finalOutput: ApprovalDraftOutput | JobPostingDraftOutput,
 ): Promise<void> {
   return apiRequest<void>(`/api/v1/ai/generations/${generationId}/final`, {
     method: "PATCH",

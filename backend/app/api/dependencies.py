@@ -182,6 +182,7 @@ def get_ai_generation_service(session: DatabaseSession) -> AIGenerationService:
         session=session,
         repository=AiGenerationRepository(session),
         organization_repository=OrganizationRepository(session),
+        recruitment_repository=RecruitmentRepository(session),
         provider=get_ai_provider(),
         settings=get_settings(),
     )

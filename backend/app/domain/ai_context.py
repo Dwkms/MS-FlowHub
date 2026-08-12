@@ -71,3 +71,51 @@ def build_approval_context(
     _put(context, "desired_date", desired_date)
     _put(context, "extra_note", extra_note)
     return context
+
+
+def build_job_posting_context(
+    *,
+    position_title: str,
+    headcount: int,
+    employment_type: str,
+    experience_level: str,
+    department_name: str,
+    requester_name: str,
+    reason: str | None = None,
+    responsibilities: str | None = None,
+    required_skills: str | None = None,
+    preferred_skills: str | None = None,
+    desired_start_date: str | None = None,
+    work_location: str | None = None,
+    application_deadline: str | None = None,
+    apply_method: str | None = None,
+    team_intro: str | None = None,
+    salary: str | None = None,
+) -> dict:
+    """채용공고 초안용 Context.
+
+    `responsibilities`·`required_skills`·`preferred_skills`는 **이미 담당자가 작성한
+    텍스트**다. AI가 없는 것을 만드는 게 아니라 공고 문장으로 다듬는다.
+
+    근무 위치·마감일·지원 방법·급여는 DB에 없으므로 사용자가 입력했을 때만 들어간다.
+    입력이 없으면 키가 없고, 따라서 AI가 "서울 본사" 같은 값을 지어낼 근거가 없다.
+    """
+    context: dict = {}
+    _put(context, "position_title", position_title)
+    _put(context, "headcount", f"{headcount}명")
+    _put(context, "employment_type", employment_type)
+    _put(context, "experience_level", experience_level)
+    _put(context, "department_name", department_name)
+    _put(context, "requester_name", requester_name)
+    _put(context, "reason", reason)
+    _put(context, "responsibilities", responsibilities)
+    _put(context, "required_skills", required_skills)
+    _put(context, "preferred_skills", preferred_skills)
+    _put(context, "desired_start_date", desired_start_date)
+
+    _put(context, "work_location", work_location)
+    _put(context, "application_deadline", application_deadline)
+    _put(context, "apply_method", apply_method)
+    _put(context, "team_intro", team_intro)
+    _put(context, "salary", salary)
+    return context
