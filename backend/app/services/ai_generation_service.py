@@ -7,6 +7,7 @@ AI가 실패하든 성공하든 전자결재·채용 상태가 변할 수 없다
 """
 
 from dataclasses import dataclass
+from datetime import date
 from uuid import uuid4
 
 from fastapi import HTTPException
@@ -14,13 +15,32 @@ from pydantic import BaseModel, ValidationError
 from sqlalchemy.orm import Session
 
 from app.core.config import Settings
-from app.domain.ai_provider import AIProvider, AIProviderResult
+from app.domain.ai_context import build_approval_context
+from app.domain.ai_provider import (
+    APPROVAL_DRAFT,
+    JOB_POSTING_DRAFT,
+    AIProvider,
+    AIProviderResult,
+)
 from app.models.ai_generation import AiGeneration
 from app.repositories.ai_generation_repository import AiGenerationRepository
+from app.repositories.organization_repository import OrganizationRepository
+from app.schemas.ai import (
+    ApprovalDraftOutput,
+    ApprovalDraftRequest,
+    JobPostingDraftOutput,
+)
+from app.security.identity import ActorContext
 
 LIMIT_MESSAGE = "오늘 AI 초안 생성 한도를 초과했습니다. 잠시 후 다시 시도해 주세요."
 SCHEMA_ERROR_MESSAGE = "AI 응답이 지정한 형식을 만족하지 않습니다."
 EMPTY_RESPONSE_MESSAGE = "AI 응답을 받지 못했습니다."
+
+# 기능별 출력 스키마. 사용자가 수정해 적용한 최종본도 같은 스키마로 검증한다.
+OUTPUT_SCHEMAS: dict[str, type[BaseModel]] = {
+    APPROVAL_DRAFT: ApprovalDraftOutput,
+    JOB_POSTING_DRAFT: JobPostingDraftOutput,
+}
 
 
 @dataclass
@@ -40,13 +60,76 @@ class AIGenerationService:
         *,
         session: Session,
         repository: AiGenerationRepository,
+        organization_repository: OrganizationRepository,
         provider: AIProvider,
         settings: Settings,
     ) -> None:
         self.session = session
         self.repository = repository
+        self.organization = organization_repository
         self.provider = provider
         self.settings = settings
+
+    def generate_approval_draft(
+        self, *, actor: ActorContext, payload: ApprovalDraftRequest
+    ) -> AIGenerationOutcome:
+        """DB 사실(작성자·부서·팀·직급)과 사용자 입력을 합쳐 초안을 만든다.
+
+        `EmployeeDetail`을 통째로 넘기지 않고 필요한 필드만 뽑아 전달한다. 그 객체에는
+        이메일·사번·근태 사유가 함께 들어 있고, Context Builder가 허용 목록 역할을 한다.
+        """
+        employee = self.organization.get_employee_detail(actor.employee_id)
+        if employee is None:
+            raise HTTPException(status_code=403, detail="직원 정보를 찾을 수 없습니다.")
+
+        context = build_approval_context(
+            author_name=employee.name,
+            position=employee.position,
+            job_title=employee.job_title,
+            department_name=employee.department,
+            team_name=employee.team,
+            drafted_on=date.today(),
+            document_type=payload.document_type,
+            purpose=payload.purpose,
+            main_content=payload.main_content,
+            amount=payload.amount,
+            quantity=payload.quantity,
+            desired_date=payload.desired_date,
+            extra_note=payload.extra_note,
+        )
+        return self.generate(
+            feature_type=APPROVAL_DRAFT,
+            context=context,
+            output_schema=ApprovalDraftOutput,
+            created_by_id=actor.employee_id,
+        )
+
+    def record_final_output(
+        self, *, generation_id: str, final_output: dict, actor: ActorContext
+    ) -> None:
+        """사용자가 적용한 최종본을 기록한다. `generated_output`은 덮어쓰지 않는다.
+
+        이 메서드도 업무 테이블을 건드리지 않는다. 전자결재 저장은 사용자가 작성 화면에서
+        [임시 저장]/[결재 요청]을 눌렀을 때 기존 경로로만 일어난다.
+        """
+        record = self.repository.get(generation_id)
+        if record is None:
+            raise HTTPException(status_code=404, detail="생성 기록을 찾을 수 없습니다.")
+        if record.created_by_id != actor.employee_id:
+            raise HTTPException(status_code=403, detail="본인이 생성한 초안만 기록할 수 있습니다.")
+
+        schema = OUTPUT_SCHEMAS.get(record.feature_type)
+        if schema is None:
+            raise HTTPException(status_code=400, detail="지원하지 않는 생성 유형입니다.")
+        try:
+            validated = schema.model_validate(final_output)
+        except ValidationError as error:
+            raise HTTPException(
+                status_code=422, detail="적용한 내용이 형식을 만족하지 않습니다."
+            ) from error
+
+        record.final_output = validated.model_dump(mode="json")
+        self.session.commit()
 
     def generate(
         self,
