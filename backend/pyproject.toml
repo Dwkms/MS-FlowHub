@@ -9,6 +9,9 @@ description = "MS FlowHub FastAPI backend"
 requires-python = ">=3.12"
 dependencies = [
   "alembic>=1.14,<2",
+  # 생성형 AI Provider. Structured Output 스키마 정리·검증과 재시도를 직접 구현하는
+  # 비용이 의존성 1개보다 크다고 판단했다(docs/AI_AUTOMATION_PLAN.md 10장).
+  "anthropic>=0.40,<1",
   "fastapi>=0.115,<1",
   "psycopg[binary]>=3.2,<4",
   "pydantic>=2.10,<3",
