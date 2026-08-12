@@ -1,7 +1,7 @@
 from datetime import date, datetime
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 RecruitmentStatus = Literal[
     "DRAFT",
@@ -60,6 +60,24 @@ class RecruitmentRequestResponse(BaseModel):
     job_posting_id: str | None
     created_at: datetime
     updated_at: datetime
+
+
+class JobPostingUpdate(RecruitmentBaseModel):
+    """채용공고 제목·본문 수정.
+
+    `status`를 **일부러 받지 않는다.** 이 API는 AI 초안을 공고에 반영하는 데도 쓰이므로,
+    상태 필드를 열어두면 AI 흐름이 공고를 게시 상태로 바꾸는 경로가 생긴다. 게시 판단은
+    사람이 별도 경로로 한다(docs/AI_AUTOMATION_PLAN.md 18장).
+    """
+
+    title: str | None = Field(default=None, min_length=1, max_length=200)
+    content: str | None = Field(default=None, min_length=1)
+
+    @model_validator(mode="after")
+    def require_change(self) -> "JobPostingUpdate":
+        if self.title is None and self.content is None:
+            raise ValueError("수정할 항목을 하나 이상 입력해야 합니다.")
+        return self
 
 
 class JobPostingResponse(BaseModel):

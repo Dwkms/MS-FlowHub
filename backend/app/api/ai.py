@@ -9,6 +9,9 @@ from app.schemas.ai import (
     ApprovalDraftOutput,
     ApprovalDraftRequest,
     ApprovalDraftResponse,
+    JobPostingDraftOutput,
+    JobPostingDraftRequest,
+    JobPostingDraftResponse,
 )
 from app.services.ai_generation_service import AIGenerationService
 
@@ -32,6 +35,26 @@ def create_approval_draft(
         provider=outcome.provider,
         is_sample=outcome.provider == MOCK,
         output=outcome.output if isinstance(outcome.output, ApprovalDraftOutput) else None,
+        error_message=outcome.error_message,
+    )
+
+
+@router.post("/job-posting-drafts", response_model=JobPostingDraftResponse)
+def create_job_posting_draft(
+    payload: JobPostingDraftRequest, service: AIServiceDependency, actor: AuthenticatedActor
+) -> JobPostingDraftResponse:
+    """채용공고 초안을 생성합니다. 공고나 채용 요청의 상태를 바꾸지 않습니다.
+
+    공고에 반영하려면 사용자가 미리보기를 확인한 뒤 `PATCH /api/v1/job-postings/{id}`를
+    직접 호출해야 합니다. 이 API는 문장만 만듭니다.
+    """
+    outcome = service.generate_job_posting_draft(actor=actor, payload=payload)
+    return JobPostingDraftResponse(
+        generation_id=outcome.generation_id,
+        success=outcome.success,
+        provider=outcome.provider,
+        is_sample=outcome.provider == MOCK,
+        output=outcome.output if isinstance(outcome.output, JobPostingDraftOutput) else None,
         error_message=outcome.error_message,
     )
 

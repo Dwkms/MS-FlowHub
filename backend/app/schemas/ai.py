@@ -69,6 +69,31 @@ class ApprovalDraftRequest(AIRequestBaseModel):
     extra_note: str | None = Field(default=None, max_length=1000)
 
 
+class JobPostingDraftRequest(AIRequestBaseModel):
+    """채용공고 초안 생성 입력.
+
+    직무·인원·고용형태·경력·주요 업무·역량은 `RecruitmentRequest`에서 자동으로 가져오므로
+    받지 않는다. 여기 있는 값들은 **DB에 없어서 사용자가 채워야 하는 것들**뿐이다.
+    입력하지 않으면 Context에서 빠지고, AI가 근무지나 마감일을 지어낼 근거가 없어진다.
+    """
+
+    job_posting_id: str = Field(min_length=1)
+    work_location: str | None = Field(default=None, max_length=200)
+    application_deadline: str | None = Field(default=None, max_length=100)
+    apply_method: str | None = Field(default=None, max_length=500)
+    team_intro: str | None = Field(default=None, max_length=1000)
+    salary: str | None = Field(default=None, max_length=200)
+
+
+class JobPostingDraftResponse(BaseModel):
+    generation_id: str
+    success: bool
+    provider: str
+    is_sample: bool
+    output: JobPostingDraftOutput | None = None
+    error_message: str | None = None
+
+
 class AIFinalOutputRequest(AIRequestBaseModel):
     """사용자가 수정해 실제로 적용한 최종본. 생성 원본은 덮어쓰지 않는다."""
 

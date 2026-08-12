@@ -4,7 +4,7 @@
 
 ## 한 줄 요약
 
-**Prompt 0~2 완료.** 공통 AI 기반과 전자결재 AI 초안이 동작합니다(Mock 기준). 다음은 **Prompt 3(채용공고 AI 초안)**, 그다음 **Prompt 5(Feature Freeze 판정)**. 포스터(Prompt 4)는 Freeze 밖으로 뺐습니다.
+**Prompt 0~3 완료.** 공통 AI 기반, 전자결재 AI 초안, 채용공고 AI 초안이 동작합니다(Mock 기준). 다음은 **Prompt 5(Feature Freeze 판정)**. 포스터(Prompt 4)는 Freeze 밖으로 뺐습니다.
 
 ## ⚠ 지금 바로 이어서 할 일
 
@@ -30,9 +30,9 @@ backend/.env:  AI_PROVIDER=claude  /  AI_API_KEY=sk-ant-...
 
 특히 `app/domain/claude_provider.py`에서 `messages.parse()`에 `output_config={"effort": "low"}`와 `output_format=schema`를 **함께** 넘기는 조합이 실호출로만 확인됩니다. 실패해도 앱은 죽지 않고 `success=false`로 떨어지지만, 그러면 "AI가 안 되는" 상태가 됩니다.
 
-### 3) Prompt 3 착수
+### 3) Prompt 5 착수 (Feature Freeze 판정)
 
-아래 "Prompt 3 시작 전 반드시 알아야 할 것"을 먼저 읽으세요.
+새 기능을 만들지 않고 전체를 점검합니다. **P0과 P1이 0개일 때만** `FEATURE FREEZE READY: YES`입니다.
 
 ---
 
@@ -44,8 +44,9 @@ backend/.env:  AI_PROVIDER=claude  /  AI_API_KEY=sk-ant-...
 | Prompt 0 | `docs/AI_AUTOMATION_PLAN.md` 24개 항목 설계 | PR #5 |
 | Prompt 1 | Provider·Mock·Claude·Structured Output·`ai_generations`·일일 한도 | PR #5 |
 | Prompt 2 | 전자결재 AI 초안 API + 화면 | 이 PR |
+| Prompt 3 | 채용공고 AI 초안 + `PATCH /job-postings/{id}` 신설 | 이 PR |
 
-**검증 상태**: ruff check/format 통과, pytest **145개** 통과, 프론트 lint/typecheck/build 통과.
+**검증 상태**: ruff check/format 통과, pytest **155개** 통과, 프론트 lint/typecheck/build 통과.
 
 **운영 DB**: migration `20260812_0022` 적용 완료. 코드 head = DB current = `20260812_0022`.
 
@@ -73,13 +74,13 @@ AI는 **어떤 상태도 바꾸지 않습니다.** 초안 생성으로 결재 �
 | **전역 일일 한도가 실질 방어선** | 사용자당 한도만 두면 46명 × 5회 = 230회까지 열린다 |
 | **Provider 실패는 200 + `success:false`** | 초안은 부가 기능이다. 5xx로 던지면 기존 작성 흐름까지 막힌다 |
 
-## Prompt 3 시작 전 반드시 알아야 할 것
+## Prompt 3에서 무엇을 했는가 (완료)
 
 ### 채용공고는 사용자가 쓰는 문서가 아닙니다
 
 결재 승인 시 [`process_approval`](../backend/app/services/recruitment_service.py)이 자동으로 `JobPosting`을 만들고, 본문은 `_build_posting_content()`가 **코드로 조립**합니다. 그리고 **공고 수정 API가 없습니다.**
 
-→ **`PATCH /api/v1/job-postings/{id}` 신설이 Prompt 3의 선행 조건입니다.** 없으면 "[공고 내용에 적용]"할 대상이 없습니다.
+→ **`PATCH /api/v1/job-postings/{id}`를 신설했습니다.** AI 전용 우회로가 아니라 원래 비어 있던 기능입니다.
 
 제약: `title`·`content`만 받고 **`status`는 받지 않습니다.** AI가 공고를 게시 상태로 바꾸는 경로를 원천 차단합니다.
 
@@ -144,7 +145,6 @@ FROM ai_generations WHERE created_at >= now() - interval '30 days';
 ## 남은 로드맵
 
 ```
-Prompt 3   채용공고 AI 초안 + PATCH /job-postings/{id}
 Prompt 5   Feature Freeze 판정 (P0/P1이 0개일 때만 YES)
 ──────── Feature Freeze ────────
 Prompt 4   포스터 자동 생성 (SVG 템플릿 + 프론트 Canvas→PNG)
@@ -158,7 +158,7 @@ Prompt 4   포스터 자동 생성 (SVG 템플릿 + 프론트 Canvas→PNG)
 cd backend
 .\.venv\Scripts\python.exe -m ruff check .
 .\.venv\Scripts\python.exe -m ruff format --check .
-.\.venv\Scripts\python.exe -m pytest -q          # 145 passed
+.\.venv\Scripts\python.exe -m pytest -q          # 155 passed
 .\.venv\Scripts\python.exe -m alembic current    # 20260812_0022 (head)
 
 cd ..\frontend
