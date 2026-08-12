@@ -168,3 +168,68 @@ cd backend
 cd ..\frontend
 npm run lint; npm run typecheck; npm run build
 ```
+
+---
+
+## 이어서 할 일 (2026-08-12 오후 중단 지점)
+
+### 0) 지금 미커밋 상태
+
+Prompt 5 수동 검수 중 찾은 결함 6건과 개선 3건이 **커밋되지 않은 채** 있습니다. 먼저 커밋하세요.
+
+```
+결함  ① 오류 메시지에 API 키 echo 가능        (dependencies.py)
+     ② 테스트가 로컬 .env로 실제 API 호출     (conftest.py, dependencies.py)
+     ③ AI가 빈 필드를 메타데이터로 채움        (ai_prompts.py)
+     ④ 프롬프트 규칙 ↔ 스키마 충돌            (schemas/ai.py: expected_effect)
+     ⑤ ValidationError를 요청 실패로 오분류    (claude_provider.py)
+     ⑥ 안내 문구에 적용 후 제목이 들어감       (job-posting-draft-panel.tsx)
+
+개선  · SUPER_ADMIN 사용자당 한도 면제 (전역 한도는 유지)
+     · 한도 초과 메시지에 실제 한도·해제 시점 표기
+     · 짧은 입력 사전 차단 (프론트+백엔드, 호출 비용 절약)
+     · AI 생성 대기 안내 문구
+     · 채용 요청 화면에 "공고 문구는 승인 후" 안내
+
+검증  ruff 통과 · pytest 162 passed · 프론트 lint/typecheck/build 통과
+```
+
+### 1) 기능 1 — 세션 자동 로그아웃 (보안)
+
+**원인**: `supabase-browser.ts`가 옵션 없이 `createClient()`를 호출해 `persistSession: true`가 적용됩니다. 세션이 localStorage에 남고 토큰이 자동 갱신돼 다음날도 로그인 상태입니다.
+
+**방식**: "브라우저를 닫았는지"는 감지 불가하지만 감지할 필요도 없습니다. **마지막 활동 시각만 기록**하면 닫혀 있던 시간도 무동작으로 계산됩니다.
+
+- 활동(클릭·키·스크롤) 시 `localStorage.lastActiveAt` 갱신
+- 마운트 · 탭 복귀(`visibilitychange`) · 1분 타이머로 경과 확인 → 초과 시 `signOut()`
+- 만료 1분 전 경고 모달, 여러 탭 동기화(`storage` 이벤트)
+- 로그인 화면에 "장시간 미사용으로 로그아웃되었습니다" 안내
+- `NEXT_PUBLIC_IDLE_LOGOUT_MINUTES` **기본 30분** (5분은 시연 중 끊김)
+
+**범위**: 프론트 신규 1파일 + `auth-session-guard.tsx` 확장. 백엔드 변경 없음.
+
+### 2) 기능 2 — 채용공고 작성 구체화
+
+**A. 자유 입력 → 드롭다운** (지금 "정규직/정규/풀타임"이 제각각 들어가고 그대로 AI Context로 감)
+
+| 항목 | 선택지 |
+|---|---|
+| 고용 형태 | 정규직 / 계약직 / 인턴 / 파트타임 / 프리랜서 |
+| 경력 수준 | 신입 / 경력무관 / 1년↑ / 3년↑ / 5년↑ / 10년↑ |
+| 학력 *(신규)* | 학력무관 / 고졸↑ / 초대졸↑ / 대졸↑ / 석사↑ |
+
+**B. AI 패널에서 매번 재입력하던 값을 DB로** — 이게 핵심
+
+`work_location` · `salary` · `application_deadline` · `apply_method`(드롭다운) · `education_level`
+
+→ 채용 요청 작성 시 한 번 입력 → **결재자가 근무지·급여·마감일을 보고 승인** → AI가 자동으로 가져감. AI 패널 입력칸이 5개에서 1개(팀 소개)로 줄어듭니다.
+
+**범위**: migration 1개(칼럼 5개, 전부 nullable) + 백엔드 4곳 + 프론트 3화면 + 테스트.
+기존 자유 입력 데이터와 충돌하지 않도록 **기존 값은 두고 신규 입력만 제한**합니다.
+
+**착수 전 확정 필요**: 위 드롭다운 선택지 목록.
+
+### 3) Prompt 5 재판정 → Feature Freeze
+
+기능 1·2는 신규 기능이라 Freeze가 밀립니다. 완료 후 Prompt 5를 다시 돌려 판정합니다.
+(직전 판정은 `P0 0건 · P1 0건`으로 YES였습니다.)

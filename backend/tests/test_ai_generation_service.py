@@ -17,9 +17,11 @@ from app.repositories.ai_generation_repository import AiGenerationRepository
 from app.repositories.organization_repository import OrganizationRepository
 from app.repositories.recruitment_repository import RecruitmentRepository
 from app.schemas.ai import ApprovalDraftOutput
+from app.security.identity import ActorContext
 from app.services.ai_generation_service import AIGenerationService
 
-ACTOR_ID = "emp-head"
+ACTOR = ActorContext(employee_id="emp-head", role="EMPLOYEE", auth_user_id="auth-emp-head")
+SUPER_ADMIN = ActorContext(employee_id="emp-head", role="SUPER_ADMIN", auth_user_id="auth-emp-head")
 CONTEXT = {"department_name": "개발팀", "purpose": "노트북 교체", "main_content": "3대 교체 필요"}
 
 VALID_PAYLOAD = json.dumps(
@@ -77,12 +79,12 @@ def _service(
     )
 
 
-def _generate(service: AIGenerationService):
+def _generate(service: AIGenerationService, actor: ActorContext = ACTOR):
     return service.generate(
         feature_type=APPROVAL_DRAFT,
         context=CONTEXT,
         output_schema=ApprovalDraftOutput,
-        created_by_id=ACTOR_ID,
+        actor=actor,
     )
 
 
@@ -185,6 +187,45 @@ def test_limit_rejection_is_not_recorded(session: Session):
         _generate(service)
 
     assert session.scalar(select(func.count()).select_from(AiGeneration)) == 1
+
+
+def test_super_admin_is_exempt_from_per_user_limit(session: Session):
+    """검수·시연이 사용자당 한도에 막히지 않게 한다. 전역 한도는 그대로 적용된다."""
+    provider = _success_provider()
+    service = _service(session, provider, per_user=1)
+
+    _generate(service, SUPER_ADMIN)
+    _generate(service, SUPER_ADMIN)
+    _generate(service, SUPER_ADMIN)
+
+    assert provider.calls == 3
+
+
+def test_super_admin_still_blocked_by_global_limit(session: Session):
+    """전역 한도가 실제 비용 상한이다. 여기까지 면제하면 한도를 둔 의미가 사라진다."""
+    provider = _success_provider()
+    service = _service(session, provider, per_user=99, global_limit=2)
+
+    _generate(service, SUPER_ADMIN)
+    _generate(service, SUPER_ADMIN)
+    with pytest.raises(HTTPException) as error:
+        _generate(service, SUPER_ADMIN)
+
+    assert error.value.status_code == 429
+    assert "전체" in error.value.detail
+    assert provider.calls == 2
+
+
+def test_limit_message_states_actual_limit(session: Session):
+    """'잠시 후 다시 시도'만 쓰면 최대 24시간을 기다려야 하는 상황에서 사용자를 오도한다."""
+    service = _service(session, _success_provider(), per_user=1)
+
+    _generate(service)
+    with pytest.raises(HTTPException) as error:
+        _generate(service)
+
+    assert "1회" in error.value.detail
+    assert "24시간" in error.value.detail
 
 
 def test_generation_does_not_touch_approval_documents(session: Session):

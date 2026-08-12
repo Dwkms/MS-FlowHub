@@ -86,10 +86,34 @@ def test_draft_is_recorded_with_creator(client: TestClient) -> None:
         assert "employee_no" not in record.source_input
 
 
+def test_expected_effect_may_be_empty(client: TestClient) -> None:
+    """근거가 없으면 기대 효과를 비울 수 있어야 한다.
+
+    프롬프트는 "쓸 근거가 없으면 빈 문자열로 둔다"고 지시한다. 스키마가 이 필드를
+    필수로 막으면, AI가 규칙을 지킨 응답이 검증에서 떨어진다(실제로 발생했다).
+    """
+    from app.schemas.ai import ApprovalDraftOutput
+
+    draft = ApprovalDraftOutput(title="제목", purpose="목적", details="내용", expected_effect="")
+
+    assert draft.expected_effect == ""
+
+
+def test_too_short_input_is_rejected_before_calling_ai(client: TestClient) -> None:
+    """짧은 입력은 AI가 쓸 근거가 없어 실패한다. 호출 비용이 나가기 전에 막는다."""
+    set_authenticated_actor(client, "emp-head")
+
+    response = client.post(
+        DRAFT_URL, json={"document_type": "GENERAL", "purpose": "ㅇㅇ", "main_content": "ㅇㅇ"}
+    )
+
+    assert response.status_code == 422
+
+
 def test_missing_required_field_is_rejected(client: TestClient) -> None:
     set_authenticated_actor(client, "emp-head")
 
-    response = client.post(DRAFT_URL, json={"document_type": "EXPENSE", "purpose": "목적만"})
+    response = client.post(DRAFT_URL, json={"document_type": "EXPENSE", "purpose": "요청 목적만"})
 
     assert response.status_code == 422
 
