@@ -64,8 +64,32 @@ export function JobPostingDraftPanel({ posting, onApplied }: Props) {
     setDraft((previous) => (previous ? { ...previous, [field]: value } : previous));
   }
 
+  /** 선택 항목이지만 값을 넣었다면 최소 길이를 요구한다. 여기 적은 값은 공고에 그대로
+   *  실리므로, "ㅇㅇ" 같은 입력은 공고를 오염시키거나 AI가 조용히 버린다. */
+  function tooShort(): string | null {
+    const rules: [string, string, number][] = [
+      [input.workLocation, "근무 위치", 2],
+      [input.applicationDeadline, "지원 마감일", 4],
+      [input.applyMethod, "지원 방법", 5],
+      [input.salary, "급여·처우", 2],
+      [input.teamIntro, "팀 소개", 10],
+    ];
+    for (const [value, label, min] of rules) {
+      const text = value.trim();
+      if (text.length > 0 && text.length < min) {
+        return `${label}은(는) 비워두거나 ${min}자 이상 입력해 주세요.`;
+      }
+    }
+    return null;
+  }
+
   async function generate() {
     setError(null);
+    const invalid = tooShort();
+    if (invalid) {
+      setError(invalid);
+      return;
+    }
     setBusy(true);
     try {
       const response = await createJobPostingDraft({
@@ -146,10 +170,12 @@ export function JobPostingDraftPanel({ posting, onApplied }: Props) {
       <div className="ai-draft-body">
         {error && <div className="inline-alert error">{error}</div>}
 
+        {/* posting.title은 AI 초안을 적용하면 헤드라인으로 바뀐다. 여기서 "직무"로
+            표시하면 적용 이후 문구가 어긋나므로 제목을 쓰지 않는다. */}
         <p className="file-help">
-          직무 {posting.title} · 모집 {posting.headcount}명 · {posting.employment_type} ·{" "}
-          {posting.experience_level} 은(는) 채용 요청에서 자동으로 가져옵니다. 아래는 DB에 없어
-          직접 입력해야 하는 항목입니다.
+          모집 {posting.headcount}명 · {posting.employment_type} · {posting.experience_level} 등
+          직무·인원·주요 업무·역량은 채용 요청에서 자동으로 가져옵니다. 아래는 DB에 없어 직접
+          입력해야 하는 항목이며, 비워두면 공고에 나오지 않습니다.
         </p>
 
         <div className="form-grid">
@@ -201,6 +227,11 @@ export function JobPostingDraftPanel({ posting, onApplied }: Props) {
         </div>
 
         <div className="ai-draft-actions">
+          {busy && (
+            <span className="ai-draft-wait">
+              AI가 초안을 작성하고 있습니다. 보통 5~10초 걸립니다.
+            </span>
+          )}
           <button
             type="button"
             className="primary-button"

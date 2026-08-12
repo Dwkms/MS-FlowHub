@@ -34,7 +34,9 @@ from app.schemas.ai import (
 )
 from app.security.identity import ActorContext
 
-LIMIT_MESSAGE = "오늘 AI 초안 생성 한도를 초과했습니다. 잠시 후 다시 시도해 주세요."
+# 사용자당 한도만 면제한다. 전역 한도는 그대로 적용된다. 전역 쪽이 비용 상한을
+# 만드는 실제 방어선이라, 여기까지 면제하면 한도를 둔 의미가 사라진다.
+PER_USER_LIMIT_EXEMPT_ROLES = {"SUPER_ADMIN"}
 SCHEMA_ERROR_MESSAGE = "AI 응답이 지정한 형식을 만족하지 않습니다."
 EMPTY_RESPONSE_MESSAGE = "AI 응답을 받지 못했습니다."
 
@@ -125,7 +127,7 @@ class AIGenerationService:
             feature_type=JOB_POSTING_DRAFT,
             context=context,
             output_schema=JobPostingDraftOutput,
-            created_by_id=actor.employee_id,
+            actor=actor,
             related_type="JOB_POSTING",
             related_id=posting.id,
         )
@@ -161,7 +163,7 @@ class AIGenerationService:
             feature_type=APPROVAL_DRAFT,
             context=context,
             output_schema=ApprovalDraftOutput,
-            created_by_id=actor.employee_id,
+            actor=actor,
         )
 
     def record_final_output(
@@ -197,11 +199,12 @@ class AIGenerationService:
         feature_type: str,
         context: dict,
         output_schema: type[BaseModel],
-        created_by_id: str,
+        actor: ActorContext,
         related_type: str | None = None,
         related_id: str | None = None,
     ) -> AIGenerationOutcome:
-        self._enforce_limits(created_by_id)
+        # 한도 판정에 역할이 필요해 created_by_id 대신 actor를 받는다.
+        self._enforce_limits(actor)
 
         result = self.provider.generate(feature_type, context, output_schema)
         output, error_message = self._validate(result, output_schema)
@@ -219,7 +222,7 @@ class AIGenerationService:
             error_message=error_message,
             input_tokens=result.input_tokens,
             output_tokens=result.output_tokens,
-            created_by_id=created_by_id,
+            created_by_id=actor.employee_id,
         )
         self.repository.add(record)
         self.session.commit()
@@ -232,18 +235,34 @@ class AIGenerationService:
             error_message=error_message,
         )
 
-    def _enforce_limits(self, created_by_id: str) -> None:
+    def _enforce_limits(self, actor: ActorContext) -> None:
         """Provider를 부르기 **전에** 막는다. 한도 초과는 호출도 기록도 하지 않는다.
 
-        전역 한도를 먼저 본다. 사용자당 한도만 두면 계정 수만큼 곱해져 열린다.
+        전역 한도를 먼저, 그리고 역할과 무관하게 본다. 사용자당 한도만 두면 계정 수만큼
+        곱해져 열리므로 전역 쪽이 실제 비용 상한이다.
+
+        메시지에 실제 한도 값을 담는다. "잠시 후 다시 시도"만 쓰면 최대 24시간을 기다려야
+        하는 상황에서 사용자를 오도한다.
         """
-        if self.repository.count_recent() >= self.settings.ai_daily_limit_global:
-            raise HTTPException(status_code=429, detail=LIMIT_MESSAGE)
-        if (
-            self.repository.count_recent(created_by_id=created_by_id)
-            >= self.settings.ai_daily_limit_per_user
-        ):
-            raise HTTPException(status_code=429, detail=LIMIT_MESSAGE)
+        global_limit = self.settings.ai_daily_limit_global
+        if self.repository.count_recent() >= global_limit:
+            raise HTTPException(
+                status_code=429,
+                detail=f"전체 AI 초안 생성 한도에 도달했습니다. (최근 24시간 {global_limit}회)",
+            )
+
+        if actor.role in PER_USER_LIMIT_EXEMPT_ROLES:
+            return
+
+        per_user_limit = self.settings.ai_daily_limit_per_user
+        if self.repository.count_recent(created_by_id=actor.employee_id) >= per_user_limit:
+            raise HTTPException(
+                status_code=429,
+                detail=(
+                    f"AI 초안 생성은 최근 24시간 기준 {per_user_limit}회까지 가능합니다. "
+                    "한도는 가장 오래된 생성 시각으로부터 24시간 뒤에 다시 열립니다."
+                ),
+            )
 
     @staticmethod
     def _validate(

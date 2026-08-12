@@ -56,8 +56,14 @@ export function ApprovalDraftPanel({ documentType, onApply }: Props) {
 
   async function generate() {
     setError(null);
-    if (!input.purpose.trim() || !input.mainContent.trim()) {
-      setError("요청 목적과 주요 내용을 입력해 주세요.");
+    // 너무 짧은 입력은 AI가 쓸 근거가 없어 결국 실패한다. 그때는 이미 호출 비용이
+    // 나간 뒤이므로, 서버에 보내기 전에 여기서 막는다.
+    if (input.purpose.trim().length < 4) {
+      setError("요청 목적을 4자 이상 구체적으로 입력해 주세요.");
+      return;
+    }
+    if (input.mainContent.trim().length < 10) {
+      setError("주요 내용을 10자 이상 입력해 주세요. AI는 여기 적힌 사실만 문장으로 옮깁니다.");
       return;
     }
 
@@ -190,6 +196,13 @@ export function ApprovalDraftPanel({ documentType, onApply }: Props) {
         </div>
 
         <div className="ai-draft-actions">
+          {/* 대기 시간을 미리 알려주면 같은 6초도 짧게 느껴진다. 응답을 빠르게 만드는
+              것보다 이쪽이 비용 0에 효과가 크다. */}
+          {busy && (
+            <span className="ai-draft-wait">
+              AI가 초안을 작성하고 있습니다. 보통 5~10초 걸립니다.
+            </span>
+          )}
           <button type="button" className="primary-button" onClick={() => void generate()} disabled={busy}>
             {busy ? "생성 중..." : draft ? "다시 생성" : "생성"}
           </button>
