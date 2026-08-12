@@ -2,6 +2,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends
 
+from app.api.ai import router as ai_router
 from app.api.approvals import router as approvals_router
 from app.api.auth import router as auth_router
 from app.api.ax import router as ax_router
@@ -21,6 +22,7 @@ api_router.include_router(employees_router)
 api_router.include_router(manuals_router)
 api_router.include_router(faqs_router)
 api_router.include_router(ax_router)
+api_router.include_router(ai_router)
 DashboardServiceDependency = Annotated[DashboardService, Depends(get_dashboard_service)]
 
 

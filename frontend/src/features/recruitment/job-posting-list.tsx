@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
+import { JobPostingDraftPanel } from "@/features/ai/job-posting-draft-panel";
 import { useCurrentUser } from "@/features/current-user/current-user-provider";
 import { listJobPostings } from "@/features/recruitment/api";
 import { RecruitmentPosterAttachment } from "@/features/recruitment/recruitment-poster-attachment";
@@ -17,6 +18,10 @@ export function JobPostingList() {
   const [items, setItems] = useState<JobPosting[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // 공고 수정 권한과 같은 범위. 적용할 수 없는 사람에게 초안 버튼을 보여주지 않는다.
+  const canEditPosting = ["SUPER_ADMIN", "HR_ADMIN", "ADMIN", "HR_MANAGER"].includes(
+    currentEmployee.role,
+  );
 
   useEffect(() => {
     let active = true;
@@ -38,6 +43,8 @@ export function JobPostingList() {
           return <article className="job-posting-card" key={item.id}>
             <header className="job-posting-hero"><div><span className="approval-status approved">공고 초안</span><p className="job-posting-department">{item.request_department_name} · 요청자 {item.requester_name}</p><h2>{item.title}</h2></div><dl><div><dt>모집 인원</dt><dd>{item.headcount}명</dd></div><div><dt>고용 형태</dt><dd>{item.employment_type}</dd></div><div><dt>경력</dt><dd>{item.experience_level}</dd></div><div><dt>희망 입사일</dt><dd>{formatDate(item.desired_start_date)}</dd></div></dl></header>
             <div className="job-posting-body"><section><h3>주요 업무</h3><p>{item.responsibilities}</p></section><section><h3>필수 역량</h3><p>{item.required_skills || "채용 담당자와 협의 후 확정"}</p></section><section><h3>우대 사항</h3><p>{item.preferred_skills || "없음"}</p></section>
+            <section><h3>공고 본문</h3><p className="job-posting-content">{item.content}</p></section>
+            {canEditPosting && <JobPostingDraftPanel posting={item} onApplied={(updated) => setItems((previous) => previous.map((row) => (row.id === updated.id ? updated : row)))} />}
             <RecruitmentPosterAttachment requestId={item.recruitment_request_id} employeeId={currentEmployee.id} originalName={item.poster_original_name} contentType={item.poster_content_type} /></div>
           </article>;
         })}</div>}

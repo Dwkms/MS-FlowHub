@@ -12,12 +12,68 @@
 | 인증 | `GET /api/v1/auth/me`, `GET /auth/permissions`, `POST /auth/logout` | 현재 인증 계정·권한 확인 및 Supabase 세션 로그아웃 |
 | 직원·조직 | `GET/POST /api/v1/employees`, `GET/PATCH/DELETE /employees/{id}`, `PATCH /employees/{id}/role`, `PUT /employees/{id}/attendance`, `GET /employees/{id}/attendance-history`, `PATCH /employees/{id}/employment-status-reason`, `GET /organization` | 직원·조직·근태 상태와 이력 관리. 변경 권한은 서버에서 역할별 검증 |
 | 전자결재 | `GET/POST /approvals`, `GET/PATCH/DELETE /approvals/{id}`, `POST /approvals/{id}/submit`, `POST /approvals/{id}/approve`, `POST /approvals/{id}/reject` | 초안·상신·승인·반려·이력. 연결 채용 요청 결재 삭제 시 관련 데이터 함께 정리 |
-| 채용 요청·공고 | `GET/POST/DELETE /recruitment-requests`, `GET /recruitment-requests/{id}`, `POST /recruitment-requests/{id}/submit`, `POST /recruitment-requests/{id}/poster`, `GET /recruitment-requests/{id}/poster`, `POST /recruitment-requests/{id}/job-posting`, `GET /job-postings` | 채용 요청·포스터·결재 연동·승인 후 공고 생성 |
+| 채용 요청·공고 | `PATCH /job-postings/{id}`, `GET/POST/DELETE /recruitment-requests`, `GET /recruitment-requests/{id}`, `POST /recruitment-requests/{id}/submit`, `POST /recruitment-requests/{id}/poster`, `GET /recruitment-requests/{id}/poster`, `POST /recruitment-requests/{id}/job-posting`, `GET /job-postings` | 채용 요청·포스터·결재 연동·승인 후 공고 생성 |
 | ATS 지원자 | `GET /applicants`, `POST /job-postings/{id}/applicants`, `GET/PATCH/DELETE /applicants/{id}`, `POST /applicants/{id}/stage` | 채용공고별 지원자 등록·검색·상세·단계 이력 관리 |
 | 직원 매뉴얼 | `GET/POST/PATCH/DELETE /manuals`, `GET /manuals/{slug}`, `GET/POST/PATCH/DELETE /manuals/categories` | 공개 매뉴얼 조회와 관리자 작성·수정·삭제. `GET /manuals/{slug}`는 관리자 편집 화면에서 기존 값을 불러올 때 사용합니다 |
 | FAQ | `GET /faqs` | 공개 FAQ 목록. 인증된 모든 역할이 조회하며 `display_order` 오름차순으로 반환합니다 |
+| AX 도우미 | `POST /ax/chat` | 등록된 매뉴얼·FAQ에서 질문에 맞는 문서를 찾아 원문을 반환. LLM을 호출하지 않습니다 |
+| 생성형 AI | `POST /ai/approval-drafts`, `POST /ai/job-posting-drafts`, `PATCH /ai/generations/{id}/final` | 전자결재·채용공고 초안 생성과 최종본 기록. **업무 데이터를 저장하거나 상태를 바꾸지 않습니다** |
 
 알림 레코드는 채용 요청 흐름에서 내부적으로 생성되지만, 알림 조회·읽음 처리 API와 화면은 현재 범위에 포함되지 않습니다.
+
+## 전자결재 AI 초안 (v0.8.0)
+
+| Method / URL | 목적 | 권한 |
+|---|---|---|
+| `POST /api/v1/ai/approval-drafts` | 로그인 사용자·부서·팀·직급(DB)과 사용자 입력을 합쳐 초안 생성 | 인증된 모든 역할 |
+| `PATCH /api/v1/ai/generations/{generation_id}/final` | 사용자가 수정해 적용한 최종본 기록 | 해당 초안을 생성한 본인 |
+
+**이 API는 `approval_documents`를 만들거나 수정하지 않습니다.** 응답은 화면에 채울 초안일 뿐이고,
+실제 저장은 기존 `POST /api/v1/approvals` 경로에서 사용자가 직접 눌러야 일어납니다.
+
+요청 본문(`POST /ai/approval-drafts`)은 `document_type`(기존 4종), `purpose`, `main_content`가 필수이고
+`amount`, `quantity`, `desired_date`, `extra_note`가 선택입니다. **선택 값은 입력했을 때만 AI Context에
+포함**되며, 넣지 않은 금액·수량·시점을 AI가 만들어내지 않도록 키 자체를 만들지 않습니다.
+
+금액·수량은 숫자가 아니라 문자열입니다. "6,000,000원", "약 500만원"처럼 사용자가 쓴 표현을 그대로
+전달해야 AI가 단위를 바꾸거나 반올림하지 않습니다. 이 값들은 결재 문서에 칼럼으로 저장되지 않고
+`ai_generations.source_input`에만 남습니다.
+
+응답은 `generation_id`, `success`, `provider`, `is_sample`, `output`, `error_message`입니다.
+`is_sample`이 `true`면 Mock Provider 결과이며 화면에 "샘플 응답" 배지를 표시합니다.
+
+### 상태 코드
+
+| 상황 | 코드 |
+|---|---|
+| 생성 성공 | `200` |
+| **Provider 실패**(timeout·API 오류·스키마 위반) | `200` + `success: false`. 초안은 부가 기능이라 기존 작성 흐름을 5xx로 막지 않습니다 |
+| 입력 검증 실패 | `422` |
+| 일일 호출 한도 초과 | `429`. 사용자당 5회 / 전역 30회(최근 24시간 기준, 환경변수로 조정) |
+| 다른 사용자의 초안에 최종본 기록 시도 | `403` |
+| 최종본이 출력 스키마를 만족하지 않음 | `422` |
+
+## 채용공고 AI 초안 (v0.8.1)
+
+| Method / URL | 목적 | 권한 |
+|---|---|---|
+| `POST /api/v1/ai/job-posting-drafts` | 채용 요청의 사실을 공고 문장으로 다듬은 초안 생성 | `SUPER_ADMIN`, `HR_ADMIN`, `ADMIN`, `HR_MANAGER` |
+| `PATCH /api/v1/job-postings/{posting_id}` | 공고 제목·본문 수정 | 위와 동일 |
+
+**`PATCH /job-postings/{id}`는 이번에 신설했습니다.** 승인 시 자동 생성된 공고를 이후에 수정할
+방법이 아예 없었습니다. AI 전용 우회로가 아니라 원래 비어 있던 기능입니다.
+
+`title`과 `content`만 받고 **`status`는 받지 않습니다.** 이 경로가 AI 흐름에서도 호출되므로,
+상태 필드를 열어두면 AI가 공고를 게시 상태로 바꾸는 경로가 생깁니다. 게시 판단은 사람이 합니다.
+
+`POST /ai/job-posting-drafts`의 요청 본문은 `job_posting_id`가 필수이고, `work_location`,
+`application_deadline`, `apply_method`, `team_intro`, `salary`가 선택입니다. **직무·인원·고용
+형태·경력·주요 업무·필수/우대 역량은 `RecruitmentRequest`에서 자동으로 가져오므로 보내지
+않습니다.** 선택 값은 입력했을 때만 AI Context에 포함되어, 넣지 않은 근무지·마감일·급여를
+AI가 만들어내지 않습니다.
+
+응답 형식과 상태 코드는 전자결재 초안과 같습니다. 초안 생성은 공고나 채용 요청의 상태를
+바꾸지 않으며, 공고에 반영하려면 사용자가 미리보기를 확인한 뒤 `PATCH`를 직접 호출해야 합니다.
 
 ## ATS 지원자 관리 MVP (v0.7.3)
 
