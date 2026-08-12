@@ -6,10 +6,11 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from app.api.dependencies import get_database_health
+from app.api.dependencies import get_ai_provider, get_database_health
 from app.core import supabase_storage
 from app.db.base import Base
 from app.db.session import get_db_session
+from app.domain.ai_provider import MockAIProvider
 from app.main import create_app
 from app.models import approval, auth, manual, notification, organization, recruitment  # noqa: F401
 from app.models.auth import EmployeeAccount
@@ -120,6 +121,9 @@ def client() -> Generator[TestClient, None, None]:
     test_app.state.testing_session_factory = testing_session
     test_app.dependency_overrides[get_db_session] = override_session
     test_app.dependency_overrides[get_database_health] = lambda: True
+    # 개발자 `.env`에 AI_PROVIDER=claude와 실제 키가 들어 있어도 테스트는 절대
+    # 네트워크를 타지 않는다. 이걸 빼면 pytest가 실제 API를 호출하고 크레딧을 쓴다.
+    test_app.dependency_overrides[get_ai_provider] = MockAIProvider
     with TestClient(test_app) as test_client:
         yield test_client
     test_app.dependency_overrides.clear()
