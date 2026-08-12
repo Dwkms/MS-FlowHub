@@ -16,8 +16,42 @@
 | ATS 지원자 | `GET /applicants`, `POST /job-postings/{id}/applicants`, `GET/PATCH/DELETE /applicants/{id}`, `POST /applicants/{id}/stage` | 채용공고별 지원자 등록·검색·상세·단계 이력 관리 |
 | 직원 매뉴얼 | `GET/POST/PATCH/DELETE /manuals`, `GET /manuals/{slug}`, `GET/POST/PATCH/DELETE /manuals/categories` | 공개 매뉴얼 조회와 관리자 작성·수정·삭제. `GET /manuals/{slug}`는 관리자 편집 화면에서 기존 값을 불러올 때 사용합니다 |
 | FAQ | `GET /faqs` | 공개 FAQ 목록. 인증된 모든 역할이 조회하며 `display_order` 오름차순으로 반환합니다 |
+| AX 도우미 | `POST /ax/chat` | 등록된 매뉴얼·FAQ에서 질문에 맞는 문서를 찾아 원문을 반환. LLM을 호출하지 않습니다 |
+| 생성형 AI | `POST /ai/approval-drafts`, `PATCH /ai/generations/{id}/final` | 전자결재 초안 생성과 최종본 기록. **업무 데이터를 저장하거나 상태를 바꾸지 않습니다** |
 
 알림 레코드는 채용 요청 흐름에서 내부적으로 생성되지만, 알림 조회·읽음 처리 API와 화면은 현재 범위에 포함되지 않습니다.
+
+## 전자결재 AI 초안 (v0.8.0)
+
+| Method / URL | 목적 | 권한 |
+|---|---|---|
+| `POST /api/v1/ai/approval-drafts` | 로그인 사용자·부서·팀·직급(DB)과 사용자 입력을 합쳐 초안 생성 | 인증된 모든 역할 |
+| `PATCH /api/v1/ai/generations/{generation_id}/final` | 사용자가 수정해 적용한 최종본 기록 | 해당 초안을 생성한 본인 |
+
+**이 API는 `approval_documents`를 만들거나 수정하지 않습니다.** 응답은 화면에 채울 초안일 뿐이고,
+실제 저장은 기존 `POST /api/v1/approvals` 경로에서 사용자가 직접 눌러야 일어납니다.
+
+요청 본문(`POST /ai/approval-drafts`)은 `document_type`(기존 4종), `purpose`, `main_content`가 필수이고
+`amount`, `quantity`, `desired_date`, `extra_note`가 선택입니다. **선택 값은 입력했을 때만 AI Context에
+포함**되며, 넣지 않은 금액·수량·시점을 AI가 만들어내지 않도록 키 자체를 만들지 않습니다.
+
+금액·수량은 숫자가 아니라 문자열입니다. "6,000,000원", "약 500만원"처럼 사용자가 쓴 표현을 그대로
+전달해야 AI가 단위를 바꾸거나 반올림하지 않습니다. 이 값들은 결재 문서에 칼럼으로 저장되지 않고
+`ai_generations.source_input`에만 남습니다.
+
+응답은 `generation_id`, `success`, `provider`, `is_sample`, `output`, `error_message`입니다.
+`is_sample`이 `true`면 Mock Provider 결과이며 화면에 "샘플 응답" 배지를 표시합니다.
+
+### 상태 코드
+
+| 상황 | 코드 |
+|---|---|
+| 생성 성공 | `200` |
+| **Provider 실패**(timeout·API 오류·스키마 위반) | `200` + `success: false`. 초안은 부가 기능이라 기존 작성 흐름을 5xx로 막지 않습니다 |
+| 입력 검증 실패 | `422` |
+| 일일 호출 한도 초과 | `429`. 사용자당 5회 / 전역 30회(최근 24시간 기준, 환경변수로 조정) |
+| 다른 사용자의 초안에 최종본 기록 시도 | `403` |
+| 최종본이 출력 스키마를 만족하지 않음 | `422` |
 
 ## ATS 지원자 관리 MVP (v0.7.3)
 

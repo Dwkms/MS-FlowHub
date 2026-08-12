@@ -3,6 +3,7 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 
+import { ApprovalDraftPanel } from "@/features/ai/approval-draft-panel";
 import { createApproval, submitApproval } from "@/features/approvals/api";
 import { useCurrentUser } from "@/features/current-user/current-user-provider";
 import { getDepartments } from "@/features/dashboard/api";
@@ -160,6 +161,14 @@ export function ApprovalForm() {
             </select>
             <small className="file-help">팀장급 이상만 결재자로 지정할 수 있습니다.</small>
           </label>
+          <ApprovalDraftPanel
+            documentType={documentType}
+            onApply={(draft) => {
+              // 폼 값을 채울 뿐이다. 저장은 아래 [임시 저장]/[결재 요청]으로만 일어난다.
+              setTitle(draft.title);
+              setContent(draft.content);
+            }}
+          />
           <label className="form-field full">
             <span>내용 *</span>
             <textarea

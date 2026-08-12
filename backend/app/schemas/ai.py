@@ -11,6 +11,8 @@ from typing import Annotated
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.schemas.approval import DocumentType
+
 # 배열 항목 1개의 길이 상한. 항목 수 상한과 함께 걸어야 긴 출력이 포스터·폼을 깨지 않는다.
 BulletItem = Annotated[str, Field(min_length=1, max_length=200)]
 
@@ -41,3 +43,48 @@ class JobPostingDraftOutput(AIOutputBaseModel):
     preferred_qualifications: list[BulletItem] = Field(default_factory=list, max_length=6)
     team_or_recruitment_description: str = Field(default="", max_length=600)
     closing_message: str = Field(default="", max_length=300)
+
+
+class AIRequestBaseModel(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+
+class ApprovalDraftRequest(AIRequestBaseModel):
+    """전자결재 초안 생성 입력.
+
+    **DB 칼럼을 늘리지 않는다.** 여기 값들은 AI에게 맥락을 주기 위한 일회성 입력이고,
+    보존은 `ai_generations.source_input`으로 충분하다. 결재 문서가 가져야 할 정보는
+    최종 `content` 한 덩어리이지 이 필드들이 아니다.
+
+    금액·수량을 숫자가 아니라 문자열로 받는다. "6,000,000원", "약 500만원"처럼 사용자가
+    쓴 표현을 그대로 넘겨야 AI가 단위를 바꾸거나 반올림하지 않는다.
+    """
+
+    document_type: DocumentType
+    purpose: str = Field(min_length=1, max_length=500)
+    main_content: str = Field(min_length=1, max_length=2000)
+    amount: str | None = Field(default=None, max_length=100)
+    quantity: str | None = Field(default=None, max_length=100)
+    desired_date: str | None = Field(default=None, max_length=100)
+    extra_note: str | None = Field(default=None, max_length=1000)
+
+
+class AIFinalOutputRequest(AIRequestBaseModel):
+    """사용자가 수정해 실제로 적용한 최종본. 생성 원본은 덮어쓰지 않는다."""
+
+    final_output: dict
+
+
+class ApprovalDraftResponse(BaseModel):
+    """실패도 200으로 내려간다. 초안 생성은 부가 기능이라 실패해도 직접 작성하면 된다.
+
+    `is_sample`은 Mock Provider 결과임을 UI에 알린다. 샘플을 실제 LLM 결과로
+    오인하는 것을 막는다(docs/AI_AUTOMATION_PLAN.md 15장).
+    """
+
+    generation_id: str
+    success: bool
+    provider: str
+    is_sample: bool
+    output: ApprovalDraftOutput | None = None
+    error_message: str | None = None
