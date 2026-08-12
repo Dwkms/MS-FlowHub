@@ -124,7 +124,7 @@ export function RecruitmentForm() {
 
   return (
     <section className="content approval-page">
-      <div className="page-heading"><div><span className="section-kicker">NEW RECRUITMENT REQUEST</span><h1>채용 요청 작성</h1><p>저장한 요청은 상세 화면에서 전자결재로 상신합니다.</p></div></div>
+      <div className="page-heading"><div><span className="section-kicker">NEW RECRUITMENT REQUEST</span><h1>채용 요청 작성</h1><p>저장한 요청은 상세 화면에서 전자결재로 상신합니다. 공고 문구는 결재 승인 후 채용공고 화면에서 AI 초안으로 작성합니다.</p></div></div>
       <form className="panel approval-form" onSubmit={(event) => void save(event)}>
         {(error || departmentError) && <div className="inline-alert error">{error ?? departmentError}</div>}
         <div className="form-grid">

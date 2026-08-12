@@ -29,7 +29,10 @@ class ApprovalDraftOutput(AIOutputBaseModel):
     title: str = Field(min_length=1, max_length=200)
     purpose: str = Field(min_length=1, max_length=500)
     details: str = Field(min_length=1, max_length=1500)
-    expected_effect: str = Field(min_length=1, max_length=500)
+    # 근거가 없으면 비울 수 있어야 한다. 프롬프트는 "쓸 근거가 없으면 빈 문자열로 둔다"고
+    # 지시하는데 여기서 필수로 막으면, AI가 규칙을 지킨 응답이 검증에서 떨어진다.
+    # 기대 효과를 억지로 지어내게 하는 것보다 비워두고 사용자가 채우는 편이 낫다.
+    expected_effect: str = Field(default="", max_length=500)
 
 
 class JobPostingDraftOutput(AIOutputBaseModel):
@@ -61,8 +64,10 @@ class ApprovalDraftRequest(AIRequestBaseModel):
     """
 
     document_type: DocumentType
-    purpose: str = Field(min_length=1, max_length=500)
-    main_content: str = Field(min_length=1, max_length=2000)
+    # 최소 길이를 둔다. "ㅇㅇ" 같은 입력은 AI가 쓸 근거가 없어 결국 검증에서 떨어지는데,
+    # 그때는 이미 API 호출 비용이 나간 뒤다. 여기서 막으면 호출 자체가 발생하지 않는다.
+    purpose: str = Field(min_length=4, max_length=500)
+    main_content: str = Field(min_length=10, max_length=2000)
     amount: str | None = Field(default=None, max_length=100)
     quantity: str | None = Field(default=None, max_length=100)
     desired_date: str | None = Field(default=None, max_length=100)
@@ -78,11 +83,13 @@ class JobPostingDraftRequest(AIRequestBaseModel):
     """
 
     job_posting_id: str = Field(min_length=1)
-    work_location: str | None = Field(default=None, max_length=200)
-    application_deadline: str | None = Field(default=None, max_length=100)
-    apply_method: str | None = Field(default=None, max_length=500)
-    team_intro: str | None = Field(default=None, max_length=1000)
-    salary: str | None = Field(default=None, max_length=200)
+    # 전부 선택 항목이다. 다만 값을 넣었다면 최소 길이를 요구한다. 여기 적은 값은 공고에
+    # 그대로 실리므로, "ㅇㅇ" 같은 입력은 공고를 오염시키거나 AI가 조용히 버린다.
+    work_location: str | None = Field(default=None, min_length=2, max_length=200)
+    application_deadline: str | None = Field(default=None, min_length=4, max_length=100)
+    apply_method: str | None = Field(default=None, min_length=5, max_length=500)
+    team_intro: str | None = Field(default=None, min_length=10, max_length=1000)
+    salary: str | None = Field(default=None, min_length=2, max_length=200)
 
 
 class JobPostingDraftResponse(BaseModel):

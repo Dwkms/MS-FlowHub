@@ -10,7 +10,7 @@
 import json
 
 import anthropic
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 
 from app.domain.ai_prompts import build_system_prompt
 from app.domain.ai_provider import CLAUDE, AIProviderResult
@@ -70,6 +70,13 @@ class ClaudeProvider:
             return self._failure(f"AI 서비스 오류가 발생했습니다. (status {error.status_code})")
         except anthropic.APIConnectionError:
             return self._failure("AI 서비스에 연결하지 못했습니다.")
+        except ValidationError:
+            # 요청은 정상이고 **응답**이 스키마를 못 맞춘 경우다. SDK가 클라이언트에서
+            # 검증하며 던진다. 요청 구성 실패와 구분해야 원인을 오해하지 않는다.
+            return self._failure(
+                "AI 응답이 지정한 형식을 만족하지 않습니다. "
+                "입력을 조금 더 구체적으로 적으면 개선될 수 있습니다."
+            )
         except (TypeError, ValueError) as error:
             # SDK 시그니처 변경 등 요청 구성 실패. 기존 업무 기능까지 죽이지 않는다.
             return self._failure(f"AI 요청을 구성하지 못했습니다. ({type(error).__name__})")

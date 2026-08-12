@@ -124,6 +124,36 @@ def test_draft_rejects_unknown_posting(client: TestClient) -> None:
     assert response.status_code == 404
 
 
+def test_too_short_optional_input_is_rejected(client: TestClient) -> None:
+    """선택 항목이라도 값을 넣었다면 최소 길이를 요구한다.
+
+    다만 길이 검증의 한계는 분명하다. `근무 위치`는 "서울"이 2자라 최소를 2자로 둘 수밖에
+    없고, 그러면 "ㅇㅇ" 같은 2자 낙서는 통과한다. 문장을 기대하는 항목(지원 방법·팀 소개)
+    에서만 실효가 있으며, 무의미한 입력의 최종 방어선은 사용자가 보는 미리보기다.
+    """
+    posting = create_posting(client)
+
+    short_sentence = client.post(
+        DRAFT_URL, json={"job_posting_id": posting["id"], "apply_method": "ㅇㅇ"}
+    )
+    single_char = client.post(
+        DRAFT_URL, json={"job_posting_id": posting["id"], "work_location": "ㅇ"}
+    )
+
+    assert short_sentence.status_code == 422
+    assert single_char.status_code == 422
+
+
+def test_all_optional_inputs_may_be_omitted(client: TestClient) -> None:
+    """비워두는 것은 정상이다. 최소 길이는 '넣었을 때'만 적용된다."""
+    posting = create_posting(client)
+
+    response = client.post(DRAFT_URL, json={"job_posting_id": posting["id"]})
+
+    assert response.status_code == 200
+    assert response.json()["success"] is True
+
+
 def test_patch_updates_title_and_content(client: TestClient) -> None:
     posting = create_posting(client)
 
