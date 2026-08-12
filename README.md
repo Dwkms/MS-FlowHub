@@ -73,7 +73,20 @@ MS FlowHub는 직원·조직 관리, 근태 상태, 전자결재, 채용 요청�
 - `SUPER_ADMIN`, `HR_ADMIN`의 매뉴얼·카테고리 작성·수정·삭제 (카드의 편집 아이콘은 관리자에게만 노출)
 - `TEAM_ADMIN`, `EMPLOYEE`의 공개 매뉴얼 조회
 - 6개 카테고리와 9개 핵심 매뉴얼 Seed (PDF 가이드 구조에 맞춰 정리)
-- 별도 FAQ 화면(`/faq`)에서 자주 묻는 질문 18개를 Accordion으로 확인하며, 인증된 모든 역할이 조회 가능
+- 매뉴얼 상세 페이지(`/manuals/{slug}`)에서 본문 전문과 이미지 확인
+- 별도 FAQ 화면(`/faq`)에서 자주 묻는 질문 21개를 Accordion으로 확인하며, 인증된 모든 역할이 조회 가능
+
+### AX 직원 도우미
+
+우측 하단 플로팅 버튼에서 열리는 사내 도우미입니다. **등록된 매뉴얼·FAQ에서 질문에 맞는 문서를 찾아 원문을 보여주며, LLM을 호출하지 않습니다.** 문서에 없는 내용은 추측하지 않고 "찾지 못했다"고 답합니다.
+
+- 응답 5종: 확정 답변 / 후보 제시(접전 시) / 근거 없음 / 정책 고정 응답 / v1 범위 밖 안내
+- 매칭: 글자 1+2gram + IDF 가중 포함률 + 카테고리 부스트 (`app/domain/ax_search.py`)
+- 역할별 매뉴얼 공개 범위(`target_roles`)를 검색 후보 단계에서 필터링
+- 답변 카드에서 근거 매뉴얼을 새 탭으로 열거나 관련 업무 화면으로 이동
+- 패널·버튼을 끌어 옮길 수 있고 위치는 브라우저에 저장 (대화 내용은 저장하지 않음)
+- 질문 로그는 익명으로 남기며, 상위 후보 3개를 함께 기록해 매칭 실패 원인을 분석
+- 기획·측정 근거: [`docs/AX_FAQ_CHATBOT_PLAN.md`](docs/AX_FAQ_CHATBOT_PLAN.md)
 
 ## 기술 구성
 
@@ -201,6 +214,17 @@ npm run test:e2e
 ```
 
 Playwright E2E는 로그인·세션 유지·로그아웃·권한 범위·직원 필터·전자결재 승인·비밀번호 변경을 검증합니다.
+
+### AX 도우미 손으로 시험하기
+
+자동화 테스트가 정해둔 질문만 확인한다면, 아래 도구는 생각나는 대로 질문을 던져볼 수 있습니다. API와 같은 서비스 로직을 타며 실제 DB의 매뉴얼·FAQ를 사용합니다. 시험 질문은 로그에 남지 않습니다.
+
+```powershell
+cd backend
+.\.venv\Scripts\python.exe -m app.scripts.try_ax_chat                 # 대화형
+.\.venv\Scripts\python.exe -m app.scripts.try_ax_chat "반차 어떻게 써요?"
+.\.venv\Scripts\python.exe -m app.scripts.try_ax_chat --role SUPER_ADMIN
+```
 
 ## 프로젝트 구조
 
