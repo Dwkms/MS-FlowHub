@@ -1,3 +1,4 @@
+from functools import lru_cache
 from typing import Annotated
 
 from fastapi import Depends, Header, HTTPException
@@ -5,8 +6,10 @@ from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
 from app.db.session import check_database_connection, get_db_session
+from app.domain.ai_provider import CLAUDE, MOCK, AIProvider, MockAIProvider
 from app.domain.ax_search import KeywordSearcher
 from app.models.organization import Employee
+from app.repositories.ai_generation_repository import AiGenerationRepository
 from app.repositories.approval_repository import ApprovalRepository
 from app.repositories.auth_repository import AuthRepository
 from app.repositories.ax_repository import AxRepository
@@ -23,6 +26,7 @@ from app.security.permissions import (
     require_roles,
 )
 from app.security.supabase_auth import get_supabase_auth_user_id
+from app.services.ai_generation_service import AIGenerationService
 from app.services.approval_service import ApprovalService
 from app.services.auth_service import AuthService
 from app.services.ax_service import AxService
@@ -134,6 +138,52 @@ def get_manual_service(session: DatabaseSession) -> ManualService:
 def get_ax_service(session: DatabaseSession) -> AxService:
     # v1은 키워드 검색기 하나뿐이다. v2에서 임베딩 검색기로 바꿀 때 이 한 줄만 바뀐다.
     return AxService(session=session, repository=AxRepository(session), searcher=KeywordSearcher())
+
+
+@lru_cache(maxsize=1)
+def _create_ai_provider(
+    provider_name: str,
+    api_key: str | None,
+    model: str | None,
+    max_tokens: int,
+    timeout: float,
+) -> AIProvider:
+    """Provider 생성 지점을 한 곳에 모은다. HTTP 커넥션 풀 재사용을 위해 캐시한다.
+
+    API 키가 없을 때 실제 Provider를 조용히 Mock으로 대체하지 않는다. "AI를 붙인 줄
+    알았는데 샘플 응답이었다"가 더 나쁜 실패다. 기본값 누락은 Mock, 명시적 오설정은 오류다.
+    """
+    if provider_name == MOCK:
+        return MockAIProvider()
+    if provider_name != CLAUDE:
+        raise RuntimeError(f"지원하지 않는 AI_PROVIDER 설정입니다: {provider_name}")
+    if not api_key:
+        raise RuntimeError("AI_PROVIDER가 지정되었으나 AI_API_KEY가 설정되지 않았습니다.")
+
+    # anthropic SDK는 실제 Provider가 필요할 때만 import한다. Mock 경로는 SDK 없이 돈다.
+    from app.domain.claude_provider import ClaudeProvider
+
+    return ClaudeProvider(api_key=api_key, model=model, timeout=timeout, max_tokens=max_tokens)
+
+
+def get_ai_provider() -> AIProvider:
+    settings = get_settings()
+    return _create_ai_provider(
+        (settings.ai_provider or MOCK).strip().lower(),
+        settings.ai_api_key,
+        settings.ai_model,
+        settings.ai_max_tokens,
+        settings.ai_timeout_seconds,
+    )
+
+
+def get_ai_generation_service(session: DatabaseSession) -> AIGenerationService:
+    return AIGenerationService(
+        session=session,
+        repository=AiGenerationRepository(session),
+        provider=get_ai_provider(),
+        settings=get_settings(),
+    )
 
 
 def _build_recruitment_service(session: Session) -> RecruitmentService:
