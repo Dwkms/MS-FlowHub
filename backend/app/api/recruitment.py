@@ -10,6 +10,7 @@ from app.schemas.recruitment import (
     ApplicantStageUpdate,
     ApplicantUpdate,
     JobPostingResponse,
+    JobPostingUpdate,
     RecruitmentRequestCreate,
     RecruitmentRequestResponse,
     RecruitmentSubmit,
@@ -98,6 +99,17 @@ def create_job_posting(
     request_id: str, service: RecruitmentServiceDependency, actor: AuthenticatedActor
 ) -> JobPostingResponse:
     return service.create_posting(request_id, actor)
+
+
+@router.patch("/job-postings/{posting_id}", response_model=JobPostingResponse)
+def update_job_posting(
+    posting_id: str,
+    payload: JobPostingUpdate,
+    service: RecruitmentServiceDependency,
+    actor: AuthenticatedActor,
+) -> JobPostingResponse:
+    """채용공고 제목·본문을 수정합니다. 게시 상태(`status`)는 변경할 수 없습니다."""
+    return service.update_posting(posting_id, payload, actor)
 
 
 @router.get("/job-postings", response_model=list[JobPostingResponse])

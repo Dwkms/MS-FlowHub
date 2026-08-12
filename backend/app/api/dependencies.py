@@ -156,7 +156,11 @@ def _create_ai_provider(
     if provider_name == MOCK:
         return MockAIProvider()
     if provider_name != CLAUDE:
-        raise RuntimeError(f"지원하지 않는 AI_PROVIDER 설정입니다: {provider_name}")
+        # 설정값을 메시지에 넣지 않는다. API 키를 AI_PROVIDER 칸에 잘못 붙여넣는 실수가
+        # 실제로 일어나며, 그때 값을 echo하면 키가 로그와 오류 화면에 그대로 남는다.
+        raise RuntimeError(
+            f"지원하지 않는 AI_PROVIDER 설정입니다. '{MOCK}' 또는 '{CLAUDE}'만 사용할 수 있습니다."
+        )
     if not api_key:
         raise RuntimeError("AI_PROVIDER가 지정되었으나 AI_API_KEY가 설정되지 않았습니다.")
 
@@ -177,11 +181,18 @@ def get_ai_provider() -> AIProvider:
     )
 
 
-def get_ai_generation_service(session: DatabaseSession) -> AIGenerationService:
+def get_ai_generation_service(
+    session: DatabaseSession,
+    # Provider를 FastAPI 의존성으로 받는다. 테스트가 이 지점을 override해 Mock을 강제하고,
+    # 그래야 개발자 로컬 `.env`에 실제 키가 있어도 테스트가 네트워크를 타지 않는다.
+    provider: Annotated[AIProvider, Depends(get_ai_provider)],
+) -> AIGenerationService:
     return AIGenerationService(
         session=session,
         repository=AiGenerationRepository(session),
-        provider=get_ai_provider(),
+        organization_repository=OrganizationRepository(session),
+        recruitment_repository=RecruitmentRepository(session),
+        provider=provider,
         settings=get_settings(),
     )
 

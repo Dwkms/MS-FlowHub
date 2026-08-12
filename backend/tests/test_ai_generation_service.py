@@ -14,6 +14,8 @@ from app.domain.ai_provider import APPROVAL_DRAFT, AIProviderResult
 from app.models.ai_generation import AiGeneration
 from app.models.approval import ApprovalDocument
 from app.repositories.ai_generation_repository import AiGenerationRepository
+from app.repositories.organization_repository import OrganizationRepository
+from app.repositories.recruitment_repository import RecruitmentRepository
 from app.schemas.ai import ApprovalDraftOutput
 from app.services.ai_generation_service import AIGenerationService
 
@@ -68,6 +70,8 @@ def _service(
     return AIGenerationService(
         session=session,
         repository=AiGenerationRepository(session),
+        organization_repository=OrganizationRepository(session),
+        recruitment_repository=RecruitmentRepository(session),
         provider=provider,
         settings=Settings(ai_daily_limit_per_user=per_user, ai_daily_limit_global=global_limit),
     )

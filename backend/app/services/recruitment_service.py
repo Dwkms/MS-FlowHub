@@ -22,6 +22,7 @@ from app.schemas.recruitment import (
     ApplicantStageUpdate,
     ApplicantUpdate,
     JobPostingResponse,
+    JobPostingUpdate,
     RecruitmentRequestCreate,
     RecruitmentRequestResponse,
     RecruitmentSubmit,
@@ -268,6 +269,30 @@ class RecruitmentService:
         self._require_status(request, "APPROVED", "승인된 채용 요청만 채용공고로 만들 수 있습니다.")
         posting = self._create_posting(request)
         request.status = "POSTING_CREATED"
+        self.session.commit()
+        self.session.refresh(posting)
+        return self.recruitment.to_posting_response(posting)
+
+    def update_posting(
+        self, posting_id: str, payload: JobPostingUpdate, actor: ActorContext
+    ) -> JobPostingResponse:
+        """공고 제목·본문을 수정한다.
+
+        승인 시 자동 생성된 공고를 이후에 손볼 방법이 없었다. AI 초안을 공고에 반영하려면
+        수정 경로가 필요해서 신설했지만, AI 전용이 아니라 원래 비어 있던 기능이다.
+
+        `status`는 받지 않는다. 공고 게시 여부는 사람이 판단할 사항이고, 이 경로가
+        AI 흐름에서도 호출되기 때문이다.
+        """
+        if actor.role not in _FULL_ACCESS_ROLES:
+            raise HTTPException(
+                status_code=403, detail="인사 담당자 또는 관리자만 채용공고를 수정할 수 있습니다."
+            )
+        posting = self._get_posting(posting_id)
+        if payload.title is not None:
+            posting.title = payload.title
+        if payload.content is not None:
+            posting.content = payload.content
         self.session.commit()
         self.session.refresh(posting)
         return self.recruitment.to_posting_response(posting)

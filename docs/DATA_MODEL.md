@@ -18,15 +18,16 @@
 10. [채용 요청·채용공고](#10-채용-요청채용공고)
 11. [ATS 지원자 관리](#11-ats-지원자-관리)
 12. [직원 매뉴얼](#12-직원-매뉴얼)
-13. [공통 데이터 규칙](#13-공통-데이터-규칙)
-14. [향후 확장 계획](#14-향후-확장-계획)
-15. [Migration 정보](#15-migration-정보)
+13. [생성형 AI 기록](#13-생성형-ai-기록)
+14. [공통 데이터 규칙](#14-공통-데이터-규칙)
+15. [향후 확장 계획](#15-향후-확장-계획)
+16. [Migration 정보](#16-migration-정보)
 
 ## 3. 현재 데이터베이스 요약
 
 - 운영 DB는 **Supabase PostgreSQL 전용**입니다. SQLite 등 다른 런타임 DB는 사용하지 않습니다.
-- 현재 Alembic head는 `20260807_0016_manual_faqs.py`이며, 총 16개 migration이 적용되어 있습니다.
-- 스키마는 `public` 한 곳에 총 **17개 테이블**(`alembic_version` 포함)로 구성됩니다.
+- 현재 Alembic head는 `20260812_0022_ai_generations.py`이며, 총 22개 migration이 적용되어 있습니다.
+- 스키마는 `public` 한 곳에 총 **19개 테이블**(`alembic_version` 포함)로 구성됩니다.
 - 프론트엔드는 Supabase 업무 테이블에 직접 접근하지 않고, 항상 FastAPI 백엔드를 거칩니다.
 - DB 레벨 `CHECK` 제약이 걸린 상태값은 `approval_documents.status`, `recruitment_requests.status`, `applicants.stage` 3곳뿐이며, 그 외 상태값(근태 상태, 직원 재직 상태, 매뉴얼 상태 등)은 애플리케이션 레이어(Pydantic `Literal`, `app/domain/employee_status.py`)에서 검증합니다.
 
@@ -40,6 +41,8 @@
 | 채용 요청·채용공고 | 3 | `recruitment_requests`, `job_postings`, `notifications` | 구현됨 |
 | ATS 지원자 관리 | 2 | `applicants`, `applicant_stage_histories` | 구현됨 |
 | 직원 매뉴얼 | 4 | `manual_categories`, `manuals`, `manual_assets`, `manual_faqs` | 구현됨 |
+| AX 직원 도우미 | 1 | `ax_chat_logs` | 구현됨 |
+| 생성형 AI | 1 | `ai_generations` | 구현됨 |
 | 마이그레이션 관리 | 1 | `alembic_version` | Alembic 내부 관리 |
 
 ## 5. 전체 테이블 목록
@@ -63,6 +66,8 @@
 | `manuals` | 직원 매뉴얼 | 매뉴얼 본문 | `category_id` → `manual_categories.id`, `created_by`/`updated_by` → `employees.id` |
 | `manual_assets` | 직원 매뉴얼 | 매뉴얼 이미지·PDF 자산 | `manual_id` → `manuals.id` |
 | `manual_faqs` | 직원 매뉴얼 | 자주 묻는 질문과 답변 | `related_manual_id` → `manuals.id` (선택) |
+| `ax_chat_logs` | AX 직원 도우미 | 질문·매칭 결과 로그(익명, 질문자 식별자 없음) | - |
+| `ai_generations` | 생성형 AI | AI 초안 생성 1건의 입력·결과·토큰 수 기록 | `created_by_id` → `employees.id` |
 | `alembic_version` | 마이그레이션 관리 | Alembic 현재 head 기록 | - |
 
 ## 6. 핵심 관계도
@@ -285,7 +290,40 @@ erDiagram
 - 매뉴얼 삭제 시 연결된 `manual_assets`가 함께 삭제됩니다(`cascade="all, delete-orphan"`).
 - 초안(`DRAFT`)은 `SUPER_ADMIN`, `HR_ADMIN`에게만 노출되고, 공개 매뉴얼(`PUBLISHED`)은 모든 인증된 직원이 조회할 수 있습니다.
 
-## 13. 공통 데이터 규칙
+## 13. 생성형 AI 기록
+
+### `ai_generations`
+
+AI 초안 생성 1건을 남깁니다. **업무 테이블이 아닙니다.** 이 테이블에 행이 생겨도 전자결재·채용 상태는 변하지 않습니다.
+
+| 컬럼 | 타입 | 설명 |
+|---|---|---|
+| `id` | String(50) PK | `ai-gen-{uuid4hex}` |
+| `feature_type` | String(40) | `APPROVAL_DRAFT` / `JOB_POSTING_DRAFT` |
+| `related_type`, `related_id` | String nullable | 업무 대상 연결(초안 단계에서는 비어 있을 수 있음) |
+| `source_input` | JSON | 호출 시점의 AI Context 스냅샷 |
+| `generated_output` | JSON nullable | **AI 최초 결과.** 재실행·수정 시 덮어쓰지 않음 |
+| `final_output` | JSON nullable | 사용자가 수정해 실제로 적용한 최종본 |
+| `provider`, `model_name` | String | `mock` 또는 실제 Provider와 모델명 |
+| `success`, `error_message` | Boolean, Text | 실패도 기록. 스키마 위반은 실패로 처리 |
+| `input_tokens`, `output_tokens` | Integer nullable | 비용 추적용 |
+| `created_by_id` | FK `employees.id` | |
+| `created_at` | timestamptz | |
+
+**인덱스**
+- `ix_ai_generations_feature_created` (`feature_type`, `created_at`)
+- `ix_ai_generations_related` (`related_type`, `related_id`)
+- `ix_ai_generations_creator_created` (`created_by_id`, `created_at`) — 일일 호출 제한 조회용
+
+**설계 의도**
+- `generated_output`과 `final_output`을 나눈 이유는 "AI가 무엇을 냈고 사람이 무엇을 고쳤는지"를 잃지 않기 위해서입니다. 재실행은 기존 행을 덮어쓰지 않고 새 행을 만듭니다.
+- 토큰 수를 저장해 Console을 열지 않고도 쿼리 하나로 실지출을 계산합니다. 이상 급증을 조기에 발견하는 수단이기도 합니다.
+- `created_by_id`와 `created_at`으로 최근 24시간 호출 수를 세어 일일 한도(사용자당·전역)를 강제합니다. 별도 테이블이 필요 없습니다.
+- 개인정보는 `source_input`에 담지 않습니다. Context Builder가 이름·직급·부서·팀만 통과시키고 이메일·사번·근태 사유는 제외합니다.
+
+상세 설계는 [`AI_AUTOMATION_PLAN.md`](AI_AUTOMATION_PLAN.md)를 참고합니다.
+
+## 14. 공통 데이터 규칙
 
 - 모든 시각 컬럼은 PostgreSQL timezone-aware `timestamptz`를 사용하며 UTC로 저장하고 화면에서 지역 시간으로 표시합니다.
 - 대부분의 PK는 UUID 문자열이며, 업무 테이블은 `created_at`, `updated_at`을 기본으로 둡니다.
@@ -293,7 +331,7 @@ erDiagram
 - 상태값은 소수(`approval_documents.status`, `recruitment_requests.status`, `applicants.stage`)만 DB `CHECK` 제약으로 강제하고, 나머지는 Pydantic `Literal`과 `app/domain/` 정책 모듈에서 검증합니다.
 - 실제 운영 DB는 Supabase PostgreSQL 하나이며, 별도 fallback DB는 사용하지 않습니다.
 
-## 14. 향후 확장 계획
+## 15. 향후 확장 계획
 
 - **이력서 파일 첨부, 외부 공개 지원 페이지, 이메일 발송, 면접 일정 관리**: ATS 지원자 관리 MVP 범위에서 의도적으로 제외했습니다.
 - **AI 자동 평가/생성 이력**: 채용·매뉴얼 등에서 AI 결과를 저장하는 공통 테이블은 아직 만들지 않았습니다. 도입 시 업무별로 나누기보다 공통 테이블 하나로 시작하는 방향을 검토합니다.
@@ -302,9 +340,9 @@ erDiagram
 
 과거에 검토했던 더 상세한 초안(테이블 컬럼 후보, 관계 설계 근거 등)은 [`docs/archive/DATA_MODEL_LEGACY.md`](./archive/DATA_MODEL_LEGACY.md)에 보존되어 있습니다.
 
-## 15. Migration 정보
+## 16. Migration 정보
 
-- 현재 Alembic head: `20260807_0016_manual_faqs.py`
+- 현재 Alembic head: `20260812_0022_ai_generations.py`
 - Migration 파일 위치: `backend/migrations/versions/`
 - Migration별 작업 배경과 진행 기록은 이 문서가 아니라 [`UPDATELOG.md`](../UPDATELOG.md)를 기준으로 확인합니다.
 - 적용 명령: `cd backend && .\.venv\Scripts\alembic.exe upgrade head` (자세한 절차는 [`README.md`](../README.md#데이터베이스와-seed) 참고)
