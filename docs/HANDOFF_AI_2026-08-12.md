@@ -23,6 +23,62 @@
 
 사용자 결정 전에는 Render 설정을 임의로 변경하지 않습니다.
 
+#### 이 게이트가 보증하는 범위
+
+통과 기준은 [`ci.yml`](../.github/workflows/ci.yml)의 두 잡뿐입니다 — Backend는 Ruff check·format·pytest,
+Frontend는 lint·typecheck·`next build`. `push: [master]`에 path 필터가 없어 모든 master 커밋에서
+실행되므로, "체크가 올라오지 않아 배포가 영구 대기"하는 상태는 생기지 않습니다.
+
+[`e2e.yml`](../.github/workflows/e2e.yml)은 `workflow_dispatch` 전용이라 **게이트에 포함되지 않습니다.**
+따라서 이 게이트는 "명백한 파손이 배포되지 않는다"까지만 보증하고, 실제 Supabase에 붙는 동작은
+보증하지 않습니다. 완전한 배포 보호가 아니라 1차 안전장치입니다.
+
+#### 실패 모드가 바뀝니다
+
+전환 후 위험은 "잘못된 코드가 배포됨"에서 **"배포가 조용히 일어나지 않음"** 으로 이동합니다.
+알아둘 두 가지입니다.
+
+- **push는 한 번만.** `ci.yml`의 `concurrency`가 `cancel-in-progress: true`이므로 master에 연달아
+  push하면 앞 커밋 CI가 **취소**되고, 취소는 성공이 아니라서 그 커밋은 배포되지 않습니다. 최신
+  커밋만 배포되니 결과는 맞지만, 검증 중에 이걸 모르면 게이트 고장으로 오판합니다.
+- **정상과 지연을 구분하는 기준**: CI 약 3~5분 → 커밋의 checks 전부 성공 → Render 배포가 1~2분 내
+  시작. checks가 전부 성공인데 **10분을 넘겨 배포가 없으면** 그때가 이상 신호입니다. GitHub 커밋의
+  checks와 Render Events 탭을 함께 봅니다.
+
+#### `[skip render]` 마커와의 관계
+
+커밋 메시지에 `[skip render]`를 넣으면 **게이트와 무관하게 그 커밋의 배포가 건너뛰어집니다.**
+`e389eec`("docs: refresh feature freeze handoff [skip render]")에서 실제로 쓴 마커이고, 저장소
+문서에는 아직 기록이 없었습니다.
+
+게이트 전환과 상충하지 않습니다. 목적이 다릅니다.
+
+| 수단 | 성격 | 의미 |
+|---|---|---|
+| `After CI Checks Pass` | 상시 게이트 | 검증되지 않은 커밋은 배포하지 않는다 |
+| `[skip render]` | 커밋별 선택 | 이 커밋은 배포할 필요가 없다 (문서 변경 등) |
+
+**단, 게이트 검증용 커밋에는 절대 붙이면 안 됩니다.** 붙이면 배포가 시작되지 않는데, 그것이
+게이트 차단인지 마커 때문인지 구분할 수 없어 검증 자체가 무의미해집니다.
+
+#### 이상 시 복구 순서
+
+`On Commit` 복구는 1차 조치가 **아닙니다.**
+
+1. Render **Manual Deploy** — 게이트를 유지한 채 해당 커밋만 내보내 배포를 정상화
+2. 원인 확인 (CI 실패인지, 체크 미보고인지, Render 쪽 대기인지)
+3. 재현되면 그때 두 서비스를 `On Commit`으로 복구
+
+`On Commit`으로 되돌려도 **이미 push된 커밋이 소급 배포되지는 않습니다.** 어느 경로든 Manual
+Deploy가 필요하므로, 일시적 문제 때문에 보호장치를 먼저 버릴 이유가 없습니다.
+
+#### 검증하지 않고 남기는 것
+
+프리즈 중 master에 의도적으로 깨진 커밋을 올리지 않기로 했으므로, **"CI 실패 → 배포 차단"은
+실증하지 않습니다.** 아래 체크리스트로 확인되는 것은 정상 경로(CI 성공 → 배포)뿐이고, 차단
+동작은 Render의 문서화된 동작을 **신뢰하는** 것입니다. 실증이 필요하면 프리즈 이후 폐기용
+브랜치·서비스에서 합니다.
+
 ### 2) Feature Freeze 유지
 
 현재 판정은 `P0 0건 · P1 0건`, `FEATURE FREEZE READY: YES`,
@@ -158,16 +214,17 @@ FROM ai_generations WHERE created_at >= now() - interval '30 days';
 
 ## 알아둘 상태
 
-- `docs/JIRA_UPDATE_2026-08-08.md`가 **미커밋으로 남아 있습니다.** 표 구분선 자동정렬만 바뀐 것이고 내용 변경은 0입니다. AI 작업과 무관해 계속 제외했습니다.
+- `docs/JIRA_UPDATE_2026-08-08.md`가 **미커밋으로 남아 있습니다.** 표 구분선 자동정렬만 바뀐 것이고 내용 변경은 0입니다. AI 작업과 무관해 계속 제외했습니다. **이 파일은 더미 파일로 삭제할 예정이므로 커밋하지 않습니다**(2026-08-13 사용자 확정). 배포 게이트 검증용 커밋으로도 쓰지 않습니다.
 - 모델 기본값은 `claude-opus-5`. `AI_MODEL` 환경변수로 교체 가능합니다. 더 싼 후보(GPT-5.6 Terra/Luna)는 언어·지시 벤치마크 데이터가 없어 한국어 품질이 미검증이라 선택하지 않았습니다.
 - **Playwright E2E는 추가하지 않기로 했습니다.** 프론트에 단위 테스트 프레임워크가 없고, E2E는 실제 Supabase에 접속합니다.
 
 ## 남은 로드맵
 
 ```
-Prompt 0~4 구현 완료
-Prompt 5   Feature Freeze 판정 완료 (P0 0건 · P1 0건)
-다음 결정  Render Auto-Deploy: On Commit → After CI Checks Pass
+Prompt 0~4   구현 완료
+Prompt 5     Feature Freeze 판정 완료 (P0 0건 · P1 0건)
+다음 결정    Render Auto-Deploy: On Commit → After CI Checks Pass  (1차 안전장치)
+프리즈 이후  GitHub branch protection: master 직접 push 금지 + PR 필수 CI  (상위 보호)
 ```
 
 초기 SVG 템플릿 계획 대신 OpenAI `gpt-image-2`로 포스터 2안을 만들고 사용자가 비교·선택·확대·다운로드하는 방식으로 구현했습니다. 생성 결과는 현재 페이지 메모리에만 유지되며 공고 첨부에는 자동 반영하지 않습니다.
@@ -326,22 +383,41 @@ NEXT_PUBLIC_SESSION_TIMEOUT_MINUTES=2로 프론트 재시작
 
 ```
 branch          master
-검증 기준        b84b8fb
-원격 상태        이 인계 문서 최신화 커밋까지 origin/master에 push
+코드 검증 기준   b84b8fb        (이후 커밋은 모두 문서 변경만)
+원격 상태        origin/master = e389eec  [skip render]로 배포 건너뜀
+미푸시           1건 — 이 문서의 배포 게이트 절차 추가
+                 Render 설정 전환 후 게이트 검증용으로 push할 커밋
 기능 변경        모두 커밋·푸시 완료
 ```
 
 작업 폴더에는 의도적으로 제외한 아래 두 변경만 남아 있습니다.
 
 - `frontend/next-env.d.ts` — dev/build가 번갈아 바꾸는 생성 파일이므로 커밋 제외
-- `docs/JIRA_UPDATE_2026-08-08.md` — 표 자동정렬만 바뀐 보류 문서이므로 커밋 제외
+- `docs/JIRA_UPDATE_2026-08-08.md` — 표 자동정렬만 바뀐 보류 문서이고 **더미 파일로 삭제 예정**이므로 커밋 제외
 
 실제 `.env`와 OpenAI API Key는 커밋되지 않았습니다. E2E 전용 계정 두 개만 생성했으며 기존 관리자 계정은 변경하지 않았습니다.
 
 ## 다음 작업 체크리스트
 
-1. 사용자 승인 시 Render Backend·Frontend의 Auto-Deploy를 각각 `After CI Checks Pass`로 변경
-2. 빈 문서 커밋 또는 안전한 문서 수정 커밋으로 `push → CI 성공 → Render 배포 시작` 순서 확인
-3. 배포 후 Backend `/health`, Frontend `/login`, Frontend API 프록시, CORS 재확인
-4. DB migration이 추가되는 후속 작업에서는 배포 전에 운영 DB에 `alembic upgrade head` 적용
-5. 프리즈 중 발견되는 P0/P1만 수정하고 P2/P3 개선 요청은 Jira 백로그로 이동
+Render 배포 게이트 전환 절차입니다. 배경과 판단 근거는 위 "1) Render 배포 게이트 방식 결정"을 보세요.
+
+1. 전환 전 **현재 Render 설정값을 캡처하거나 기록** (Backend·Frontend 각각. 복구 기준점)
+2. Backend Auto-Deploy를 `After CI Checks Pass`로 변경
+3. Frontend도 동일하게 변경 — **두 서비스를 모두 바꾼 뒤에** 4번으로 갑니다. 한쪽만 바꾸고
+   push하면 검증이 성립하지 않고, 스키마·API 불일치가 오히려 더 잘 생깁니다
+4. 안전한 커밋을 **한 번만** push. migration도 코드 변경도 없는 것으로 고르고, 커밋 메시지에
+   **`[skip render]`를 넣지 않습니다** (붙이면 배포가 건너뛰어져 검증이 성립하지 않음)
+5. GitHub Actions CI가 **먼저** 성공하는지 확인
+6. 그 **후에야** Backend·Frontend 배포가 시작되는지 확인 (green 후 1~2분 내 시작, 10분 초과 시 이상)
+7. 배포 후 Backend `/health`, Frontend `/login`, Frontend API 프록시, CORS 재확인
+8. 이상 시 Manual Deploy → 원인 확인 → 재현되면 `On Commit` 복구 (위 "이상 시 복구 순서")
+9. DB migration이 추가되는 후속 작업에서는 배포 전에 운영 DB에 `alembic upgrade head` 적용
+10. 프리즈 중 발견되는 P0/P1만 수정하고 P2/P3 개선 요청은 Jira 백로그로 이동
+
+## 프리즈 이후 (지금 하지 않음)
+
+- **master 직접 push 금지 + PR 필수 CI (GitHub branch protection)** — Render 게이트는 하류 방어이고,
+  잘못된 커밋이 애초에 master에 들어오지 않게 막는 상위 보호 장치입니다. 커밋 이력상 PR 머지(#3~#7)를
+  쓰고 있으므로 남은 구멍은 직접 push 경로입니다.
+  **프리즈 중에는 켜지 않습니다.** P0 핫픽스도 PR을 거쳐야 해 대응이 느려지고, 그 트레이드오프는
+  프리즈가 풀린 뒤 판단할 문제입니다.
