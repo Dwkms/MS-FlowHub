@@ -24,6 +24,15 @@ import { RecruitmentPosterAttachment } from "@/features/recruitment/recruitment-
 import type { ApprovalDocument } from "@/types/approval";
 import type { RecruitmentRequest } from "@/types/recruitment";
 
+function splitRecruitmentDocumentContent(content: string) {
+  const sections = content.split(/\r?\n\r?\n/).map((block) => {
+    const [title, ...bodyLines] = block.split(/\r?\n/);
+    return { body: bodyLines.join("\n").trim(), title: title.trim() };
+  });
+
+  return sections.every((section) => section.title && section.body) ? sections : [];
+}
+
 export function ApprovalDetail() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
@@ -157,6 +166,9 @@ export function ApprovalDetail() {
   const canDelete = isAdmin;
   const isCompleted =
     document.status === "APPROVED" || document.status === "REJECTED";
+  const recruitmentDocumentSections = document.related_type === "RECRUITMENT_REQUEST"
+    ? splitRecruitmentDocumentContent(document.content)
+    : [];
 
   return (
     <section className="content approval-page">
@@ -230,8 +242,14 @@ export function ApprovalDetail() {
             </dl>
 
             <div className="document-content">
-              <span>문서 내용</span>
-              <p>{document.content}</p>
+              {recruitmentDocumentSections.length > 0
+                ? recruitmentDocumentSections.map((section) => (
+                    <section className="document-content-section" key={section.title}>
+                      <h3>{section.title}</h3>
+                      <p>{section.body}</p>
+                    </section>
+                  ))
+                : <><span>문서 내용</span><p>{document.content}</p></>}
             </div>
 
             {relatedRecruitmentRequest && (

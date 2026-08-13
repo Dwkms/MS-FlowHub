@@ -12,6 +12,10 @@ export function getSupabaseBrowserClient(): SupabaseClient {
     );
   }
 
-  browserClient ??= createClient(url, publishableKey);
+  // 세션 저장과 토큰 갱신은 그대로 둔다. 이걸 끄면 새로고침만 해도 로그아웃돼 업무가 끊긴다.
+  // "다음날도 로그인 상태" 문제는 features/auth/session-timeout.ts의 자리 비움 측정으로 막는다.
+  browserClient ??= createClient(url, publishableKey, {
+    auth: { persistSession: true, autoRefreshToken: true },
+  });
   return browserClient;
 }

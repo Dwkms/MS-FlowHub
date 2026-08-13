@@ -13,6 +13,7 @@ from app.core.config import Settings
 from app.domain.ai_provider import APPROVAL_DRAFT, AIProviderResult
 from app.models.ai_generation import AiGeneration
 from app.models.approval import ApprovalDocument
+from app.models.auth import EmployeeAccount
 from app.repositories.ai_generation_repository import AiGenerationRepository
 from app.repositories.organization_repository import OrganizationRepository
 from app.repositories.recruitment_repository import RecruitmentRepository
@@ -22,6 +23,7 @@ from app.services.ai_generation_service import AIGenerationService
 
 ACTOR = ActorContext(employee_id="emp-head", role="EMPLOYEE", auth_user_id="auth-emp-head")
 SUPER_ADMIN = ActorContext(employee_id="emp-head", role="SUPER_ADMIN", auth_user_id="auth-emp-head")
+OTHER_ACTOR = ActorContext(employee_id="emp-sales", role="EMPLOYEE", auth_user_id="auth-emp-sales")
 CONTEXT = {"department_name": "개발팀", "purpose": "노트북 교체", "main_content": "3대 교체 필요"}
 
 VALID_PAYLOAD = json.dumps(
@@ -201,19 +203,40 @@ def test_super_admin_is_exempt_from_per_user_limit(session: Session):
     assert provider.calls == 3
 
 
-def test_super_admin_still_blocked_by_global_limit(session: Session):
-    """전역 한도가 실제 비용 상한이다. 여기까지 면제하면 한도를 둔 의미가 사라진다."""
+def test_super_admin_is_exempt_from_global_limit(session: Session):
+    """최고 관리자는 검수용 반복 생성 중 전역 한도에도 막히지 않는다."""
     provider = _success_provider()
     service = _service(session, provider, per_user=99, global_limit=2)
 
     _generate(service, SUPER_ADMIN)
     _generate(service, SUPER_ADMIN)
-    with pytest.raises(HTTPException) as error:
-        _generate(service, SUPER_ADMIN)
+    _generate(service, SUPER_ADMIN)
 
-    assert error.value.status_code == 429
-    assert "전체" in error.value.detail
-    assert provider.calls == 2
+    assert provider.calls == 3
+
+
+def test_super_admin_calls_do_not_consume_normal_global_limit(session: Session):
+    """관리자 검수 호출 때문에 일반 직원의 전역 생성 가능 횟수가 줄면 안 된다."""
+    session.add(
+        EmployeeAccount(
+            id="account-limit-super-admin",
+            auth_user_id="auth-limit-super-admin",
+            employee_id=SUPER_ADMIN.employee_id,
+            role="SUPER_ADMIN",
+        )
+    )
+    session.commit()
+    provider = _success_provider()
+    service = _service(session, provider, per_user=99, global_limit=2)
+
+    for _ in range(3):
+        _generate(service, SUPER_ADMIN)
+    _generate(service, OTHER_ACTOR)
+    _generate(service, OTHER_ACTOR)
+    with pytest.raises(HTTPException):
+        _generate(service, OTHER_ACTOR)
+
+    assert provider.calls == 5
 
 
 def test_limit_message_states_actual_limit(session: Session):

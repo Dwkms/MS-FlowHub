@@ -1,3 +1,10 @@
+import type {
+  ApplyMethod,
+  EducationLevel,
+  EmploymentType,
+  ExperienceLevel,
+} from "@/features/recruitment/recruitment-options";
+
 export type RecruitmentStatus =
   | "DRAFT"
   | "PENDING_APPROVAL"
@@ -17,6 +24,14 @@ export interface RecruitmentRequest {
   headcount: number;
   employment_type: string;
   experience_level: string;
+  experience_years_min: number | null;
+  /** 서버가 조립한 표기("경력 3년 이상"). 코드값 해석을 화면마다 반복하지 않는다. */
+  experience_label: string;
+  education_level: string | null;
+  work_location: string | null;
+  salary: string | null;
+  application_deadline: string | null;
+  apply_method: string | null;
   reason: string;
   responsibilities: string;
   required_skills: string | null;
@@ -37,8 +52,14 @@ export interface RecruitmentRequestInput {
   approver_id: string;
   position_title: string;
   headcount: number;
-  employment_type: string;
-  experience_level: string;
+  employment_type: EmploymentType;
+  experience_level: ExperienceLevel;
+  experience_years_min?: number | null;
+  education_level?: EducationLevel | null;
+  work_location?: string | null;
+  salary?: string | null;
+  application_deadline?: string | null;
+  apply_method?: ApplyMethod | null;
   reason: string;
   responsibilities: string;
   required_skills?: string | null;
@@ -56,6 +77,12 @@ export interface JobPosting {
   headcount: number;
   employment_type: string;
   experience_level: string;
+  experience_label: string;
+  education_level: string | null;
+  work_location: string | null;
+  salary: string | null;
+  application_deadline: string | null;
+  apply_method: string | null;
   responsibilities: string;
   required_skills: string | null;
   preferred_skills: string | null;

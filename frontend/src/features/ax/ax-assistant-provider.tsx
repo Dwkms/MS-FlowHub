@@ -13,7 +13,6 @@ export interface Turn {
 
 interface Positions {
   panel: Position | null;
-  launcher: Position | null;
 }
 
 interface AxAssistantContextValue {
@@ -50,7 +49,7 @@ export function AxAssistantProvider({ children }: { children: ReactNode }) {
 
   const readPositions = useCallback((): Positions => {
     if (positionsRef.current) return positionsRef.current;
-    let loaded: Positions = { panel: null, launcher: null };
+    let loaded: Positions = { panel: null };
     try {
       const saved = window.localStorage.getItem(STORAGE_KEY);
       if (saved) loaded = { ...loaded, ...(JSON.parse(saved) as Positions) };

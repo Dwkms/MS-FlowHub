@@ -34,7 +34,6 @@ export function AxAssistant() {
   const [compact, setCompact] = useState(false);
   const logRef = useRef<HTMLDivElement>(null);
   const panelRef = useRef<HTMLElement>(null);
-  const launcherRef = useRef<HTMLButtonElement>(null);
 
   // 좁은 화면에서는 전체화면 시트라 옮길 필요도, 옮겨서도 안 된다.
   useEffect(() => {
@@ -53,13 +52,6 @@ export function AxAssistant() {
     elementRef: panelRef,
     getPosition: useCallback(() => getPosition("panel"), [getPosition]),
     onCommit: useCallback((position: Position) => savePosition("panel", position), [savePosition]),
-    disabled: compact,
-  });
-
-  const launcherDrag = useDraggable({
-    elementRef: launcherRef,
-    getPosition: useCallback(() => getPosition("launcher"), [getPosition]),
-    onCommit: useCallback((position: Position) => savePosition("launcher", position), [savePosition]),
     disabled: compact,
   });
 
@@ -90,14 +82,8 @@ export function AxAssistant() {
         aria-expanded={open}
         aria-label={open ? "도움말 닫기" : "도움말 열기"}
         className="ax-launcher"
-        onClick={() => {
-          // 끌어서 옮긴 직후에도 click이 이어서 발생하므로, 그때는 열지 않는다.
-          if (launcherDrag.consumeDragged()) return;
-          setOpen(!open);
-        }}
-        ref={launcherRef}
+        onClick={() => setOpen(!open)}
         type="button"
-        {...launcherDrag.handlers}
       >
         {open ? "×" : "?"}
       </button>
@@ -113,7 +99,15 @@ export function AxAssistant() {
               <strong>MS FlowHub 도우미</strong>
               <small>{compact ? "등록된 매뉴얼과 FAQ에서 찾아드립니다" : "제목을 끌어 옮길 수 있습니다"}</small>
             </div>
-            <button aria-label="닫기" className="modal-close" onClick={() => setOpen(false)} type="button">×</button>
+            <button
+              aria-label="닫기"
+              className="modal-close"
+              onClick={() => setOpen(false)}
+              onPointerDown={(event) => event.stopPropagation()}
+              type="button"
+            >
+              ×
+            </button>
           </header>
 
           <div className="ax-log" ref={logRef}>

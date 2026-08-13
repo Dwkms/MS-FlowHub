@@ -32,8 +32,10 @@ def list_departments(service: DashboardServiceDependency) -> list[DepartmentResp
 
 
 @api_router.get("/employee-options", response_model=list[EmployeeResponse], tags=["Employees"])
-def list_employees(service: DashboardServiceDependency) -> list[EmployeeResponse]:
-    return service.list_employees()
+def list_employees(
+    service: DashboardServiceDependency, actor: AuthenticatedActor
+) -> list[EmployeeResponse]:
+    return service.list_employees(actor)
 
 
 @api_router.get("/dashboard", response_model=DashboardResponse, tags=["Dashboard"])

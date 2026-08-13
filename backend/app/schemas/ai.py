@@ -77,9 +77,15 @@ class ApprovalDraftRequest(AIRequestBaseModel):
 class JobPostingDraftRequest(AIRequestBaseModel):
     """채용공고 초안 생성 입력.
 
-    직무·인원·고용형태·경력·주요 업무·역량은 `RecruitmentRequest`에서 자동으로 가져오므로
-    받지 않는다. 여기 있는 값들은 **DB에 없어서 사용자가 채워야 하는 것들**뿐이다.
-    입력하지 않으면 Context에서 빠지고, AI가 근무지나 마감일을 지어낼 근거가 없어진다.
+    직무·인원·고용형태·경력·학력·주요 업무·역량은 `RecruitmentRequest`에서 자동으로 가져오므로
+    받지 않는다.
+
+    근무지·급여·마감일·지원방법도 이제 채용 요청 단계에서 받아 DB에 있다. **서버가 DB 값을
+    우선 쓰고**, 여기 남은 필드는 그 칼럼들이 없던 시절의 요청을 위한 보완 경로다. 결재자가
+    보고 승인한 근무지를 AI 패널에서 조용히 갈아끼울 수 없다.
+
+    `team_intro`만 DB에 없어 항상 사용자 입력이다. 입력하지 않으면 Context에서 빠지고,
+    AI가 팀 소개를 지어낼 근거가 없어진다.
     """
 
     job_posting_id: str = Field(min_length=1)
@@ -98,6 +104,23 @@ class JobPostingDraftResponse(BaseModel):
     provider: str
     is_sample: bool
     output: JobPostingDraftOutput | None = None
+    error_message: str | None = None
+
+
+class JobPosterGenerateRequest(AIRequestBaseModel):
+    """승인 후 생성된 공고를 포스터 이미지로 표현하기 위한 요청."""
+
+    job_posting_id: str = Field(min_length=1)
+    design_direction: str | None = Field(default=None, min_length=4, max_length=500)
+
+
+class JobPosterGenerateResponse(BaseModel):
+    generation_id: str
+    success: bool
+    provider: str
+    model_name: str | None = None
+    image_base64: str | None = None
+    content_type: str | None = None
     error_message: str | None = None
 
 

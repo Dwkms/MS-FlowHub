@@ -81,6 +81,7 @@ def build_job_posting_context(
     experience_level: str,
     department_name: str,
     requester_name: str,
+    education_level: str | None = None,
     reason: str | None = None,
     responsibilities: str | None = None,
     required_skills: str | None = None,
@@ -97,14 +98,19 @@ def build_job_posting_context(
     `responsibilities`·`required_skills`·`preferred_skills`는 **이미 담당자가 작성한
     텍스트**다. AI가 없는 것을 만드는 게 아니라 공고 문장으로 다듬는다.
 
-    근무 위치·마감일·지원 방법·급여는 DB에 없으므로 사용자가 입력했을 때만 들어간다.
-    입력이 없으면 키가 없고, 따라서 AI가 "서울 본사" 같은 값을 지어낼 근거가 없다.
+    근무 위치·마감일·지원 방법·급여는 이제 채용 요청 단계에서 받아 DB에 있다. 호출 쪽이
+    DB 값을 우선 넘기고, 그 칼럼이 없던 시절의 요청만 사용자 입력으로 채운다. 어느 쪽에도
+    값이 없으면 키가 없고, 따라서 AI가 "서울 본사" 같은 값을 지어낼 근거가 없다.
+
+    `experience_level`은 코드값이 아니라 사람이 읽는 표기("경력 3년 이상")로 받는다.
+    "EXPERIENCED"를 그대로 넘기면 AI가 그 단어를 문장에 쓴다.
     """
     context: dict = {}
     _put(context, "position_title", position_title)
     _put(context, "headcount", f"{headcount}명")
     _put(context, "employment_type", employment_type)
     _put(context, "experience_level", experience_level)
+    _put(context, "education_level", education_level)
     _put(context, "department_name", department_name)
     _put(context, "requester_name", requester_name)
     _put(context, "reason", reason)

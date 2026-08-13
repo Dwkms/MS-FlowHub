@@ -63,8 +63,8 @@ def test_recruitment_mutation_endpoints_require_bearer_auth(client: TestClient) 
         "approver_id": "emp-hr",
         "position_title": "Developer",
         "headcount": 1,
-        "employment_type": "Full time",
-        "experience_level": "Junior",
+        "employment_type": "정규직",
+        "experience_level": "NEW",
         "reason": "Reason",
         "responsibilities": "Responsibilities",
     }

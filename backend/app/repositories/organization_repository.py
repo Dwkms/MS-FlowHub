@@ -323,14 +323,19 @@ class OrganizationRepository:
             ).all()
         ]
 
-    def list_employees(self) -> list[EmployeeResponse]:
-        rows = self.session.execute(
+    def list_employees(
+        self, *, exclude_employee_id_prefix: str | None = None
+    ) -> list[EmployeeResponse]:
+        statement = (
             select(Employee, Department, Team)
             .join(Department, Employee.department_id == Department.id)
             .outerjoin(Team, Employee.team_id == Team.id)
             .where(Employee.is_active.is_(True))
             .order_by(Employee.employee_no)
-        ).all()
+        )
+        if exclude_employee_id_prefix:
+            statement = statement.where(Employee.id.not_like(f"{exclude_employee_id_prefix}%"))
+        rows = self.session.execute(statement).all()
         return [
             EmployeeResponse(
                 id=e.id,
@@ -400,6 +405,7 @@ class OrganizationRepository:
         visible_employee_id: str | None = None,
         visible_team_id: str | None = None,
         visible_department_id: str | None = None,
+        exclude_employee_id_prefix: str | None = None,
     ) -> PaginatedEmployeeResponse:
         target_date = work_date or date.today()
         statement: Select = (
@@ -441,6 +447,8 @@ class OrganizationRepository:
             statement = statement.where(Employee.team_id == visible_team_id)
         if visible_department_id:
             statement = statement.where(Employee.department_id == visible_department_id)
+        if exclude_employee_id_prefix:
+            statement = statement.where(Employee.id.not_like(f"{exclude_employee_id_prefix}%"))
         total = self.session.scalar(select(func.count()).select_from(statement.subquery())) or 0
         rows = self.session.execute(
             statement.order_by(Employee.employee_no).offset((page - 1) * page_size).limit(page_size)
@@ -659,13 +667,18 @@ class OrganizationRepository:
             registered_at=attendance.reason_registered_at,
         )
 
-    def organization_tree(self) -> OrganizationNode:
-        rows = self.session.execute(
+    def organization_tree(
+        self, *, exclude_employee_id_prefix: str | None = None
+    ) -> OrganizationNode:
+        statement = (
             select(Employee, Department, Team)
             .join(Department, Employee.department_id == Department.id)
             .outerjoin(Team, Employee.team_id == Team.id)
             .order_by(Employee.employee_no)
-        ).all()
+        )
+        if exclude_employee_id_prefix:
+            statement = statement.where(Employee.id.not_like(f"{exclude_employee_id_prefix}%"))
+        rows = self.session.execute(statement).all()
         nodes = {
             e.id: OrganizationNode(
                 id=e.id,

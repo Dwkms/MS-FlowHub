@@ -8,16 +8,16 @@
 
 | 그룹 | Method / URL | 현재 동작 |
 |---|---|---|
-| 공통 | `GET /health`, `GET /api/v1/departments`, `GET /api/v1/employee-options`, `GET /api/v1/dashboard` | 상태·부서·직원 선택지·현재 사용자 기준 대시보드 조회 |
+| 공통 | `GET /health`, `GET /api/v1/departments`, `GET /api/v1/employee-options`, `GET /api/v1/dashboard` | 상태·부서·직원 선택지·현재 사용자 기준 대시보드 조회. 일반 로그인에서는 E2E 전용 계정을 직원 선택지에서 제외 |
 | 인증 | `GET /api/v1/auth/me`, `GET /auth/permissions`, `POST /auth/logout` | 현재 인증 계정·권한 확인 및 Supabase 세션 로그아웃 |
-| 직원·조직 | `GET/POST /api/v1/employees`, `GET/PATCH/DELETE /employees/{id}`, `PATCH /employees/{id}/role`, `PUT /employees/{id}/attendance`, `GET /employees/{id}/attendance-history`, `PATCH /employees/{id}/employment-status-reason`, `GET /organization` | 직원·조직·근태 상태와 이력 관리. 변경 권한은 서버에서 역할별 검증 |
+| 직원·조직 | `GET/POST /api/v1/employees`, `GET/PATCH/DELETE /employees/{id}`, `PATCH /employees/{id}/role`, `PUT /employees/{id}/attendance`, `GET /employees/{id}/attendance-history`, `PATCH /employees/{id}/employment-status-reason`, `GET /organization` | 직원·조직·근태 상태와 이력 관리. 변경 권한은 서버에서 역할별 검증하며 E2E 전용 계정은 E2E 로그인에서만 목록·조직도에 표시 |
 | 전자결재 | `GET/POST /approvals`, `GET/PATCH/DELETE /approvals/{id}`, `POST /approvals/{id}/submit`, `POST /approvals/{id}/approve`, `POST /approvals/{id}/reject` | 초안·상신·승인·반려·이력. 연결 채용 요청 결재 삭제 시 관련 데이터 함께 정리 |
 | 채용 요청·공고 | `PATCH /job-postings/{id}`, `GET/POST/DELETE /recruitment-requests`, `GET /recruitment-requests/{id}`, `POST /recruitment-requests/{id}/submit`, `POST /recruitment-requests/{id}/poster`, `GET /recruitment-requests/{id}/poster`, `POST /recruitment-requests/{id}/job-posting`, `GET /job-postings` | 채용 요청·포스터·결재 연동·승인 후 공고 생성 |
 | ATS 지원자 | `GET /applicants`, `POST /job-postings/{id}/applicants`, `GET/PATCH/DELETE /applicants/{id}`, `POST /applicants/{id}/stage` | 채용공고별 지원자 등록·검색·상세·단계 이력 관리 |
 | 직원 매뉴얼 | `GET/POST/PATCH/DELETE /manuals`, `GET /manuals/{slug}`, `GET/POST/PATCH/DELETE /manuals/categories` | 공개 매뉴얼 조회와 관리자 작성·수정·삭제. `GET /manuals/{slug}`는 관리자 편집 화면에서 기존 값을 불러올 때 사용합니다 |
 | FAQ | `GET /faqs` | 공개 FAQ 목록. 인증된 모든 역할이 조회하며 `display_order` 오름차순으로 반환합니다 |
 | AX 도우미 | `POST /ax/chat` | 등록된 매뉴얼·FAQ에서 질문에 맞는 문서를 찾아 원문을 반환. LLM을 호출하지 않습니다 |
-| 생성형 AI | `POST /ai/approval-drafts`, `POST /ai/job-posting-drafts`, `PATCH /ai/generations/{id}/final` | 전자결재·채용공고 초안 생성과 최종본 기록. **업무 데이터를 저장하거나 상태를 바꾸지 않습니다** |
+| 생성형 AI | `POST /ai/approval-drafts`, `POST /ai/job-posting-drafts`, `POST /ai/job-posting-posters`, `PATCH /ai/generations/{id}/final` | 전자결재·채용공고 문안과 채용 포스터 미리보기 생성. **업무 데이터를 저장하거나 상태를 바꾸지 않습니다** |
 
 알림 레코드는 채용 요청 흐름에서 내부적으로 생성되지만, 알림 조회·읽음 처리 API와 화면은 현재 범위에 포함되지 않습니다.
 
@@ -69,11 +69,26 @@
 `POST /ai/job-posting-drafts`의 요청 본문은 `job_posting_id`가 필수이고, `work_location`,
 `application_deadline`, `apply_method`, `team_intro`, `salary`가 선택입니다. **직무·인원·고용
 형태·경력·주요 업무·필수/우대 역량은 `RecruitmentRequest`에서 자동으로 가져오므로 보내지
-않습니다.** 선택 값은 입력했을 때만 AI Context에 포함되어, 넣지 않은 근무지·마감일·급여를
-AI가 만들어내지 않습니다.
+않습니다.** 근무지·마감일·지원 방법·급여도 승인된 `RecruitmentRequest`의 DB 값을 우선하고,
+요청 본문의 선택 값은 해당 칼럼이 없던 이전 요청을 위한 보완 경로로만 사용합니다. 최종 값이
+없으면 AI Context에 키를 만들지 않습니다.
 
 응답 형식과 상태 코드는 전자결재 초안과 같습니다. 초안 생성은 공고나 채용 요청의 상태를
 바꾸지 않으며, 공고에 반영하려면 사용자가 미리보기를 확인한 뒤 `PATCH`를 직접 호출해야 합니다.
+
+## 채용공고 AI 포스터 미리보기 (v0.9.0)
+
+| Method / URL | 목적 | 권한 |
+|---|---|---|
+| `POST /api/v1/ai/job-posting-posters` | 승인 후 생성된 채용공고를 세로형 포스터 이미지로 생성 | `SUPER_ADMIN`, `HR_ADMIN`, `ADMIN`, `HR_MANAGER` |
+
+요청은 `job_posting_id`가 필수이고 `design_direction`이 선택입니다. 직무·인원·고용 형태·경력·학력·근무지·급여·마감일·지원 방법·업무·역량과 현재 공고 본문은 서버가 연결된 채용 요청과 공고에서 가져옵니다. 값이 없으면 이미지 프롬프트에도 키와 문장을 만들지 않습니다.
+
+성공 응답은 `generation_id`, `success`, `provider`, `model_name`, `image_base64`, `content_type`을 반환합니다. Base64 이미지는 미리보기 전달용이며 DB에는 저장하지 않습니다. `ai_generations.generated_output`에는 형식·크기·`preview_only` 메타데이터만 기록합니다. 생성만으로 공고, 채용 요청, 기존 첨부 포스터는 바뀌지 않습니다.
+
+채용공고 화면은 한 화면에서 생성한 응답들을 시안으로 모읍니다. 데스크톱은 두 열 비교, 모바일은 이전·다음 방식으로 한 장씩 보여 주며 선택한 시안을 PNG로 다운로드합니다. 후보와 선택 상태는 브라우저 메모리에만 있고 메뉴를 벗어나면 사라집니다. 기존 텍스트 공고 초안 입력 UI는 노출하지 않으며, 사용자가 입력할 수 있는 추가값은 선택적인 `design_direction`뿐입니다.
+
+Provider 실패는 기존 AI 초안과 마찬가지로 `200 + success: false`, 권한 오류 `403`, 공고 없음 `404`, 이미지 전용 최근 24시간 한도 초과는 `429`입니다. 일반 계정의 기본 한도는 사용자당 2회·전역 5회이며 환경변수로 조정합니다. `SUPER_ADMIN`은 두 한도에서 제외되며 관리자 호출은 일반 계정의 전역 집계에도 포함하지 않습니다.
 
 ## ATS 지원자 관리 MVP (v0.7.3)
 
@@ -198,6 +213,8 @@ in the leader's department.
 
 ## Recruitment request selection rules
 
+- `POST /api/v1/recruitment-requests`의 고용 형태·경력·학력·지원 방법은 서버의 정해진 선택지만 허용합니다. 경력 코드는 `NEW`, `EXPERIENCED`, `ANY`이며 `EXPERIENCED`일 때 `experience_years_min`이 필수입니다.
+- 요청 본문은 선택 항목으로 `education_level`, `work_location`, `salary`, `application_deadline`, `apply_method`를 받습니다. 응답은 화면 표시용 `experience_label`을 함께 반환합니다.
 - `POST /api/v1/recruitment-requests` accepts an approver only when the
   employee position contains team leader, department head, director, or CEO
   level (`팀장`, `부장`, `이사`, `대표`). The rule is enforced by the backend.
@@ -245,7 +262,7 @@ Base path는 `/api/v1`이다. 공통 조회 API와 전자결재 Router는 구현
 | Approvals | `POST /approvals/{id}/approve` | Bearer, body `{comment?}` | APPROVED / 지정 결재자 / 200,401,403,409 | PENDING→APPROVED; 이력 원자 처리 |
 | Approvals | `POST /approvals/{id}/reject` | Bearer, body `{comment}` | REJECTED / 지정 결재자 / 200,401,403,409,422 | PENDING→REJECTED; 반려 사유 필수 |
 | Approvals | `POST /approvals/{id}/cancel` | body `{reason?}` | CANCELLED / 작성자 / 200,409 | DRAFT→CANCELLED |
-| Recruitment Requests | `POST /recruitment-requests` | Bearer, body 직무·인원·사유·부서·결재자 | DRAFT / 활성 직원 / 201,400,401 | 토큰 사용자를 요청자로 기록, `recruitment_requests` |
+| Recruitment Requests | `POST /recruitment-requests` | Bearer, body 직무·인원·고용 형태·경력/최소 연수·학력·근무지·급여·마감일·지원 방법·사유·부서·결재자 | DRAFT / 활성 직원 / 201,400,401,422 | 토큰 사용자를 요청자로 기록, 선택지와 경력 규칙 검증, `recruitment_requests` |
 | Recruitment Requests | `GET /recruitment-requests` | query status/department | 목록 / 부서장·인사·관리자 / 200 | role scope |
 | Recruitment Requests | `GET /recruitment-requests/{id}` | 상세 | 요청·결재·AI 링크 / 관련 역할 / 200,403,404 | 여러 테이블 read |
 | Recruitment Requests | `POST /recruitment-requests/{id}/submit` | Bearer, body `{comment?}` | 요청 PENDING+결재 | 토큰 요청자 / 200,401,403,409 | 요청·결재·이력·알림 transaction |

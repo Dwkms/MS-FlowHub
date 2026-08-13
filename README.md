@@ -31,6 +31,7 @@ MS FlowHub는 직원·조직 관리, 근태 상태, 전자결재, 채용 요청�
 ### 인증과 권한
 
 - Supabase Auth 로그인, 로그아웃, 세션 유지, 비밀번호 변경
+- 자리 비움 자동 로그아웃: 화면을 닫아둔 시간이 30분을 넘으면 다시 접속할 때 세션을 끊습니다. 창을 열어두면 조작이 없어도 유지됩니다.
 - Supabase access token을 공통 API Client가 `Authorization: Bearer` 헤더로 전달
 - FastAPI의 Supabase JWT 검증과 `employee_accounts` 기반 직원·역할 연결
 - 비활성 계정 또는 직원 연결이 없는 인증 계정의 업무 API 접근 차단
@@ -39,6 +40,7 @@ MS FlowHub는 직원·조직 관리, 근태 상태, 전자결재, 채용 요청�
 
 - 46명 조직 Seed와 부서·팀·직급 기반 직원 목록
 - 이름·사번·이메일 검색, 부서·재직 상태·근무 상태 필터
+- Playwright E2E 전용 계정은 일반 로그인에서 직원 목록과 선택지에 표시하지 않고 E2E 계정으로 로그인한 경우에만 표시
 - 날짜별 근무 상태 등록과 병가·결근·휴직 사유 등록
 - 공개 사유와 관리자·인사 담당자 전용 비공개 상세 사유 분리
 - 데스크톱 조직도와 모바일 전용 직원 목록·하단 메뉴 반응형 UI
@@ -47,7 +49,7 @@ MS FlowHub는 직원·조직 관리, 근태 상태, 전자결재, 채용 요청�
 
 - 일반 품의 문서 작성, 수정, 상신, 승인, 반려, 삭제, 처리 이력
 - 작성자·결재자·관리자 권한에 따른 결재 처리 제한
-- 채용 요청 작성·상신, 결재 승인 후 채용공고 생성
+- 채용 요청에 고용 형태·경력·학력·근무지·급여·마감일·지원 방법을 입력하고 상신, 결재 승인 후 같은 사실을 담은 채용공고 생성
 - JPG, PNG, WEBP, PDF 형식의 채용 포스터 첨부·미리보기·다운로드
 
 ### 채용 지원자 관리 (ATS Lite)
@@ -62,6 +64,7 @@ MS FlowHub는 직원·조직 관리, 근태 상태, 전자결재, 채용 요청�
 
 - 로그인한 직원 기준의 결재 대기·상신 결재·생성된 채용공고 수를 실제 DB 데이터로 표시
 - 값이 있는 지표 카드는 전자결재 또는 채용공고 화면으로 이동
+- `전체 채용공고 현황`은 모든 공고의 지원자를 합산해 `서류전형 → 1차면접 → 2차면접 → 최종입사`로 표시합니다. 지원 접수·서류 검토는 서류전형, 제안은 2차면접에 합산하며 불합격은 진행 단계 수치에서 제외합니다.
 - 최근 업무에는 전자결재와 채용 요청만 표시
 - 상단 알림 아이콘은 알림 조회·읽음 처리 기능 구현 전까지 비활성 상태
 
@@ -87,6 +90,21 @@ MS FlowHub는 직원·조직 관리, 근태 상태, 전자결재, 채용 요청�
 - 패널·버튼을 끌어 옮길 수 있고 위치는 브라우저에 저장 (대화 내용은 저장하지 않음)
 - 질문 로그는 익명으로 남기며, 상위 후보 3개를 함께 기록해 매칭 실패 원인을 분석
 - 기획·측정 근거: [`docs/AX_FAQ_CHATBOT_PLAN.md`](docs/AX_FAQ_CHATBOT_PLAN.md)
+
+### 생성형 AI 초안·채용 포스터
+
+전자결재에서는 Claude가 사용자가 검토할 문안 초안을 만들고, 채용공고에서는 OpenAI가 승인된 채용정보를 담은 세로형 포스터 이미지를 만듭니다. AI는 문서를 저장하거나 업무 상태를 바꾸지 않습니다.
+
+- 전자결재: 작성자·직급·부서·팀 등 DB 사실과 사용자 입력을 합쳐 제목·본문 생성. `[적용]`은 폼만 채우며 저장은 사용자가 직접 실행
+- 채용공고: 승인된 채용 요청의 직무·인원·업무·역량·근무지·급여·마감일·지원 방법을 읽어 PNG 포스터 미리보기 생성. 한 화면에서 여러 시안을 데스크톱은 좌우로, 모바일은 한 장씩 비교·선택하고, 이미지를 눌러 확대 검토한 뒤 선택본을 다운로드하며 팀 소개 입력은 사용하지 않음
+- 값이 없으면 Context에 키를 만들지 않습니다. 주지 않은 사실은 존재조차 알리지 않는 것이 가장 확실한 환각 차단입니다.
+- `AI_PROVIDER=mock`이 기본값이라 **API 키 없이도 전체 흐름을 개발·시연**할 수 있습니다. Mock 결과에는 "샘플 응답" 배지가 붙습니다.
+- 비용 방어: 최근 24시간 기준 전역·사용자당 호출 한도, 호출당 토큰 상한, 짧은 입력 사전 차단. `SUPER_ADMIN`은 검수용 반복 생성을 위해 횟수 제한에서 제외되지만 호출 비용은 계속 발생합니다.
+- `ai_generations` 테이블에 AI 최초본과 사람이 수정한 최종본을 나눠 기록하고 토큰 수를 남겨 실지출을 쿼리로 계산합니다.
+- 생성 이미지는 화면에서 확인하고 PNG로 내려받을 수 있습니다. 확인 전용 응답이므로 기존 첨부 포스터나 공고를 자동으로 덮어쓰지 않습니다.
+- 생성 시안은 현재 화면 메모리에만 유지되므로 메뉴를 벗어나면 사라집니다. 보관할 시안은 화면을 나가기 전에 선택해 다운로드합니다.
+- 이미지 생성은 `IMAGE_AI_PROVIDER=openai`일 때만 활성화되고, 일반 계정에는 최근 24시간 기준 사용자당 2회·전역 5회의 별도 기본 한도를 적용합니다. `SUPER_ADMIN` 호출은 두 한도와 일반 계정의 전역 집계에서 제외합니다.
+- 설계 근거: [`docs/AI_AUTOMATION_PLAN.md`](docs/AI_AUTOMATION_PLAN.md)
 
 ## 기술 구성
 
@@ -150,8 +168,13 @@ Copy-Item .env.example .env.local
 | `backend/.env` | `DATABASE_URL` | Supabase PostgreSQL 애플리케이션 연결 |
 | `backend/.env` | `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SECRET_KEY`, `SUPABASE_JWKS_URL` | 서버의 Auth 검증·계정 Seed·Storage(채용 포스터) 연동 |
 | `backend/.env` | `AUTH_SEED_DEFAULT_PASSWORD`, `E2E_AUTH_*_PASSWORD` | 개발·E2E 전용 Seed 비밀번호 |
+| `backend/.env` | `AI_PROVIDER`, `AI_API_KEY`, `AI_MODEL` | 생성형 AI 초안. 기본값 `mock`은 키가 필요 없고, `claude`인데 키가 없으면 오류로 처리합니다 |
+| `backend/.env` | `AI_MAX_TOKENS`, `AI_TIMEOUT_SECONDS`, `AI_DAILY_LIMIT_PER_USER`, `AI_DAILY_LIMIT_GLOBAL` | AI 비용 상한. 한도는 최근 24시간 기준이며 전역 한도가 실질적 방어선입니다 |
+| `backend/.env` | `IMAGE_AI_PROVIDER`, `OPENAI_API_KEY`, `IMAGE_AI_MODEL`, `IMAGE_AI_SIZE`, `IMAGE_AI_QUALITY`, `IMAGE_AI_TIMEOUT_SECONDS` | 채용 포스터 이미지 생성. 기본값 `disabled`는 호출하지 않고 `openai`에서만 유료 API를 사용합니다 |
+| `backend/.env` | `IMAGE_AI_DAILY_LIMIT_PER_USER`, `IMAGE_AI_DAILY_LIMIT_GLOBAL` | 채용 포스터 이미지 생성의 최근 24시간 비용 한도. 기본값 2회·5회 |
 | `frontend/.env.local` | `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | 브라우저 Supabase Auth 클라이언트 |
 | `frontend/.env.local` | `BACKEND_URL` | Next.js 개발 프록시 대상, 기본값은 `http://127.0.0.1:8000` |
+| `frontend/.env.local` | `NEXT_PUBLIC_SESSION_TIMEOUT_MINUTES` | 선택. 자리 비움 자동 로그아웃 기준, 기본값 30분 |
 
 `SUPABASE_SECRET_KEY`, 데이터베이스 URL, 실제 비밀번호, access token은 Frontend 환경변수·소스 코드·로그에 넣지 않습니다.
 
@@ -213,7 +236,7 @@ npm run build
 npm run test:e2e
 ```
 
-Playwright E2E는 로그인·세션 유지·로그아웃·권한 범위·직원 필터·전자결재 승인·비밀번호 변경을 검증합니다.
+Playwright E2E는 로그인·세션 유지·로그아웃·권한 범위·직원 필터·전자결재 승인·비밀번호 변경을 검증합니다. 2026-08-13 기준 전체 정적 검사와 빌드를 통과했으며, Backend 회귀 테스트는 201개입니다.
 
 ### AX 도우미 손으로 시험하기
 
@@ -261,11 +284,11 @@ MS FlowHub/
 - [설계 결정 기록](./docs/DECISIONS.md)
 - [배포 기획 (Render)](./docs/DEPLOYMENT_PLAN.md)
 - [CI 구성·E2E 확장 기획](./docs/CI_E2E_PLAN.md)
-- [AI 확장 설계 (미구현)](./docs/AI_DESIGN.md)
+- [AI 설계와 구현 기준](./docs/AI_DESIGN.md)
 - [업데이트 로그](./UPDATELOG.md)
 
 과거 기획·스냅샷 문서(구현 요약, 사용자 흐름 초안, 프로토타입 체크리스트, ATS MVP 착수 전 기획)는 [docs/archive](./docs/archive)에 보존되어 있습니다.
 
 ## 문제 해결
 
-로그인, JWT `401`, 권한 `403`, E2E 테스트 계정, Pytest 경고 등 실제 작업 중 확인한 오류와 해결 방법은 [TROUBLESHOOTING.md](./TROUBLESHOOTING.md)를 참고하세요.
+로그인, JWT `401`, 권한 `403`, migration 누락, E2E 테스트 계정, AI 포스터 timeout·임시 미리보기, 대시보드 집계 등 실제 작업 중 확인한 오류와 해결 방법은 [TROUBLESHOOTING.md](./TROUBLESHOOTING.md)를 참고하세요.

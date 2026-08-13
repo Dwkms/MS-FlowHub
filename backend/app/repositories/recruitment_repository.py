@@ -4,6 +4,7 @@ from uuid import uuid4
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
+from app.domain.recruitment_options import describe_experience
 from app.models.organization import Department, Employee
 from app.models.recruitment import Applicant, ApplicantStageHistory, JobPosting, RecruitmentRequest
 from app.schemas.common import DashboardBreakdownItem, DashboardTask
@@ -211,6 +212,15 @@ class RecruitmentRepository:
             headcount=request.headcount,
             employment_type=request.employment_type,
             experience_level=request.experience_level,
+            experience_years_min=request.experience_years_min,
+            experience_label=describe_experience(
+                request.experience_level, request.experience_years_min
+            ),
+            education_level=request.education_level,
+            work_location=request.work_location,
+            salary=request.salary,
+            application_deadline=request.application_deadline,
+            apply_method=request.apply_method,
             reason=request.reason,
             responsibilities=request.responsibilities,
             required_skills=request.required_skills,
@@ -240,6 +250,14 @@ class RecruitmentRepository:
             headcount=request.headcount,
             employment_type=request.employment_type,
             experience_level=request.experience_level,
+            experience_label=describe_experience(
+                request.experience_level, request.experience_years_min
+            ),
+            education_level=request.education_level,
+            work_location=request.work_location,
+            salary=request.salary,
+            application_deadline=request.application_deadline,
+            apply_method=request.apply_method,
             responsibilities=request.responsibilities,
             required_skills=request.required_skills,
             preferred_skills=request.preferred_skills,

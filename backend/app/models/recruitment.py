@@ -38,7 +38,15 @@ class RecruitmentRequest(Base):
     position_title: Mapped[str] = mapped_column(String(150), nullable=False)
     headcount: Mapped[int] = mapped_column(Integer, nullable=False)
     employment_type: Mapped[str] = mapped_column(String(50), nullable=False)
+    # 자유 입력으로 먼저 운영돼 "Junior" 같은 값이 남아 있다. 신규 입력만 코드값으로 좁힌다.
     experience_level: Mapped[str] = mapped_column(String(50), nullable=False)
+    experience_years_min: Mapped[int | None] = mapped_column(Integer)
+    education_level: Mapped[str | None] = mapped_column(String(50))
+    # 공고에 필요하지만 채용 요청에는 없던 값들. 결재자가 보고 승인하도록 여기서 받는다.
+    work_location: Mapped[str | None] = mapped_column(String(200))
+    salary: Mapped[str | None] = mapped_column(String(200))
+    application_deadline: Mapped[date | None] = mapped_column(Date)
+    apply_method: Mapped[str | None] = mapped_column(String(50))
     reason: Mapped[str] = mapped_column(Text, nullable=False)
     responsibilities: Mapped[str] = mapped_column(Text, nullable=False)
     required_skills: Mapped[str | None] = mapped_column(Text)

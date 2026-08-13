@@ -1,6 +1,7 @@
 from fastapi import HTTPException, status
 
 from app.core.config import Settings
+from app.domain.test_accounts import E2E_EMPLOYEE_ID_PREFIX, is_e2e_employee
 from app.repositories.approval_repository import ApprovalRepository
 from app.repositories.organization_repository import OrganizationRepository
 from app.repositories.recruitment_repository import RecruitmentRepository
@@ -11,6 +12,7 @@ from app.schemas.common import (
     DepartmentResponse,
     EmployeeResponse,
 )
+from app.security.identity import ActorContext
 
 _MODULE_ACCESS = {
     "EMPLOYEE": ["전자결재", "직원 매뉴얼"],
@@ -37,8 +39,12 @@ class DashboardService:
     def list_departments(self) -> list[DepartmentResponse]:
         return self.organization.list_departments()
 
-    def list_employees(self) -> list[EmployeeResponse]:
-        return self.organization.list_employees()
+    def list_employees(self, actor: ActorContext) -> list[EmployeeResponse]:
+        return self.organization.list_employees(
+            exclude_employee_id_prefix=(
+                None if is_e2e_employee(actor.employee_id) else E2E_EMPLOYEE_ID_PREFIX
+            )
+        )
 
     def get_dashboard(self, employee_id: str, role: str) -> DashboardResponse:
         employee = self.organization.get_employee(employee_id)

@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { type ReactNode, useState } from "react";
 
 import { BellIcon, FlowMark } from "@/components/icons";
+import { clearLastSeenAt } from "@/features/auth/session-timeout";
 import { AxAssistant } from "@/features/ax/ax-assistant";
 import { useCurrentUser } from "@/features/current-user/current-user-provider";
 import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
@@ -26,6 +27,7 @@ export function PortalShell({ children }: { children: ReactNode }) {
   if (pathname === "/login" || pathname === "/change-password") return <>{children}</>;
 
   async function logout() {
+    clearLastSeenAt();
     await getSupabaseBrowserClient().auth.signOut();
     router.replace("/login");
   }

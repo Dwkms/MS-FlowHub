@@ -10,6 +10,17 @@ import {
   createRecruitmentRequest,
   uploadRecruitmentPoster,
 } from "@/features/recruitment/api";
+import {
+  APPLY_METHODS,
+  EDUCATION_LEVELS,
+  EMPLOYMENT_TYPES,
+  EXPERIENCE_CHOICES,
+  EXPERIENCE_YEARS,
+  type ApplyMethod,
+  type EducationLevel,
+  type EmploymentType,
+  type ExperienceLevel,
+} from "@/features/recruitment/recruitment-options";
 import type { Department } from "@/types/dashboard";
 
 const MAX_POSTER_SIZE = 5 * 1024 * 1024;
@@ -27,8 +38,15 @@ export function RecruitmentForm() {
   const [form, setForm] = useState({
     positionTitle: "",
     headcount: "1",
-    employmentType: "정규직",
-    experienceLevel: "신입/경력",
+    employmentType: "정규직" as EmploymentType,
+    experienceLevel: "NEW" as ExperienceLevel,
+    // 경력을 골랐을 때만 쓰인다. 되돌리면 서버가 잘라내지만 여기서도 보내지 않는다.
+    experienceYearsMin: "3",
+    educationLevel: "학력무관" as EducationLevel,
+    workLocation: "",
+    salary: "",
+    applicationDeadline: "",
+    applyMethod: "이메일" as ApplyMethod,
     reason: "",
     responsibilities: "",
     requiredSkills: "",
@@ -105,6 +123,13 @@ export function RecruitmentForm() {
         headcount: Number(form.headcount),
         employment_type: form.employmentType,
         experience_level: form.experienceLevel,
+        experience_years_min:
+          form.experienceLevel === "EXPERIENCED" ? Number(form.experienceYearsMin) : null,
+        education_level: form.educationLevel,
+        work_location: form.workLocation.trim() || null,
+        salary: form.salary.trim() || null,
+        application_deadline: form.applicationDeadline || null,
+        apply_method: form.applyMethod,
         reason: form.reason.trim(),
         responsibilities: form.responsibilities.trim(),
         required_skills: form.requiredSkills.trim() || null,
@@ -124,7 +149,7 @@ export function RecruitmentForm() {
 
   return (
     <section className="content approval-page">
-      <div className="page-heading"><div><span className="section-kicker">NEW RECRUITMENT REQUEST</span><h1>채용 요청 작성</h1><p>저장한 요청은 상세 화면에서 전자결재로 상신합니다. 공고 문구는 결재 승인 후 채용공고 화면에서 AI 초안으로 작성합니다.</p></div></div>
+      <div className="page-heading"><div><span className="section-kicker">NEW RECRUITMENT REQUEST</span><h1>채용 요청 작성</h1><p>저장한 요청은 상세 화면에서 전자결재로 상신합니다. 근무지·급여·마감일은 결재자가 보고 승인하며, 이후 AI 채용 포스터가 그대로 사용합니다.</p></div></div>
       <form className="panel approval-form" onSubmit={(event) => void save(event)}>
         {(error || departmentError) && <div className="inline-alert error">{error ?? departmentError}</div>}
         <div className="form-grid">
@@ -132,8 +157,25 @@ export function RecruitmentForm() {
           <label className="form-field"><span>모집 인원 *</span><input type="number" min="1" value={form.headcount} onChange={(event) => change("headcount", event.target.value)} /></label>
           <label className="form-field"><span>요청 부서 *</span><select value={selectedDepartmentId} disabled={Boolean(departmentError) || !canSelectDepartment} onChange={(event) => setDepartmentId(event.target.value)}>{availableDepartments.map((item) => <option value={item.id} key={item.id}>{item.name}</option>)}</select>{!canSelectDepartment && !departmentError && <small className="file-help">현재 역할은 소속 부서로만 요청할 수 있습니다.</small>}</label>
           <label className="form-field"><span>결재자 *</span><select value={approverId} onChange={(event) => setApproverId(event.target.value)}>{approvers.map((item) => <option value={item.id} key={item.id}>{item.name} · {item.role_label}</option>)}</select></label>
-          <label className="form-field"><span>고용 형태 *</span><input value={form.employmentType} onChange={(event) => change("employmentType", event.target.value)} /></label>
-          <label className="form-field"><span>경력 수준 *</span><input value={form.experienceLevel} onChange={(event) => change("experienceLevel", event.target.value)} /></label>
+          <label className="form-field"><span>고용 형태 *</span><select value={form.employmentType} onChange={(event) => change("employmentType", event.target.value)}>{EMPLOYMENT_TYPES.map((item) => <option key={item} value={item}>{item}</option>)}</select></label>
+          <label className="form-field"><span>학력 *</span><select value={form.educationLevel} onChange={(event) => change("educationLevel", event.target.value)}>{EDUCATION_LEVELS.map((item) => <option key={item} value={item}>{item}</option>)}</select></label>
+          <fieldset className="form-field full experience-field">
+            <legend>경력 조건 *</legend>
+            <div className="experience-choices">{EXPERIENCE_CHOICES.map((choice) => (
+              <label className="experience-choice" key={choice.value}>
+                <input checked={form.experienceLevel === choice.value} name="experienceLevel" onChange={() => change("experienceLevel", choice.value)} type="radio" value={choice.value} />
+                {choice.label}
+              </label>
+            ))}</div>
+            {/* 년수는 '경력'일 때만 뜬다. 신입에 년수를 남겨두면 공고 표기와 어긋난다. */}
+            {form.experienceLevel === "EXPERIENCED" && (
+              <label className="experience-years"><span>최소 경력</span><select value={form.experienceYearsMin} onChange={(event) => change("experienceYearsMin", event.target.value)}>{EXPERIENCE_YEARS.map((year) => <option key={year} value={String(year)}>{year}년 이상</option>)}</select></label>
+            )}
+          </fieldset>
+          <label className="form-field"><span>근무지</span><input placeholder="서울 강남구" value={form.workLocation} onChange={(event) => change("workLocation", event.target.value)} /></label>
+          <label className="form-field"><span>급여</span><input placeholder="면접 후 협의" value={form.salary} onChange={(event) => change("salary", event.target.value)} /></label>
+          <label className="form-field"><span>모집 마감일</span><input type="date" value={form.applicationDeadline} onChange={(event) => change("applicationDeadline", event.target.value)} /></label>
+          <label className="form-field"><span>지원 방법</span><select value={form.applyMethod} onChange={(event) => change("applyMethod", event.target.value)}>{APPLY_METHODS.map((item) => <option key={item} value={item}>{item}</option>)}</select></label>
           <label className="form-field full"><span>채용 사유 *</span><textarea rows={4} value={form.reason} onChange={(event) => change("reason", event.target.value)} /></label>
           <label className="form-field full"><span>주요 업무 *</span><textarea rows={4} value={form.responsibilities} onChange={(event) => change("responsibilities", event.target.value)} /></label>
           <label className="form-field"><span>필수 역량</span><textarea rows={3} value={form.requiredSkills} onChange={(event) => change("requiredSkills", event.target.value)} /></label>

@@ -21,35 +21,18 @@ export interface ApprovalDraftRequest {
   extra_note?: string;
 }
 
-/** AI가 다듬은 채용공고 문장. 주요 업무·필수 역량은 담당자가 이미 쓴 텍스트를 옮긴 것이지
- *  없던 항목을 만든 것이 아니다. */
-export interface JobPostingDraftOutput {
-  headline: string;
-  introduction: string;
-  responsibilities: string[];
-  requirements: string[];
-  preferred_qualifications: string[];
-  team_or_recruitment_description: string;
-  closing_message: string;
-}
-
-/** 직무·인원·업무·역량은 채용 요청에서 자동으로 가져오므로 보내지 않는다.
- *  여기 있는 값은 DB에 없어서 사용자가 채워야 하는 것들뿐이다. */
-export interface JobPostingDraftRequest {
+export interface JobPosterGenerateRequest {
   job_posting_id: string;
-  work_location?: string;
-  application_deadline?: string;
-  apply_method?: string;
-  team_intro?: string;
-  salary?: string;
+  design_direction?: string;
 }
 
-export interface JobPostingDraftResponse {
+export interface JobPosterGenerateResponse {
   generation_id: string;
   success: boolean;
   provider: string;
-  is_sample: boolean;
-  output: JobPostingDraftOutput | null;
+  model_name: string | null;
+  image_base64: string | null;
+  content_type: string | null;
   error_message: string | null;
 }
 

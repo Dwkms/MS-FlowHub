@@ -6,16 +6,33 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from app.api.dependencies import get_ai_provider, get_database_health
+from app.api.dependencies import get_ai_provider, get_database_health, get_image_ai_provider
 from app.core import supabase_storage
 from app.db.base import Base
 from app.db.session import get_db_session
 from app.domain.ai_provider import MockAIProvider
+from app.domain.image_ai_provider import ImageAIProviderResult
 from app.main import create_app
 from app.models import approval, auth, manual, notification, organization, recruitment  # noqa: F401
 from app.models.auth import EmployeeAccount
 from app.models.organization import Department, Employee, Team
 from app.repositories.organization_repository import OrganizationRepository
+
+_ONE_PIXEL_PNG_BASE64 = (
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9Z4QAAAABJRU5ErkJggg=="
+)
+
+
+class MockImageAIProvider:
+    def generate(self, prompt: str) -> ImageAIProviderResult:
+        assert "Approved facts" in prompt
+        return ImageAIProviderResult(
+            provider="mock-image",
+            success=True,
+            model_name="mock-image-v1",
+            image_base64=_ONE_PIXEL_PNG_BASE64,
+            content_type="image/png",
+        )
 
 
 def seed_workflow_test_identities(session: Session) -> None:
@@ -124,6 +141,7 @@ def client() -> Generator[TestClient, None, None]:
     # 개발자 `.env`에 AI_PROVIDER=claude와 실제 키가 들어 있어도 테스트는 절대
     # 네트워크를 타지 않는다. 이걸 빼면 pytest가 실제 API를 호출하고 크레딧을 쓴다.
     test_app.dependency_overrides[get_ai_provider] = MockAIProvider
+    test_app.dependency_overrides[get_image_ai_provider] = MockImageAIProvider
     with TestClient(test_app) as test_client:
         yield test_client
     test_app.dependency_overrides.clear()

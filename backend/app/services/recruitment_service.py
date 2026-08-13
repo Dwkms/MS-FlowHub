@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.core import supabase_storage
 from app.core.supabase_storage import POSTER_BUCKET, StorageObjectNotFoundError
+from app.domain.recruitment_options import describe_experience
 from app.domain.recruitment_policy import (
     is_recruitment_approver,
     is_requestable_recruitment_department,
@@ -431,17 +432,27 @@ class RecruitmentService:
 
     @staticmethod
     def _build_posting_content(request: RecruitmentRequest) -> str:
+        # 채용 요청에 없으면 줄 자체를 넣지 않는다. "근무지: 미정"은 공고에서 안 쓴 것만 못하다.
+        summary = [
+            f"모집 인원: {request.headcount}명",
+            f"고용 형태: {request.employment_type}",
+            f"경력: {describe_experience(request.experience_level, request.experience_years_min)}",
+        ]
+        optional_lines = (
+            ("학력", request.education_level),
+            ("근무지", request.work_location),
+            ("급여", request.salary),
+            (
+                "모집 마감",
+                request.application_deadline.isoformat() if request.application_deadline else None,
+            ),
+            ("지원 방법", request.apply_method),
+        )
+        summary.extend(f"{label}: {value}" for label, value in optional_lines if value)
         return "\n\n".join(
             [
                 f"모집 부문: {request.position_title}",
-                (
-                    f"모집 인원: {request.headcount}명\n"
-                    f"고용 형태: {request.employment_type}\n"
-                    f"경력: {request.experience_level}"
-                ),
-                f"주요 업무\n{request.responsibilities}",
-                f"필수 역량\n{request.required_skills or '채용 요청 내용을 바탕으로 협의 예정'}",
-                f"우대 사항\n{request.preferred_skills or '없음'}",
+                "\n".join(summary),
             ]
         )
 

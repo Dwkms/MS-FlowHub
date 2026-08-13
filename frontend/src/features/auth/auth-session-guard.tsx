@@ -1,9 +1,10 @@
 "use client";
 
 import { usePathname, useRouter } from "next/navigation";
-import { type ReactNode, useEffect, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 
 import { getAuthenticatedEmployee } from "@/features/auth/api";
+import { useSessionTimeout } from "@/features/auth/session-timeout";
 import { useCurrentUser } from "@/features/current-user/current-user-provider";
 import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
 
@@ -13,6 +14,25 @@ export function AuthSessionGuard({ children }: { children: ReactNode }) {
   const { syncAuthenticatedEmployee } = useCurrentUser();
   const isPublicPage = pathname === "/login" || pathname === "/change-password";
   const [authenticatedPath, setAuthenticatedPath] = useState<string | null>(null);
+
+  // 자리 비움으로 끊긴 경우에만 로그인 화면에 사유를 남긴다.
+  // 아래 onAuthStateChange와 훅이 각각 화면을 옮기므로, 사유를 미리 적어 두 경로가 같은 주소로 가게 한다.
+  const timedOutRef = useRef(false);
+
+  const redirectToLogin = useCallback(() => {
+    setAuthenticatedPath(null);
+    router.replace(timedOutRef.current ? "/login?reason=timeout" : "/login");
+  }, [router]);
+
+  const markTimedOut = useCallback(() => {
+    timedOutRef.current = true;
+  }, []);
+
+  useSessionTimeout({
+    enabled: !isPublicPage,
+    onSignOutStart: markTimedOut,
+    onSignOutEnd: redirectToLogin,
+  });
 
   useEffect(() => {
     if (isPublicPage) {
@@ -38,6 +58,8 @@ export function AuthSessionGuard({ children }: { children: ReactNode }) {
           return;
         }
         if (!active) return;
+        // 새 세션이 붙었으므로 지난 로그아웃 사유는 지운다.
+        timedOutRef.current = false;
         setAuthenticatedPath(pathname);
       } catch {
         await client.auth.signOut();
@@ -46,16 +68,13 @@ export function AuthSessionGuard({ children }: { children: ReactNode }) {
     };
     void applySession();
     const { data: listener } = client.auth.onAuthStateChange((_event, session) => {
-      if (!session) {
-        setAuthenticatedPath(null);
-        router.replace("/login");
-      }
+      if (!session) redirectToLogin();
     });
     return () => {
       active = false;
       listener.subscription.unsubscribe();
     };
-  }, [isPublicPage, pathname, router, syncAuthenticatedEmployee]);
+  }, [isPublicPage, pathname, redirectToLogin, router, syncAuthenticatedEmployee]);
 
   if (isPublicPage || authenticatedPath === pathname) return <>{children}</>;
   return <main className="auth-loading">세션을 확인하는 중입니다.</main>;

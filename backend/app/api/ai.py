@@ -2,21 +2,31 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, status
 
-from app.api.dependencies import AuthenticatedActor, get_ai_generation_service
+from app.api.dependencies import (
+    AuthenticatedActor,
+    get_ai_generation_service,
+    get_job_poster_generation_service,
+)
 from app.domain.ai_provider import MOCK
 from app.schemas.ai import (
     AIFinalOutputRequest,
     ApprovalDraftOutput,
     ApprovalDraftRequest,
     ApprovalDraftResponse,
+    JobPosterGenerateRequest,
+    JobPosterGenerateResponse,
     JobPostingDraftOutput,
     JobPostingDraftRequest,
     JobPostingDraftResponse,
 )
 from app.services.ai_generation_service import AIGenerationService
+from app.services.job_poster_generation_service import JobPosterGenerationService
 
 router = APIRouter(prefix="/ai", tags=["AI"])
 AIServiceDependency = Annotated[AIGenerationService, Depends(get_ai_generation_service)]
+JobPosterServiceDependency = Annotated[
+    JobPosterGenerationService, Depends(get_job_poster_generation_service)
+]
 
 
 @router.post("/approval-drafts", response_model=ApprovalDraftResponse)
@@ -55,6 +65,28 @@ def create_job_posting_draft(
         provider=outcome.provider,
         is_sample=outcome.provider == MOCK,
         output=outcome.output if isinstance(outcome.output, JobPostingDraftOutput) else None,
+        error_message=outcome.error_message,
+    )
+
+
+@router.post("/job-posting-posters", response_model=JobPosterGenerateResponse)
+def create_job_posting_poster(
+    payload: JobPosterGenerateRequest,
+    service: JobPosterServiceDependency,
+    actor: AuthenticatedActor,
+) -> JobPosterGenerateResponse:
+    """승인된 채용공고의 포스터 미리보기를 생성합니다.
+
+    결과는 화면 확인용으로만 반환하며 공고나 기존 첨부 포스터를 수정하지 않습니다.
+    """
+    outcome = service.generate(actor=actor, payload=payload)
+    return JobPosterGenerateResponse(
+        generation_id=outcome.generation_id,
+        success=outcome.success,
+        provider=outcome.provider,
+        model_name=outcome.model_name,
+        image_base64=outcome.image_base64,
+        content_type=outcome.content_type,
         error_message=outcome.error_message,
     )
 

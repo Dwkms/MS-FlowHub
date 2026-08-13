@@ -15,6 +15,7 @@ from app.domain.employee_status import (
     requires_reason,
     supports_daily_work_status,
 )
+from app.domain.test_accounts import E2E_EMPLOYEE_ID_PREFIX, is_e2e_employee
 from app.models.auth import EmployeeAccount
 from app.models.organization import Department, Employee, Team
 from app.repositories.organization_repository import OrganizationRepository
@@ -41,6 +42,8 @@ class EmployeeService:
         self.repository = repository
 
     def list(self, actor: ActorContext, **filters: object) -> PaginatedEmployeeResponse:
+        if not is_e2e_employee(actor.employee_id):
+            filters["exclude_employee_id_prefix"] = E2E_EMPLOYEE_ID_PREFIX
         if actor.role not in {SUPER_ADMIN, HR_ADMIN, "ADMIN", "HR_MANAGER"}:
             if actor.role == TEAM_ADMIN:
                 manager = self._require_employee(actor.employee_id)
@@ -52,8 +55,12 @@ class EmployeeService:
                 filters["visible_employee_id"] = actor.employee_id
         return self.repository.list_employee_page(**filters)
 
-    def organization_tree(self):
-        return self.repository.organization_tree()
+    def organization_tree(self, actor: ActorContext):
+        return self.repository.organization_tree(
+            exclude_employee_id_prefix=(
+                None if is_e2e_employee(actor.employee_id) else E2E_EMPLOYEE_ID_PREFIX
+            )
+        )
 
     def detail(self, employee_id: str, viewer: ActorContext | None = None) -> EmployeeDetail:
         item = self.repository.get_employee_detail(employee_id)

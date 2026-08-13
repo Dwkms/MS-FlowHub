@@ -198,7 +198,7 @@ erDiagram
 **사용 테이블**: `recruitment_requests`, `job_postings`, `notifications`
 
 **테이블별 역할**
-- `recruitment_requests`: 요청 부서·요청자·결재자, 직무·인원·경력·채용 사유, 채용 포스터 메타데이터(`poster_original_name`, `poster_stored_name`, `poster_content_type`, `poster_size`), 연결된 결재 문서.
+- `recruitment_requests`: 요청 부서·요청자·결재자, 직무·인원·고용 형태·경력 코드/최소 연수·학력·근무지·급여·모집 마감일·지원 방법·채용 사유, 채용 포스터 메타데이터(`poster_original_name`, `poster_stored_name`, `poster_content_type`, `poster_size`), 연결된 결재 문서. `experience_years_min`, `education_level`, `work_location`, `salary`, `application_deadline`, `apply_method`는 기존 데이터 호환을 위해 nullable입니다.
 - `job_postings`: 승인된 요청 1건당 생성되는 채용공고 초안(제목·본문).
 - `notifications`: 요청 상신·승인·반려에 따라 생성·삭제되는 인앱 알림 레코드.
 
@@ -213,6 +213,7 @@ erDiagram
 - `recruitment_requests.status` DB `CHECK`: `DRAFT`, `PENDING_APPROVAL`, `APPROVED`, `REJECTED`, `POSTING_CREATED`
 - `recruitment_requests.approval_document_id` UNIQUE
 - `job_postings.recruitment_request_id` UNIQUE (요청당 채용공고 1건만 허용)
+- 신규 요청의 `experience_level`은 `NEW`, `EXPERIENCED`, `ANY` 코드이며, `EXPERIENCED`일 때만 `experience_years_min`을 사용합니다. 기존 자유 입력 값은 표시 호환을 위해 유지합니다.
 
 **주요 상태값**
 - `recruitment_requests.status`는 위 5개 값을 사용하며 결재 문서 상태와는 별도로 관리됩니다.

@@ -13,6 +13,7 @@ dependencies = [
   # 비용이 의존성 1개보다 크다고 판단했다(docs/AI_AUTOMATION_PLAN.md 10장).
   "anthropic>=0.40,<1",
   "fastapi>=0.115,<1",
+  "openai>=2,<3",
   "psycopg[binary]>=3.2,<4",
   "pydantic>=2.10,<3",
   "pydantic-settings>=2.7,<3",

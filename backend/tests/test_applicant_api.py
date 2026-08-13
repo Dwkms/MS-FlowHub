@@ -22,7 +22,8 @@ def create_job_posting(client: TestClient) -> dict[str, object]:
             "position_title": "Backend Engineer",
             "headcount": 1,
             "employment_type": "정규직",
-            "experience_level": "경력",
+            "experience_level": "EXPERIENCED",
+            "experience_years_min": 3,
             "reason": "ATS 지원자 관리 테스트",
             "responsibilities": "백엔드 개발",
         },
@@ -65,6 +66,27 @@ def test_hr_admin_can_create_and_search_applicant(client: TestClient) -> None:
     assert applicant["email"] == "hong.applicant@example.com"
     assert applicant["stage"] == "APPLIED"
     assert applicant["stage_histories"][0]["from_stage"] is None
+
+
+def test_dashboard_reflects_five_new_applicants(client: TestClient) -> None:
+    """지원자 등록 뒤 업무 홈을 다시 열면 최신 APPLIED 집계를 반환한다."""
+    posting = create_job_posting(client)
+    for index in range(1, 6):
+        created = client.post(
+            f"/api/v1/job-postings/{posting['id']}/applicants",
+            json={
+                "name": f"가상지원자{index}",
+                "email": f"applicant{index}@example.test",
+                "phone": f"010-9000-000{index}",
+                "career_summary": "대시보드 지원자 집계 검증용 가상 데이터",
+            },
+        )
+        assert created.status_code == 201
+
+    dashboard = client.get("/api/v1/dashboard")
+
+    assert dashboard.status_code == 200
+    assert dashboard.json()["analytics"]["applicant_by_stage"] == [{"label": "APPLIED", "value": 5}]
 
 
 def test_stage_change_keeps_history_and_rejected_requires_note(client: TestClient) -> None:

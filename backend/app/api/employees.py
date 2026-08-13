@@ -127,5 +127,5 @@ def delete_employee(employee_id: str, service: Service, actor: EmployeeManagemen
 
 
 @router.get("/organization", response_model=OrganizationNode)
-def organization_tree(service: Service) -> OrganizationNode:
-    return service.organization_tree()
+def organization_tree(service: Service, actor: AuthenticatedActor) -> OrganizationNode:
+    return service.organization_tree(actor)

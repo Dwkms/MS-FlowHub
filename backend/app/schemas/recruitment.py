@@ -3,6 +3,15 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from app.domain.recruitment_options import (
+    EXPERIENCE_EXPERIENCED,
+    EXPERIENCE_YEARS_MAX,
+    ApplyMethod,
+    EducationLevel,
+    EmploymentType,
+    ExperienceLevel,
+)
+
 RecruitmentStatus = Literal[
     "DRAFT",
     "PENDING_APPROVAL",
@@ -22,13 +31,32 @@ class RecruitmentRequestCreate(RecruitmentBaseModel):
     approver_id: str = Field(min_length=1)
     position_title: str = Field(min_length=1, max_length=150)
     headcount: int = Field(gt=0, le=100)
-    employment_type: str = Field(min_length=1, max_length=50)
-    experience_level: str = Field(min_length=1, max_length=50)
+    employment_type: EmploymentType
+    experience_level: ExperienceLevel
+    experience_years_min: int | None = Field(default=None, ge=1, le=EXPERIENCE_YEARS_MAX)
+    education_level: EducationLevel | None = None
+    work_location: str | None = Field(default=None, max_length=200)
+    salary: str | None = Field(default=None, max_length=200)
+    application_deadline: date | None = None
+    apply_method: ApplyMethod | None = None
     reason: str = Field(min_length=1)
     responsibilities: str = Field(min_length=1)
     required_skills: str | None = None
     preferred_skills: str | None = None
     desired_start_date: date | None = None
+
+    @model_validator(mode="after")
+    def check_experience_years(self) -> "RecruitmentRequestCreate":
+        """경력 년수는 '경력'을 골랐을 때만 의미가 있다.
+
+        신입인데 년수가 남아 있으면 화면에서 '경력'을 골랐다가 되돌린 흔적이다.
+        그대로 저장하면 공고 표기와 어긋나므로 여기서 잘라낸다.
+        """
+        if self.experience_level != EXPERIENCE_EXPERIENCED:
+            self.experience_years_min = None
+        elif self.experience_years_min is None:
+            raise ValueError("경력을 선택하면 최소 경력 년수를 입력해야 합니다.")
+        return self
 
 
 class RecruitmentSubmit(RecruitmentBaseModel):
@@ -47,6 +75,14 @@ class RecruitmentRequestResponse(BaseModel):
     headcount: int
     employment_type: str
     experience_level: str
+    experience_years_min: int | None
+    #: 화면·공고에 그대로 쓰는 경력 표기("경력 3년 이상"). 코드값 해석을 클라이언트로 넘기지 않는다.
+    experience_label: str
+    education_level: str | None
+    work_location: str | None
+    salary: str | None
+    application_deadline: date | None
+    apply_method: str | None
     reason: str
     responsibilities: str
     required_skills: str | None
@@ -90,6 +126,12 @@ class JobPostingResponse(BaseModel):
     headcount: int
     employment_type: str
     experience_level: str
+    experience_label: str
+    education_level: str | None
+    work_location: str | None
+    salary: str | None
+    application_deadline: date | None
+    apply_method: str | None
     responsibilities: str
     required_skills: str | None
     preferred_skills: str | None

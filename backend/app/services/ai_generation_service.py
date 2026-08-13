@@ -22,6 +22,7 @@ from app.domain.ai_provider import (
     AIProvider,
     AIProviderResult,
 )
+from app.domain.recruitment_options import describe_experience
 from app.models.ai_generation import AiGeneration
 from app.repositories.ai_generation_repository import AiGenerationRepository
 from app.repositories.organization_repository import OrganizationRepository
@@ -34,9 +35,9 @@ from app.schemas.ai import (
 )
 from app.security.identity import ActorContext
 
-# 사용자당 한도만 면제한다. 전역 한도는 그대로 적용된다. 전역 쪽이 비용 상한을
-# 만드는 실제 방어선이라, 여기까지 면제하면 한도를 둔 의미가 사라진다.
-PER_USER_LIMIT_EXEMPT_ROLES = {"SUPER_ADMIN"}
+# 검수·시연을 담당하는 최고 관리자는 사용자당·전역 생성 횟수 제한에서 제외한다.
+# 실제 호출 비용은 계속 발생하므로 화면에서 별도로 안내한다.
+AI_LIMIT_EXEMPT_ROLES = {"SUPER_ADMIN"}
 SCHEMA_ERROR_MESSAGE = "AI 응답이 지정한 형식을 만족하지 않습니다."
 EMPTY_RESPONSE_MESSAGE = "AI 응답을 받지 못했습니다."
 
@@ -60,6 +61,49 @@ class AIGenerationOutcome:
     provider: str
     output: BaseModel | None = None
     error_message: str | None = None
+
+
+def enforce_ai_limits(
+    *,
+    repository: AiGenerationRepository,
+    actor: ActorContext,
+    per_user_limit: int,
+    global_limit: int,
+    feature_type: str | None = None,
+    label: str = "AI 초안 생성",
+) -> None:
+    """최근 24시간 한도를 Provider 호출 전에 검사한다."""
+    # 최고 관리자는 검수·시연 중 여러 시안을 비교해야 하므로 모든 생성 한도에서 제외한다.
+    # 관리자 호출이 일반 직원의 전역 한도까지 소진하지 않도록 전역 집계에서도 뺀다.
+    if actor.role in AI_LIMIT_EXEMPT_ROLES:
+        return
+
+    if (
+        repository.count_recent(
+            feature_type=feature_type,
+            excluded_account_roles=AI_LIMIT_EXEMPT_ROLES,
+        )
+        >= global_limit
+    ):
+        raise HTTPException(
+            status_code=429,
+            detail=f"전체 {label} 한도에 도달했습니다. (최근 24시간 {global_limit}회)",
+        )
+
+    if (
+        repository.count_recent(
+            created_by_id=actor.employee_id,
+            feature_type=feature_type,
+        )
+        >= per_user_limit
+    ):
+        raise HTTPException(
+            status_code=429,
+            detail=(
+                f"{label}은 최근 24시간 기준 {per_user_limit}회까지 가능합니다. "
+                "한도는 가장 오래된 생성 시각으로부터 24시간 뒤에 다시 열립니다."
+            ),
+        )
 
 
 class AIGenerationService:
@@ -107,7 +151,10 @@ class AIGenerationService:
             position_title=request.position_title,
             headcount=request.headcount,
             employment_type=request.employment_type,
-            experience_level=request.experience_level,
+            experience_level=describe_experience(
+                request.experience_level, request.experience_years_min
+            ),
+            education_level=request.education_level,
             department_name=summary.request_department_name,
             requester_name=summary.requester_name,
             reason=request.reason,
@@ -117,11 +164,17 @@ class AIGenerationService:
             desired_start_date=(
                 request.desired_start_date.isoformat() if request.desired_start_date else None
             ),
-            work_location=payload.work_location,
-            application_deadline=payload.application_deadline,
-            apply_method=payload.apply_method,
+            # 결재자가 보고 승인한 값이 우선이다. 사용자 입력은 이 칼럼들이 없던 시절의
+            # 채용 요청에만 쓰인다. 승인된 근무지를 AI 패널에서 조용히 갈아끼울 수 없게 한다.
+            work_location=request.work_location or payload.work_location,
+            application_deadline=(
+                request.application_deadline.isoformat()
+                if request.application_deadline
+                else payload.application_deadline
+            ),
+            apply_method=request.apply_method or payload.apply_method,
+            salary=request.salary or payload.salary,
             team_intro=payload.team_intro,
-            salary=payload.salary,
         )
         return self.generate(
             feature_type=JOB_POSTING_DRAFT,
@@ -244,25 +297,12 @@ class AIGenerationService:
         메시지에 실제 한도 값을 담는다. "잠시 후 다시 시도"만 쓰면 최대 24시간을 기다려야
         하는 상황에서 사용자를 오도한다.
         """
-        global_limit = self.settings.ai_daily_limit_global
-        if self.repository.count_recent() >= global_limit:
-            raise HTTPException(
-                status_code=429,
-                detail=f"전체 AI 초안 생성 한도에 도달했습니다. (최근 24시간 {global_limit}회)",
-            )
-
-        if actor.role in PER_USER_LIMIT_EXEMPT_ROLES:
-            return
-
-        per_user_limit = self.settings.ai_daily_limit_per_user
-        if self.repository.count_recent(created_by_id=actor.employee_id) >= per_user_limit:
-            raise HTTPException(
-                status_code=429,
-                detail=(
-                    f"AI 초안 생성은 최근 24시간 기준 {per_user_limit}회까지 가능합니다. "
-                    "한도는 가장 오래된 생성 시각으로부터 24시간 뒤에 다시 열립니다."
-                ),
-            )
+        enforce_ai_limits(
+            repository=self.repository,
+            actor=actor,
+            per_user_limit=self.settings.ai_daily_limit_per_user,
+            global_limit=self.settings.ai_daily_limit_global,
+        )
 
     @staticmethod
     def _validate(

@@ -8,6 +8,12 @@ from app.core.config import get_settings
 from app.db.session import check_database_connection, get_db_session
 from app.domain.ai_provider import CLAUDE, MOCK, AIProvider, MockAIProvider
 from app.domain.ax_search import KeywordSearcher
+from app.domain.image_ai_provider import (
+    DISABLED,
+    OPENAI,
+    DisabledImageAIProvider,
+    ImageAIProvider,
+)
 from app.models.organization import Employee
 from app.repositories.ai_generation_repository import AiGenerationRepository
 from app.repositories.approval_repository import ApprovalRepository
@@ -32,6 +38,7 @@ from app.services.auth_service import AuthService
 from app.services.ax_service import AxService
 from app.services.dashboard_service import DashboardService
 from app.services.employee_service import EmployeeService
+from app.services.job_poster_generation_service import JobPosterGenerationService
 from app.services.manual_service import ManualService
 from app.services.recruitment_service import RecruitmentService
 
@@ -181,6 +188,49 @@ def get_ai_provider() -> AIProvider:
     )
 
 
+@lru_cache(maxsize=1)
+def _create_image_ai_provider(
+    provider_name: str,
+    api_key: str | None,
+    model: str,
+    size: str,
+    quality: str,
+    timeout: float,
+) -> ImageAIProvider:
+    """이미지 Provider 생성과 OpenAI SDK import를 한 경계에 모은다."""
+    if provider_name == DISABLED:
+        return DisabledImageAIProvider()
+    if provider_name != OPENAI:
+        raise RuntimeError(
+            "지원하지 않는 IMAGE_AI_PROVIDER 설정입니다. "
+            f"'{DISABLED}' 또는 '{OPENAI}'만 사용할 수 있습니다."
+        )
+    if not api_key:
+        raise RuntimeError("IMAGE_AI_PROVIDER가 지정되었으나 OPENAI_API_KEY가 설정되지 않았습니다.")
+
+    from app.domain.openai_image_provider import OpenAIImageProvider
+
+    return OpenAIImageProvider(
+        api_key=api_key,
+        model=model,
+        size=size,
+        quality=quality,
+        timeout=timeout,
+    )
+
+
+def get_image_ai_provider() -> ImageAIProvider:
+    settings = get_settings()
+    return _create_image_ai_provider(
+        settings.image_ai_provider,
+        settings.openai_api_key,
+        settings.image_ai_model,
+        settings.image_ai_size,
+        settings.image_ai_quality,
+        settings.image_ai_timeout_seconds,
+    )
+
+
 def get_ai_generation_service(
     session: DatabaseSession,
     # Provider를 FastAPI 의존성으로 받는다. 테스트가 이 지점을 override해 Mock을 강제하고,
@@ -191,6 +241,19 @@ def get_ai_generation_service(
         session=session,
         repository=AiGenerationRepository(session),
         organization_repository=OrganizationRepository(session),
+        recruitment_repository=RecruitmentRepository(session),
+        provider=provider,
+        settings=get_settings(),
+    )
+
+
+def get_job_poster_generation_service(
+    session: DatabaseSession,
+    provider: Annotated[ImageAIProvider, Depends(get_image_ai_provider)],
+) -> JobPosterGenerationService:
+    return JobPosterGenerationService(
+        session=session,
+        repository=AiGenerationRepository(session),
         recruitment_repository=RecruitmentRepository(session),
         provider=provider,
         settings=get_settings(),
