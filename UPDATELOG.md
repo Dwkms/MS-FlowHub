@@ -43,6 +43,8 @@
 - E2E 최고관리자 로그인과 대시보드 조회를 확인하고, 채용 포스터 API가 최고관리자 요청은 처리하며 일반 직원 요청은 403으로 차단하는지 실제 인증으로 점검했습니다. 유료 OpenAI 이미지 호출은 수행하지 않았습니다.
 - 머지·배포 게이트는 **GO**입니다. `NEXT_PUBLIC_SESSION_TIMEOUT_MINUTES=2`에서 모든 탭을 닫고 3분 뒤 재접속하면 로그인 화면으로 이동했고, 탭을 열어 둔 상태에서 3분 이상 대기하면 로그인 세션이 유지되는 것을 실제 Chrome에서 확인했습니다. 검증 후 로컬 설정은 기본 30분 동작으로 복구했습니다.
 - 현재 실행 환경에 연결 가능한 자동 브라우저가 없어 자동 화면·모바일 회귀는 실행하지 못했지만, 위 자동 로그아웃 최종 시나리오는 사용자가 수동 검증했습니다.
+- 기능 프리즈 커밋 `24c9c84`의 GitHub Actions CI가 성공했습니다. Render Auto-Deploy 후 Backend health, Frontend 로그인, Frontend→Backend 부서 API 프록시가 모두 200이고 CORS origin·credentials 설정도 정상임을 확인했습니다.
+- 운영 E2E 최고관리자로 로그인해 대시보드와 공고 2건을 읽었고, 새 포스터 API는 최고관리자의 없는 공고 요청을 404로 처리하며 일반 직원 요청을 403으로 차단했습니다. 이 운영 점검에서는 OpenAI 이미지 생성 비용이 발생하지 않았습니다.
 
 ### 검증
 
@@ -50,6 +52,7 @@
 - Frontend: lint·typecheck·production build 통과
 - DB: `alembic current` → `20260813_0023 (head)`
 - 저장소: `git diff --check` 통과, 실제 API health·로그인·권한 smoke 통과
+- 원격: GitHub Actions CI 성공, Render Backend·Frontend·프록시·CORS·인증 API smoke 통과
 
 ---
 

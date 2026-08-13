@@ -11,6 +11,7 @@
 | 코드 Feature Freeze | **READY: YES** | 신규 기능 추가 중단, 회귀 결함만 수정 |
 | 자동 검증 | **완료** | Backend pytest 201 passed·Ruff 통과, Frontend lint·typecheck·build 통과, migration `20260813_0023 (head)` |
 | 머지·배포 게이트 | **GO** | 2분 테스트 설정에서 탭을 닫은 뒤 로그아웃, 탭을 열어 둔 상태의 세션 유지 확인 |
+| GitHub CI·Render 운영 검증 | **완료** | `24c9c84` CI 성공, Backend·Frontend·프록시·CORS·운영 E2E 인증/권한 smoke 통과 |
 
 현재 프리즈 범위에는 자리 비움 자동 로그아웃, 구체화된 채용 요청·공고, OpenAI 채용 포스터 2안 생성·비교·선택·확대·PNG 다운로드, 지원자 4단계 집계와 관련 반응형 UI가 포함됩니다. 자동 브라우저가 연결되지 않은 이번 회차에는 화면 회귀를 재실행하지 못했지만, 자동 로그아웃의 탭 닫힘·열림 실제 시간 경과 시나리오는 사용자 수동 검증을 통과했습니다.
 
@@ -31,8 +32,8 @@
 
 | 작업 | 상태 | 다음 조치 |
 |---|---|---|
-| GitHub Actions 실행 결과 확인 | 진행 중 | `b9fd0bf` push로 실행된 CI의 결과를 GitHub Actions에서 확인 |
-| Render 배포 게이트 | 결정 필요 | Auto-Deploy 유지 또는 CI 통과 후 Deploy Hook 호출 방식 결정 |
+| GitHub Actions 실행 결과 확인 | 완료 | 최신 프리즈 커밋 `24c9c84`의 Backend·Frontend CI 성공 확인 |
+| Render 배포 게이트 방식 | 검토 중 | 현재 Auto-Deploy 운영 검증은 완료. CI 통과 후 Deploy Hook으로 전환할지는 별도 결정 |
 | 대시보드 데이터 운영 정책 | 결정 필요 | 적은 실데이터를 유지할지, 검증용 업무 데이터를 추가할지 결정 |
 | 파트장 계정 권한 부여 | 결정 필요 | SW/HW/CS 파트장에게 TEAM_ADMIN 권한을 실제로 부여할지 결정 |
 | 알림과 공통 오류 응답 | 미착수 | 상단 알림과 표준 오류 응답 형식 설계·구현 |

@@ -277,7 +277,7 @@ application_deadline  date          apply_method     varchar(50)
    생성한 업무 테스트 데이터는 삭제했습니다.
 3. UPDATELOG에 기능 2 항목을 기록했습니다.
 
-**남은 것**: 원격 CI와 실제 배포 상태 확인. 기능 백업 커밋 `32523cb`는 `origin/master`에 푸시했습니다.
+**원격 확인 완료**: 기능 백업 `32523cb`와 프리즈 확정 `24c9c84`를 `origin/master`에 푸시했고, `24c9c84`의 GitHub Actions CI와 Render 운영 스모크가 통과했습니다.
 
 ### 3) Prompt 5 재판정 → Feature Freeze
 
@@ -293,6 +293,7 @@ application_deadline  date          apply_method     varchar(50)
 - 운영 DB는 Alembic `20260813_0023 (head)`입니다.
 - Backend는 Ruff check·format check와 pytest **201 passed**, Frontend는 lint·typecheck·production build를 통과했습니다.
 - E2E 최고관리자 로그인, 대시보드 조회, 포스터 API의 최고관리자 허용·일반 직원 차단을 실제 API로 확인했습니다. 이 점검에서는 유료 이미지 생성을 호출하지 않았습니다.
+- GitHub Actions CI 성공 후 Render 운영 Backend health·Frontend 로그인·Frontend API 프록시가 모두 200을 반환했고 CORS도 정상입니다. 운영 E2E 최고관리자 대시보드·공고 조회, 없는 공고 포스터 요청 404와 일반 직원 403을 확인했으며 유료 이미지 호출은 0회입니다.
 - 현재 실행 환경에는 자동 브라우저 대상이 없어 자동 화면 회귀는 실행하지 못했습니다. 대신 아래 자동 로그아웃 시나리오를 사용자가 실제 Chrome에서 확인해 모두 통과했습니다.
 
 ```text
