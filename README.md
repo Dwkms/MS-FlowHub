@@ -110,11 +110,13 @@ MS FlowHub는 직원·조직 관리, 근태 상태, 전자결재, 채용 요청�
 
 | 영역 | 사용 기술 |
 |---|---|
-| Frontend | Next.js App Router, TypeScript, Tailwind CSS |
-| Backend | FastAPI, SQLAlchemy 2.0, Pydantic |
+| Frontend | Next.js 16 App Router, React 19, TypeScript |
+| 스타일 | `src/app/globals.css`의 시맨틱 클래스와 CSS 변수. Tailwind v4가 설치·import돼 있으나 유틸리티 클래스는 사실상 사용하지 않습니다 |
+| Backend | FastAPI, SQLAlchemy 2.0(동기 Session), Pydantic |
 | Database | Supabase PostgreSQL, Alembic, Psycopg 3 |
 | Authentication | Supabase Auth, JWT/JWKS |
-| Testing | Pytest, Ruff, Playwright |
+| AI | Anthropic(초안), OpenAI(포스터 이미지) |
+| Testing | Pytest, Ruff, Playwright(수동 실행) |
 
 ## 역할과 권한
 
@@ -260,6 +262,9 @@ MS FlowHub/
 │  │  ├─ repositories/   # SQLAlchemy 데이터 접근
 │  │  ├─ models/         # ORM 모델
 │  │  ├─ schemas/        # Pydantic API 스키마
+│  │  ├─ domain/         # 순수 규칙·상수·AI Provider (DB·HTTP 비의존)
+│  │  ├─ security/       # 토큰 검증·ActorContext·역할 상수
+│  │  ├─ core/  db/      # 설정, 엔진·세션
 │  │  └─ scripts/        # Seed와 운영 보조 스크립트
 │  ├─ migrations/
 │  └─ tests/
@@ -268,17 +273,28 @@ MS FlowHub/
 │  ├─ src/features/      # 기능별 UI·API 호출
 │  ├─ src/components/    # 공통 UI
 │  ├─ src/lib/           # 공통 API·Supabase 클라이언트
+│  ├─ src/types/         # 백엔드 스키마 대응 타입
 │  └─ e2e/               # Playwright 시나리오
 ├─ docs/
+├─ AGENTS.md             # AI 에이전트 규칙과 Context Map
+├─ CLAUDE.md             # AGENTS.md를 가리키는 포인터
 ├─ README.md
 ├─ TROUBLESHOOTING.md
 └─ UPDATELOG.md
 ```
 
+구조와 데이터 흐름의 상세는 [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md)에 있습니다.
+
 ## 관련 문서
 
-- [API 명세](./docs/API_SPEC.md)
+AI 에이전트로 작업한다면 [AGENTS.md](./AGENTS.md)의 Context Map부터 보세요.
+
+- [현재 구현 상태](./docs/CURRENT_STATE.md) — 무엇이 되고 무엇이 안 되는지
+- [시스템 구조](./docs/ARCHITECTURE.md) — 요청 흐름, 계층, 배포
+- [업무 도메인과 규칙](./docs/DOMAIN.md) — 권한, 상태 전이
 - [데이터 모델](./docs/DATA_MODEL.md)
+- [API](./docs/API_SPEC.md)
+- [코드 작성 규칙](./docs/CODING_RULES.md)
 - [기능 로드맵](./docs/ROADMAP.md)
 - [프로젝트 명세](./docs/PROJECT_SPEC.md)
 - [설계 결정 기록](./docs/DECISIONS.md)

@@ -1,302 +1,111 @@
-# API Specification
+# API
 
-> 기준일: 2026-08-05. 이 문서의 **현재 구현 API**만 실제 서버 계약입니다. 아래의 과거 계약·확장 설계는 구현 여부를 뜻하지 않습니다.
+현재 존재하는 엔드포인트 지도입니다. 요청·응답 스키마의 단일 출처는 `backend/app/schemas/`이고,
+서버를 띄우면 `/docs`(Swagger)에서 실제 스키마를 볼 수 있습니다.
+여기에 필드를 복사해 두지 않습니다 — 코드와 어긋나기 때문입니다.
 
-## 현재 구현 API
+버전별 변경 이력은 [`archive/API_SPEC_LEGACY.md`](archive/API_SPEC_LEGACY.md)에 보존돼 있습니다.
 
-모든 업무 API는 `Authorization: Bearer {supabase_access_token}`을 사용하며, 사용자 ID를 query/body로 받아 인증하지 않습니다. API base path는 `/api/v1`입니다.
+## 공통
 
-| 그룹 | Method / URL | 현재 동작 |
+- Base path: **`/api/v1`** (`app/api/router.py`)
+- 인증: `Authorization: Bearer <Supabase access token>`. 미인증은 401, 권한 부족은 403
+- 프론트엔드는 `/api/*`로 호출하고 Next.js rewrite가 백엔드로 넘깁니다
+- 오류 응답은 FastAPI 기본 형식 `{"detail": "..."}` 입니다
+- Health check는 `/health` (prefix 없음)
+
+## 인증 · 공통
+
+| Method | Path | 설명 |
 |---|---|---|
-| 공통 | `GET /health`, `GET /api/v1/departments`, `GET /api/v1/employee-options`, `GET /api/v1/dashboard` | 상태·부서·직원 선택지·현재 사용자 기준 대시보드 조회. 일반 로그인에서는 E2E 전용 계정을 직원 선택지에서 제외 |
-| 인증 | `GET /api/v1/auth/me`, `GET /auth/permissions`, `POST /auth/logout` | 현재 인증 계정·권한 확인 및 Supabase 세션 로그아웃 |
-| 직원·조직 | `GET/POST /api/v1/employees`, `GET/PATCH/DELETE /employees/{id}`, `PATCH /employees/{id}/role`, `PUT /employees/{id}/attendance`, `GET /employees/{id}/attendance-history`, `PATCH /employees/{id}/employment-status-reason`, `GET /organization` | 직원·조직·근태 상태와 이력 관리. 변경 권한은 서버에서 역할별 검증하며 E2E 전용 계정은 E2E 로그인에서만 목록·조직도에 표시 |
-| 전자결재 | `GET/POST /approvals`, `GET/PATCH/DELETE /approvals/{id}`, `POST /approvals/{id}/submit`, `POST /approvals/{id}/approve`, `POST /approvals/{id}/reject` | 초안·상신·승인·반려·이력. 연결 채용 요청 결재 삭제 시 관련 데이터 함께 정리 |
-| 채용 요청·공고 | `PATCH /job-postings/{id}`, `GET/POST/DELETE /recruitment-requests`, `GET /recruitment-requests/{id}`, `POST /recruitment-requests/{id}/submit`, `POST /recruitment-requests/{id}/poster`, `GET /recruitment-requests/{id}/poster`, `POST /recruitment-requests/{id}/job-posting`, `GET /job-postings` | 채용 요청·포스터·결재 연동·승인 후 공고 생성 |
-| ATS 지원자 | `GET /applicants`, `POST /job-postings/{id}/applicants`, `GET/PATCH/DELETE /applicants/{id}`, `POST /applicants/{id}/stage` | 채용공고별 지원자 등록·검색·상세·단계 이력 관리 |
-| 직원 매뉴얼 | `GET/POST/PATCH/DELETE /manuals`, `GET /manuals/{slug}`, `GET/POST/PATCH/DELETE /manuals/categories` | 공개 매뉴얼 조회와 관리자 작성·수정·삭제. `GET /manuals/{slug}`는 관리자 편집 화면에서 기존 값을 불러올 때 사용합니다 |
-| FAQ | `GET /faqs` | 공개 FAQ 목록. 인증된 모든 역할이 조회하며 `display_order` 오름차순으로 반환합니다 |
-| AX 도우미 | `POST /ax/chat` | 등록된 매뉴얼·FAQ에서 질문에 맞는 문서를 찾아 원문을 반환. LLM을 호출하지 않습니다 |
-| 생성형 AI | `POST /ai/approval-drafts`, `POST /ai/job-posting-drafts`, `POST /ai/job-posting-posters`, `PATCH /ai/generations/{id}/final` | 전자결재·채용공고 문안과 채용 포스터 미리보기 생성. **업무 데이터를 저장하거나 상태를 바꾸지 않습니다** |
+| GET | `/auth/me` | 현재 로그인 직원과 역할 |
+| GET | `/auth/permissions` | 접근 가능 모듈 |
+| POST | `/auth/logout` | 로그아웃 |
+| GET | `/dashboard` | 개인 지표 · 최근 업무 · (관리자) 분석 |
+| GET | `/departments` | 부서 목록 |
+| GET | `/employee-options` | 결재자 선택용 직원 목록 |
 
-알림 레코드는 채용 요청 흐름에서 내부적으로 생성되지만, 알림 조회·읽음 처리 API와 화면은 현재 범위에 포함되지 않습니다.
+## 직원 · 조직 · 근태
 
-## 전자결재 AI 초안 (v0.8.0)
+| Method | Path | 권한 | 설명 |
+|---|---|---|---|
+| GET | `/employees` | 역할별 범위 | 목록. 검색·부서·재직·근무상태 필터, 페이지네이션 |
+| GET | `/employees/{id}` | 역할별 범위 | 상세. 비공개 사유는 권한 없으면 제거됨 |
+| POST | `/employees` | 관리자 | 등록 |
+| PATCH | `/employees/{id}` | 관리자 | 수정 |
+| PATCH | `/employees/{id}/role` | `SUPER_ADMIN` | 역할 변경 |
+| DELETE | `/employees/{id}` | 관리자 | 비활성화 |
+| PUT | `/employees/{id}/attendance` | 본인 또는 관리 범위 | 일일 근무 상태 |
+| PATCH | `/employees/{id}/employment-status-reason` | 관리자 | 재직 상태 사유 |
+| GET | `/organization` | 로그인 | 조직도 |
 
-| Method / URL | 목적 | 권한 |
+역할별 관리 범위는 [`DOMAIN.md`](DOMAIN.md#관리-범위)를 보세요.
+
+## 전자결재
+
+| Method | Path | 설명 |
 |---|---|---|
-| `POST /api/v1/ai/approval-drafts` | 로그인 사용자·부서·팀·직급(DB)과 사용자 입력을 합쳐 초안 생성 | 인증된 모든 역할 |
-| `PATCH /api/v1/ai/generations/{generation_id}/final` | 사용자가 수정해 적용한 최종본 기록 | 해당 초안을 생성한 본인 |
+| GET | `/approvals` | 목록. 관리자가 아니면 본인 관련 문서만 |
+| GET | `/approvals/{id}` | 상세와 이력 |
+| POST | `/approvals` | 작성 (`DRAFT`) |
+| PATCH | `/approvals/{id}` | 수정. `DRAFT` + 작성자만 |
+| DELETE | `/approvals/{id}` | 삭제. 관리자만 |
+| POST | `/approvals/{id}/submit` | 상신 |
+| POST | `/approvals/{id}/approve` | 승인 |
+| POST | `/approvals/{id}/reject` | 반려. 사유 필수 |
 
-**이 API는 `approval_documents`를 만들거나 수정하지 않습니다.** 응답은 화면에 채울 초안일 뿐이고,
-실제 저장은 기존 `POST /api/v1/approvals` 경로에서 사용자가 직접 눌러야 일어납니다.
+상태 전이와 권한 규칙은 [`DOMAIN.md`](DOMAIN.md#전자결재).
 
-요청 본문(`POST /ai/approval-drafts`)은 `document_type`(기존 4종), `purpose`, `main_content`가 필수이고
-`amount`, `quantity`, `desired_date`, `extra_note`가 선택입니다. **선택 값은 입력했을 때만 AI Context에
-포함**되며, 넣지 않은 금액·수량·시점을 AI가 만들어내지 않도록 키 자체를 만들지 않습니다.
+## 채용 · 지원자
 
-금액·수량은 숫자가 아니라 문자열입니다. "6,000,000원", "약 500만원"처럼 사용자가 쓴 표현을 그대로
-전달해야 AI가 단위를 바꾸거나 반올림하지 않습니다. 이 값들은 결재 문서에 칼럼으로 저장되지 않고
-`ai_generations.source_input`에만 남습니다.
+| Method | Path | 설명 |
+|---|---|---|
+| GET | `/recruitment-requests` | 채용 요청 목록 |
+| POST | `/recruitment-requests` | 채용 요청 생성 |
+| GET | `/recruitment-requests/{id}` | 상세 |
+| DELETE | `/recruitment-requests/{id}` | 삭제 |
+| POST | `/recruitment-requests/{id}/submit` | 전자결재로 상신 |
+| POST | `/recruitment-requests/{id}/job-posting` | 공고 생성 |
+| POST · GET | `/recruitment-requests/{id}/poster` | 포스터 업로드 · 조회 (Supabase Storage) |
+| GET | `/job-postings` | 공고 목록 |
+| PATCH | `/job-postings/{id}` | 공고 수정. **`title`·`content`만. `status`는 받지 않음** |
+| POST | `/job-postings/{id}/applicants` | 지원자 등록 |
+| GET | `/applicants` | 지원자 목록. 공고·단계·검색 필터 |
+| GET · PATCH · DELETE | `/applicants/{id}` | 상세 · 수정 · 삭제 |
+| POST | `/applicants/{id}/stage` | 전형 단계 변경 |
 
-응답은 `generation_id`, `success`, `provider`, `is_sample`, `output`, `error_message`입니다.
-`is_sample`이 `true`면 Mock Provider 결과이며 화면에 "샘플 응답" 배지를 표시합니다.
+## 매뉴얼 · FAQ · AX
 
-### 상태 코드
+| Method | Path | 설명 |
+|---|---|---|
+| GET | `/manuals` | 목록. 역할별 공개 범위 적용 |
+| GET · PATCH · DELETE | `/manuals/{slug}` | 상세 · 수정 · 삭제 |
+| POST | `/manuals` | 등록 |
+| GET | `/manuals/categories` | 카테고리 목록 |
+| PATCH · DELETE | `/manuals/categories/{id}` | 카테고리 수정 · 삭제 |
+| GET | `/faqs` | FAQ 목록 |
+| POST | `/ax/chat` | AX 직원 도우미 질의. 매뉴얼·FAQ 기반 |
 
-| 상황 | 코드 |
+## AI
+
+| Method | Path | 설명 |
+|---|---|---|
+| POST | `/ai/approval-drafts` | 전자결재 초안 생성 |
+| POST | `/ai/job-posting-drafts` | 채용공고 초안 생성 |
+| POST | `/ai/job-posting-posters` | 채용 포스터 이미지 2안 생성 |
+| PATCH | `/ai/generations/{id}/final` | 사용자가 최종 채택한 결과 기록 |
+
+**Provider 실패는 5xx가 아니라 `200 + success:false`입니다.** 초안은 부가 기능이므로 기존 작성
+흐름을 막지 않습니다. 호출 한도 초과는 429입니다. 제약은 [`AI_DESIGN.md`](AI_DESIGN.md).
+
+## 상태 코드
+
+| 코드 | 의미 |
 |---|---|
-| 생성 성공 | `200` |
-| **Provider 실패**(timeout·API 오류·스키마 위반) | `200` + `success: false`. 초안은 부가 기능이라 기존 작성 흐름을 5xx로 막지 않습니다 |
-| 입력 검증 실패 | `422` |
-| 일일 호출 한도 초과 | `429`. 사용자당 5회 / 전역 30회(최근 24시간 기준, 환경변수로 조정) |
-| 다른 사용자의 초안에 최종본 기록 시도 | `403` |
-| 최종본이 출력 스키마를 만족하지 않음 | `422` |
-
-## 채용공고 AI 초안 (v0.8.1)
-
-| Method / URL | 목적 | 권한 |
-|---|---|---|
-| `POST /api/v1/ai/job-posting-drafts` | 채용 요청의 사실을 공고 문장으로 다듬은 초안 생성 | `SUPER_ADMIN`, `HR_ADMIN`, `ADMIN`, `HR_MANAGER` |
-| `PATCH /api/v1/job-postings/{posting_id}` | 공고 제목·본문 수정 | 위와 동일 |
-
-**`PATCH /job-postings/{id}`는 이번에 신설했습니다.** 승인 시 자동 생성된 공고를 이후에 수정할
-방법이 아예 없었습니다. AI 전용 우회로가 아니라 원래 비어 있던 기능입니다.
-
-`title`과 `content`만 받고 **`status`는 받지 않습니다.** 이 경로가 AI 흐름에서도 호출되므로,
-상태 필드를 열어두면 AI가 공고를 게시 상태로 바꾸는 경로가 생깁니다. 게시 판단은 사람이 합니다.
-
-`POST /ai/job-posting-drafts`의 요청 본문은 `job_posting_id`가 필수이고, `work_location`,
-`application_deadline`, `apply_method`, `team_intro`, `salary`가 선택입니다. **직무·인원·고용
-형태·경력·주요 업무·필수/우대 역량은 `RecruitmentRequest`에서 자동으로 가져오므로 보내지
-않습니다.** 근무지·마감일·지원 방법·급여도 승인된 `RecruitmentRequest`의 DB 값을 우선하고,
-요청 본문의 선택 값은 해당 칼럼이 없던 이전 요청을 위한 보완 경로로만 사용합니다. 최종 값이
-없으면 AI Context에 키를 만들지 않습니다.
-
-응답 형식과 상태 코드는 전자결재 초안과 같습니다. 초안 생성은 공고나 채용 요청의 상태를
-바꾸지 않으며, 공고에 반영하려면 사용자가 미리보기를 확인한 뒤 `PATCH`를 직접 호출해야 합니다.
-
-## 채용공고 AI 포스터 미리보기 (v0.9.0)
-
-| Method / URL | 목적 | 권한 |
-|---|---|---|
-| `POST /api/v1/ai/job-posting-posters` | 승인 후 생성된 채용공고를 세로형 포스터 이미지로 생성 | `SUPER_ADMIN`, `HR_ADMIN`, `ADMIN`, `HR_MANAGER` |
-
-요청은 `job_posting_id`가 필수이고 `design_direction`이 선택입니다. 직무·인원·고용 형태·경력·학력·근무지·급여·마감일·지원 방법·업무·역량과 현재 공고 본문은 서버가 연결된 채용 요청과 공고에서 가져옵니다. 값이 없으면 이미지 프롬프트에도 키와 문장을 만들지 않습니다.
-
-성공 응답은 `generation_id`, `success`, `provider`, `model_name`, `image_base64`, `content_type`을 반환합니다. Base64 이미지는 미리보기 전달용이며 DB에는 저장하지 않습니다. `ai_generations.generated_output`에는 형식·크기·`preview_only` 메타데이터만 기록합니다. 생성만으로 공고, 채용 요청, 기존 첨부 포스터는 바뀌지 않습니다.
-
-채용공고 화면은 한 화면에서 생성한 응답들을 시안으로 모읍니다. 데스크톱은 두 열 비교, 모바일은 이전·다음 방식으로 한 장씩 보여 주며 선택한 시안을 PNG로 다운로드합니다. 후보와 선택 상태는 브라우저 메모리에만 있고 메뉴를 벗어나면 사라집니다. 기존 텍스트 공고 초안 입력 UI는 노출하지 않으며, 사용자가 입력할 수 있는 추가값은 선택적인 `design_direction`뿐입니다.
-
-Provider 실패는 기존 AI 초안과 마찬가지로 `200 + success: false`, 권한 오류 `403`, 공고 없음 `404`, 이미지 전용 최근 24시간 한도 초과는 `429`입니다. 일반 계정의 기본 한도는 사용자당 2회·전역 5회이며 환경변수로 조정합니다. `SUPER_ADMIN`은 두 한도에서 제외되며 관리자 호출은 일반 계정의 전역 집계에도 포함하지 않습니다.
-
-## ATS 지원자 관리 MVP (v0.7.3)
-
-| Method / URL | 목적 | 권한 |
-|---|---|---|
-| `GET /api/v1/applicants?job_posting_id=&stage=&search=` | 공고·단계 필터와 이름·이메일 검색 목록 | `SUPER_ADMIN`, `HR_ADMIN` 전체 / `TEAM_ADMIN` 본인 부서만 |
-| `POST /api/v1/job-postings/{posting_id}/applicants` | 지원자 수동 등록 및 최초 이력 생성 | `SUPER_ADMIN`, `HR_ADMIN` |
-| `GET /api/v1/applicants/{applicant_id}` | 지원자 상세와 최신순 단계 이력 | `SUPER_ADMIN`, `HR_ADMIN` 전체 / `TEAM_ADMIN` 본인 부서만 |
-| `PATCH /api/v1/applicants/{applicant_id}` | 이름·연락처·경력 요약 수정 | `SUPER_ADMIN`, `HR_ADMIN` |
-| `POST /api/v1/applicants/{applicant_id}/stage` | 전형 단계 변경 및 이력 기록 | `SUPER_ADMIN`, `HR_ADMIN` |
-| `DELETE /api/v1/applicants/{applicant_id}` | 오등록·중복 지원자 삭제 | `SUPER_ADMIN`, `HR_ADMIN` |
-
-일반 직원은 모든 지원자 API를 호출할 수 없습니다. 같은 공고에 동일 이메일을 등록하면 `409`, 종료 단계
-지원자를 변경하면 `409`, 불합격 단계에 메모가 없으면 `422`를 반환합니다.
-
-## 대시보드 실제 업무 데이터 (v0.7.2)
-
-`GET /api/v1/dashboard`는 Bearer 토큰으로 확인한 현재 직원 기준으로 다음 데이터를 반환합니다.
-
-- **내 결재 대기**: 현재 직원이 결재자인 `PENDING` 전자결재 문서 수
-- **내가 상신한 결재**: 현재 직원이 기안자이며 처리 대기 중인 전자결재 문서 수
-- **진행 중 채용**: 시스템에 생성된 채용공고 수
-- **최근 업무**: 현재 직원과 관련된 전자결재 및 채용 요청 목록
-
-`SUPER_ADMIN`, `HR_ADMIN` 응답에는 추가로 `analytics`가 포함됩니다. 전자결재 상태별 건수,
-평균 결재 처리 시간(상신~처리), 지원자 전형별 건수, 전체 채용 요청 수, 당일 근태 상태별
-건수와 활성 직원 중 당일 근태 미등록 인원 수를 실제 업무 테이블에서 읽어 반환합니다. `TEAM_ADMIN`, `EMPLOYEE`의 `analytics`는
-`null`로 반환해 조직 전체 업무 현황을 노출하지 않습니다.
-
-현재 범위에 없는 기능의 안내용 고정값은 반환하지 않습니다.
-
-## 직원 매뉴얼 MVP (v0.7.0)
-
-모든 매뉴얼 API는 `Authorization: Bearer {supabase_access_token}`을 사용합니다.
-
-| Method / URL | 목적 | 권한 |
-|---|---|---|
-| `GET /api/v1/manuals/categories` | 카테고리 목록 | 인증된 전 직원 |
-| `POST/PATCH/DELETE /api/v1/manuals/categories` | 카테고리 관리 | `SUPER_ADMIN`, `HR_ADMIN` |
-| `GET /api/v1/manuals?search=&category_id=` | 매뉴얼 목록·검색·카테고리 필터 | 인증된 전 직원 |
-| `GET /api/v1/manuals/{slug}` | 매뉴얼 본문과 이미지/PDF URL 상세 | 인증된 전 직원 |
-| `POST /api/v1/manuals` | 매뉴얼 작성 | `SUPER_ADMIN`, `HR_ADMIN` |
-| `PATCH/DELETE /api/v1/manuals/{slug}` | 매뉴얼 수정·삭제 | `SUPER_ADMIN`, `HR_ADMIN` |
-
-일반 조회 역할은 `PUBLISHED` 상태만 볼 수 있습니다. 관리자 역할은 초안도 조회할 수 있습니다.
-목록은 중요 고정(`is_pinned`)을 먼저, 그 다음 최근 수정일 내림차순으로 정렬합니다. 쓰기
-요청의 이미지·PDF는 `assets` 배열의 URL로 등록하며 서버 파일 업로드는 지원하지 않습니다.
-
-## Supabase Bearer authentication transition (v0.6.2)
-
-Employee attendance and employment-status-reason updates now require an
-`Authorization: Bearer {supabase_access_token}` header. The authenticated
-employee is resolved through `employee_accounts`; the request no longer accepts
-`actor_id` as the identity source for these endpoints. Missing or invalid bearer
-credentials return `401`.
-
-Approval submission now also requires the bearer header. Its request body accepts
-only an optional `comment`; the submitting employee is resolved from the token,
-not an `actor_id` field.
-
-Approval approval and rejection also require the bearer header. Approval accepts
-an optional `comment` and rejection requires a `comment`; both resolve the
-acting employee from the token instead of an `actor_id` field. Only the assigned
-approver, a `SUPER_ADMIN`, or a `TEAM_ADMIN` handling a same-team author's document can
-process a pending approval. The document author cannot process their own document; the
-existing self-processing exception is limited to a `SUPER_ADMIN` recruitment request.
-
-Approval creation, draft update, deletion, and listing require the bearer header
-as well. Creation records the token owner as the author, draft update uses that
-owner for author validation and history, and deletion is limited to `SUPER_ADMIN`.
-Lists return all documents to `SUPER_ADMIN` and only author-or-approver related
-documents to other users. These endpoints no longer accept `author_id`, `actor_id`,
-or `employee_id` as an identity source.
-일반 전자결재의 결재자는 직급에 `팀장`, `부장`, `이사`, `대표` 중 하나가 포함된 직원만 지정할 수
-있으며, 생성과 임시 저장 문서 수정 모두에서 서버가 검증합니다.
-
-All recruitment request and job posting endpoints now require the bearer header.
-The token owner becomes the requester, and these APIs no longer accept
-`requester_id`, `actor_id`, or `employee_id` as an identity source. Poster files
-are downloaded through the shared API client so the bearer header is included.
-
-Dashboard and employee-detail APIs also require the bearer header and resolve the
-current employee from the token. Supabase access tokens are verified against the
-configured JWKS before the linked `employee_accounts` role is loaded.
-
-## Employee organization management (v0.6.0)
-
-- `GET /api/v1/employees`: paginated employees; supports `page`, `page_size`,
-  `search`, `department_code`, `team_code`, `employment_status`, and `position`.
-- `GET/POST/PATCH/DELETE /api/v1/employees/{employee_id}`: detail and employee
-  lifecycle. DELETE transitions an employee to `INACTIVE` and rejects managers
-  with active reports.
-- `GET /api/v1/departments`, `GET /api/v1/organization`: department data and
-  the CEO-rooted management tree.
-
-`GET /api/v1/employees` also accepts `daily_work_status` and `work_date`.
-When `work_date` is omitted, the API uses the current date. Its employee summary
-includes `employment_status`, `daily_work_status`, `check_in_at`, and `check_out_at`.
-When no attendance record exists, `daily_work_status` is `null` and the UI displays `-`.
-
-- `PUT /api/v1/employees/{employee_id}/attendance`: the employee or an
-  administrator updates a daily status with `reason_category`, `reason_summary`,
-  and `private_note`. Sick leave and absence require `reason_summary`.
-- `GET /api/v1/employees/{employee_id}/attendance-history?work_date=YYYY-MM-DD`:
-  returns actual status changes for the employee and date, newest first. It follows
-  the same self/team/administrator visibility rule as employee detail. Private notes
-  are redacted unless the viewer is an administrator or HR manager.
-- `PATCH /api/v1/employees/{employee_id}/employment-status-reason`:
-  the employee or an administrator updates the reason while the employee is on leave.
-  Employee list responses expose only reason-existence flags. Detail responses expose
-  public summaries to all viewers and private notes only to administrators and HR managers.
-
-Employee status endpoints resolve the actor from the Bearer token through the API
-dependency layer. The service receives an `ActorContext` (employee ID and role),
-rather than querying request parameters or making authorization decisions in the Router.
-
-For employee organization and attendance management, a `TEAM_ADMIN` with a `team_id`
-is limited to that part. A department leader without a `team_id` is limited to employees
-in the leader's department.
-
-## Recruitment Poster (v0.5.7)
-
-## Recruitment request selection rules
-
-- `POST /api/v1/recruitment-requests`의 고용 형태·경력·학력·지원 방법은 서버의 정해진 선택지만 허용합니다. 경력 코드는 `NEW`, `EXPERIENCED`, `ANY`이며 `EXPERIENCED`일 때 `experience_years_min`이 필수입니다.
-- 요청 본문은 선택 항목으로 `education_level`, `work_location`, `salary`, `application_deadline`, `apply_method`를 받습니다. 응답은 화면 표시용 `experience_label`을 함께 반환합니다.
-- `POST /api/v1/recruitment-requests` accepts an approver only when the
-  employee position contains team leader, department head, director, or CEO
-  level (`팀장`, `부장`, `이사`, `대표`). The rule is enforced by the backend.
-- 일반 직원은 자신을 채용 요청 결재자로 지정하거나 자신의 요청을 처리할 수 없습니다. `SUPER_ADMIN`은 채용 요청에 한해 본인을 결재자로 지정하고 처리할 수 있습니다.
-- The CEO is shown without a department or team (`-`) and cannot be selected as a
-  recruitment request department.
-- Employee option labels use the real department name for department heads,
-  for example `개발팀장` and `마케팅팀장`, rather than the generic `부서장`.
-
-### POST /api/v1/recruitment-requests/{request_id}/poster
-
-- 목적: 임시 저장 상태의 채용 요청에 포스터 파일을 첨부한다.
-- 요청: Bearer header, multipart field `poster`.
-- 허용 형식: JPG, PNG, WEBP, PDF. 최대 5MB.
-- 권한: 요청 작성자 또는 관리자. 상신 후에는 변경할 수 없다.
-- 응답: 포스터 메타데이터가 포함된 채용 요청.
-- 오류: 400(형식·크기), 403(권한), 409(상신 후 상태).
-
-### GET /api/v1/recruitment-requests/{request_id}/poster
-
-- 목적: 권한이 있는 직원이 첨부된 채용 포스터를 연다.
-- 요청: Bearer header.
-- 응답: 원본 파일명과 MIME 형식을 유지한 파일 응답.
-- 관련 테이블: `recruitment_requests`.
-
-Base path는 `/api/v1`이다. 공통 조회 API와 전자결재 Router는 구현되었고, 나머지 모듈의 API는 이 문서의 계약을 기준으로 구현할 예정이다. 공통 오류는 현재 FastAPI의 `detail` 응답을 사용하며, 이후 `{code, message, details?, request_id?}` 형태로 확장할 수 있다. Bearer 인증으로 전환된 API는 토큰에서 현재 직원과 역할을 확인하며, 남은 레거시 API만 query 또는 body의 사용자 ID를 사용한다.
-
-## 과거 API 계약 초안 (현재 미구현 항목 포함)
-
-> 아래 표의 AI·지원자·알림 조회 항목과 `actor_id` 기반 계약은 과거 설계 기록입니다. 현재 API로 사용하지 않습니다.
-
-| 그룹 | Method / URL | 목적·요청 | 응답 / 역할 / 상태 코드 | 규칙·트랜잭션·테이블 |
-|---|---|---|---|---|
-| Health | `GET /health` | 프로세스 상태 | `{status}` / 전체 / 200 | DB deep health는 별도 검토 |
-| Departments | `GET /departments` | 부서 목록, query `active?` | 부서 목록 / 전체 / 200 | `departments` |
-| Employees | `GET /employees` | 샘플 직원 목록, query `department_id?, role?` | 직원 목록 / 전체 / 200 | `employees`, `departments` |
-| Current User | `PUT /session/current-user` | body `{employee_id}` | 현재 직원·역할·접근 모듈 / 전체 / 200, 404, 409 | 활성 직원 재조회; 영속 세션 방식은 구현 시 결정 |
-| Dashboard | `GET /dashboard` | Bearer 기반 현재 역할의 업무 요약 | counts/tasks / 전체 / 200,401 | 토큰 사용자 기준 결재·채용공고·최근 업무 read transaction |
-| Approvals | `GET /approvals` | Bearer, query `status?` | 목록 / 역할별 / 200,401 | `SUPER_ADMIN`은 전체, 그 외 역할은 작성·결재 관련 문서만 조회, `approval_documents` |
-| Approvals | `GET /approvals/{id}` | 결재와 이력 상세 | 상세 / 작성자·결재자·관리자 / 200,403,404 | approval/history |
-| Approvals | `POST /approvals` | Bearer, body `{document_type,title,content,department_id,approver_id}` | DRAFT / 작성 가능 역할 / 201,400,401 | 토큰 사용자가 작성자; 작성자≠결재자; `SUPER_ADMIN`은 모든 부서, 그 외 역할은 소속 부서만 기안; 문서와 초기 이력 transaction |
-| Approvals | `PATCH /approvals/{id}` | Bearer, body `{title?,document_type?,content?,department_id?,approver_id?}` | 수정된 DRAFT / 작성자 / 200,400,401,403,409 | DRAFT와 토큰 작성자만 수정 가능 |
-| Approvals | `DELETE /approvals/{id}` | Bearer | 빈 응답 / `SUPER_ADMIN` / 204,401,403,404 | 상태와 관계없이 관리자만 삭제 가능. 연결된 채용 요청이면 채용 요청·공고·관련 알림·결재 이력을 함께 삭제 |
-| Approvals | `POST /approvals/{id}/submit` | Bearer, body `{comment?}` | PENDING / 작성자 / 200,401,403,409 | DRAFT→PENDING, 이력 transaction |
-| Approvals | `POST /approvals/{id}/approve` | Bearer, body `{comment?}` | APPROVED / 지정 결재자 / 200,401,403,409 | PENDING→APPROVED; 이력 원자 처리 |
-| Approvals | `POST /approvals/{id}/reject` | Bearer, body `{comment}` | REJECTED / 지정 결재자 / 200,401,403,409,422 | PENDING→REJECTED; 반려 사유 필수 |
-| Approvals | `POST /approvals/{id}/cancel` | body `{reason?}` | CANCELLED / 작성자 / 200,409 | DRAFT→CANCELLED |
-| Recruitment Requests | `POST /recruitment-requests` | Bearer, body 직무·인원·고용 형태·경력/최소 연수·학력·근무지·급여·마감일·지원 방법·사유·부서·결재자 | DRAFT / 활성 직원 / 201,400,401,422 | 토큰 사용자를 요청자로 기록, 선택지와 경력 규칙 검증, `recruitment_requests` |
-| Recruitment Requests | `GET /recruitment-requests` | query status/department | 목록 / 부서장·인사·관리자 / 200 | role scope |
-| Recruitment Requests | `GET /recruitment-requests/{id}` | 상세 | 요청·결재·AI 링크 / 관련 역할 / 200,403,404 | 여러 테이블 read |
-| Recruitment Requests | `POST /recruitment-requests/{id}/submit` | Bearer, body `{comment?}` | 요청 PENDING+결재 | 토큰 요청자 / 200,401,403,409 | 요청·결재·이력·알림 transaction |
-| Job Postings | `POST /recruitment-requests/{id}/job-posting` | Bearer | 공고 / 인사 / 201,401,403,409 | 요청 APPROVED, 1회만; posting transaction |
-| Job Postings | `GET /job-postings` | query status? | 목록 / 관련 역할 / 200 | `job_postings` |
-| Job Postings | `GET /job-postings/{id}` | 상세 | 공고 / 관련 역할 / 200,404 | posting |
-| Applicants | `POST /job-postings/{id}/applicants` | body 이름·연락·경력 | APPLIED 지원자 / 인사 / 201,400,403 | posting 존재 확인 |
-| Applicants | `GET /applicants` | query posting/stage | 목록 / 인사·관리자 / 200 | applicant |
-| Applicants | `GET /applicants/{id}` | 상세 | 지원자+AI 링크 / 인사·관리자 / 200,404 | applicant/ai |
-| Applicants | `POST /applicants/{id}/transition` | body `{stage}` | 변경된 지원자 / 인사 / 200,400,409 | 허용 단계 규칙; 합격 자동 결정 금지 |
-| AI Generations | `POST /ai-generations` | body `{feature_type,related_type,related_id,input}` | 생성 기록·결과 | 관련 업무 역할 / 201 또는 fallback 201 | 업무 존재·권한 확인; AI 실패가 업무 저장 rollback을 유발하지 않음 |
-| AI Generations | `GET /ai-generations/{id}` | 생성 상세 | source/generated/final/status | 관련 역할 / 200,403,404 | ai |
-| AI Generations | `PATCH /ai-generations/{id}/final-output` | body `{final_output}` | 수정 결과 | 관련 담당자 / 200,400,403 | generated 원본 보존 |
-| AI Generations | `POST /ai-generations/{id}/retry` | 선택적 재실행 | 새 generation 권장 | 관련 담당자 / 201,409 | 기존 기록 덮어쓰지 않음 |
-| Notifications | `GET /notifications` | query unread? | 현재 사용자 알림 | 전체 / 200 | recipient 강제 |
-| Notifications | `POST /notifications/{id}/read` | 없음 | read_at | 수신자 / 200,403,404 | notification |
-
-## 상태와 오류 기준
-
-- `400`: 형식·범위 오류, `403`: 역할/소유권 위반, `404`: 대상 없음, `409`: 현재 상태와 명령 충돌
-- 결재: DRAFT→PENDING, PENDING→APPROVED/REJECTED, DRAFT→CANCELLED만 허용
-- 승인/반려에서 결재문서, 관련 업무, 이력, 알림은 한 트랜잭션이다.
-## v0.5.0 구현 API
-
-| Recruitment Requests | `DELETE /recruitment-requests/{id}` | Bearer 인증된 `SUPER_ADMIN`만 삭제 가능. 연결된 공고·결재·이력·관련 알림도 같은 트랜잭션으로 삭제 |
-
-관리자는 지정 결재자가 아니어도 `PENDING` 전자결재를 승인 또는 반려할 수 있다. 처리 이력에는 실제 관리자 ID가 기록된다.
-
-| Group | API | 핵심 규칙 |
-|---|---|---|
-| Recruitment Requests | `POST /recruitment-requests` | 활성 직원이면 생성 가능하며 요청 부서는 등록된 부서인지 검증 |
-| Recruitment Requests | `GET /recruitment-requests?employee_id=` | 요청자·결재자만, 인사·관리자는 전체 조회 |
-| Recruitment Requests | `GET /recruitment-requests/{id}?employee_id=` | 역할 범위로 상세 조회 |
-| Recruitment Requests | `POST /recruitment-requests/{id}/submit` | 요청·공통 결재·이력·알림을 함께 생성 |
-| Job Postings | `GET /job-postings?employee_id=` | 승인으로 자동 생성된 공고 초안 목록 |
-
-결재 승인·반려 API는 관련 유형이 `RECRUITMENT_REQUEST`이면 같은 트랜잭션에서 요청 상태와 공고/알림을 함께 갱신한다.
+| 400 | 참조 대상 없음, 소속 부서 불일치 등 요청 내용 오류 |
+| 401 | 토큰 없음·만료·검증 실패 |
+| 403 | 역할 또는 관리 범위 밖 |
+| 404 | 대상 없음 |
+| 409 | 상태 충돌 (하위 직원 존재, 재직 상태와 근무 상태 불일치 등) |
+| 422 | 스키마 검증 실패, 필수 사유 누락 |
+| 429 | AI 호출 한도 초과 |

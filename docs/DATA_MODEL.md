@@ -1,5 +1,9 @@
 # Data Model
 
+> 상태값의 **의미와 전이 규칙**은 [`DOMAIN.md`](DOMAIN.md), 계층 구조는 [`ARCHITECTURE.md`](ARCHITECTURE.md).
+> 이 문서는 테이블·컬럼·관계만 다룹니다.
+> 2026-08-13 확인: 19개 테이블과 migration `20260813_0023`까지 실제 모델과 일치합니다.
+
 ## 1. 문서 개요
 
 이 문서는 MS FlowHub의 **현재 구현된 Supabase PostgreSQL 데이터 모델**을 기준일(2026-08-05) 기준으로 정리한 기록입니다. 실제 운영 DB에 없는 테이블·컬럼·관계는 이 문서에 포함하지 않습니다. 아직 만들어지지 않은 확장 설계는 "14. 향후 확장 계획"에 짧게만 남기고, 과거 초안·미구현 예측 설계는 [`docs/archive/DATA_MODEL_LEGACY.md`](./archive/DATA_MODEL_LEGACY.md)로 이동했습니다. Migration 적용 이력은 이 문서가 아니라 [`UPDATELOG.md`](../UPDATELOG.md)와 `backend/migrations/versions/`를 기준으로 확인합니다.
