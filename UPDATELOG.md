@@ -2,6 +2,7 @@
 
 ## 목차
 
+- [2026-08-13 · 배포 게이트 전환과 Context 구조 정비](#2026-08-13--배포-게이트-전환과-context-구조-정비)
 - [2026-08-13 · Feature Freeze 재판정](#2026-08-13--feature-freeze-재판정)
 - [2026-08-13 · AI 채용 포스터 생성·미리보기](#2026-08-13--ai-채용-포스터-생성미리보기)
 - [2026-08-13 · 폼·카드 UI 정렬과 밀도 보정](#2026-08-13--폼카드-ui-정렬과-밀도-보정)
@@ -33,6 +34,20 @@
 - [2026-07-30 · v0.1~v0.4 기반 기능](#2026-07-30--v01v04-기반-기능)
 
 ---
+
+## 2026-08-13 · 배포 게이트 전환과 Context 구조 정비
+
+- Render Backend(`MS-FlowHub`)와 Frontend 두 서비스의 `Auto-Deploy`를 `On Commit`에서 **`After CI Checks Pass`로 전환**했습니다. GitHub Actions CI가 성공한 커밋만 운영에 반영됩니다.
+- 다만 **게이트 동작은 아직 검증되지 않았습니다.** 두 서비스의 Root Directory가 `backend`·`frontend`라 전환 이후 push한 문서 커밋은 Render가 `Deploy skipped`로 건너뜁니다. 프리즈 해제 후 첫 코드 배포에서 확인해야 합니다.
+- 배포 문서의 백엔드 주소가 실재하지 않는 예시값이었습니다. 실제 서비스명은 `MS-FlowHub`, URL은 `https://ms-flowhub.onrender.com`으로 정정했습니다.
+- 백엔드가 무료 플랜에서 잠든 동안 프론트 `/api/*` 프록시가 대기 없이 즉시 502를 반환하는 것을 확인해 `TROUBLESHOOTING.md`에 판별법과 함께 기록했습니다.
+- 파트장 권한 역할 **`PART_ADMIN` 설계를 확정**했습니다. 팀장(`TEAM_ADMIN`)은 부서 전체, 파트장은 자기 파트만 관리하도록 범위 기준을 역할에 고정합니다. 구현은 `feat/part-admin-role` 브랜치에 있고 프리즈 해제 후 머지합니다.
+- 설계 중 결함을 찾았습니다. `approval_service`가 팀 비교를 `team_id` 일치로만 해서, `team_id`가 비어 있는 팀장은 지정 결재자로 걸린 문서 외에 **한 건도 결재를 처리할 수 없었습니다.** 브랜치에서 부서 단위 판정으로 고치고 회귀 테스트를 추가했습니다.
+- 대시보드 운영 데이터 정책을 확정했습니다. 운영 DB에 가짜 업무 데이터를 넣지 않고, 시연이 필요하면 E2E 계정과 같은 접두어 격리 방식으로 집계에서 제외하며 배포 단계에서 뺍니다.
+- **AI 에이전트용 Context 구조를 정비했습니다.** `CLAUDE.md`가 없어 Claude Code가 `AGENTS.md` 규칙을 자동으로 읽지 못하던 문제를 포인터 파일로 해결하고, `AGENTS.md`를 96줄 규칙 나열에서 54줄 Context Map으로 교체했습니다. `docs/ARCHITECTURE.md`·`DOMAIN.md`·`CURRENT_STATE.md`·`CODING_RULES.md`를 신설했습니다.
+- 코드와 어긋난 문서를 고쳤습니다. README의 Tailwind CSS 표기(실제로는 `globals.css` 시맨틱 클래스가 스타일 시스템), 구조도에 빠져 있던 `app/domain`·`security`·`core`·`db`, `PROJECT_SPEC`의 "AI는 현재 구현 범위가 아니며" 문구입니다.
+- `API_SPEC.md`를 버전별 변경 이력에서 현재 엔드포인트 지도로 재작성하고, `ROADMAP.md`를 180줄 스냅샷 누적에서 39줄 전망 문서로 정리했습니다. 기존 내용과 완료된 인계 문서 2건은 `docs/archive/`에 보존했습니다.
+- `AGENTS.md`의 학습 모드 규칙(초급자 설명·연습문제 제안)은 스캐폴드 단계 설정이라 삭제했습니다.
 
 ## 2026-08-13 · Feature Freeze 재판정
 
