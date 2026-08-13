@@ -1,6 +1,7 @@
 # 작업 인계 문서 — 생성형 AI 자동화 (2026-08-12)
 
 > 이 문서만 읽고 이어서 작업할 수 있게 작성했습니다. 설계 근거는 [`AI_AUTOMATION_PLAN.md`](AI_AUTOMATION_PLAN.md)를 보세요.
+> 마지막 갱신: 2026-08-13 · 기능·운영 검증 기준 커밋 `b84b8fb`
 
 ## 한 줄 요약
 
@@ -8,16 +9,26 @@
 
 ## ⚠ 지금 바로 이어서 할 일
 
-### 1) PR 머지 후 로컬 정리
+### 1) Render 배포 게이트 방식 결정
 
-```powershell
-cd "C:\Users\user\Documents\MS FlowHub"
-git switch master
-git pull --ff-only
-git branch -d feat/ai-approval-draft
-```
+아직 Render 설정은 바꾸지 않았습니다. Backend와 Frontend 모두 `master` push 즉시 배포되는
+`Auto-Deploy: On Commit` 상태입니다. 권장안은 두 서비스의 Render Dashboard 설정을
+`Auto-Deploy: After CI Checks Pass`로 바꾸는 것입니다.
 
-### 2) 실제 Claude 호출 검증 — **완료 (2026-08-12)**
+- 목적: GitHub Actions의 Backend·Frontend CI가 모두 성공한 커밋만 운영 배포
+- 코드·DB·환경변수·서비스 URL 변경 없음
+- Deploy Hook이나 GitHub Secret 추가 불필요
+- 부작용: CI 시간만큼 배포가 늦어지고, 한쪽 CI 실패가 Backend·Frontend 배포를 모두 막음
+- 주의: Alembic migration은 이 설정으로 자동화되지 않으므로 DB 변경 시 계속 먼저 수동 적용
+
+사용자 결정 전에는 Render 설정을 임의로 변경하지 않습니다.
+
+### 2) Feature Freeze 유지
+
+현재 판정은 `P0 0건 · P1 0건`, `FEATURE FREEZE READY: YES`,
+`MERGE / RELEASE GATE: GO`입니다. 신규 기능은 추가하지 않고 회귀 결함만 수정합니다.
+
+### 3) 실제 Claude 호출 검증 — **완료 (2026-08-12)**
 
 전자결재·채용공고 초안 모두 `claude-opus-5`로 실호출에 성공했습니다. `messages.parse()`에
 `output_config`와 `output_format`을 함께 넘기는 조합도 코드 수정 없이 통과했습니다.
@@ -33,7 +44,7 @@ cd backend
 **실측 비용**: 전자결재 약 19원, 채용공고 약 24원(건당). 설계 추정치의 약 1/5이며,
 `effort: low`가 예상보다 간결하게 쓰는 것이 원인입니다. 충전한 $5로 약 300회 쓸 수 있습니다.
 
-### 3) Prompt 5 판정 (Feature Freeze)
+### 4) Prompt 5 판정 (Feature Freeze)
 
 `FEATURE FREEZE READY: YES` — **P0 0건 · P1 0건**입니다. 자동 로그아웃의 실제 시간 경과 수동 확인까지 통과했습니다. 지금부터 새 기능은 추가하지 않고 회귀 결함만 수정합니다.
 
@@ -46,12 +57,14 @@ cd backend
 | Prompt -1 | 저장소 점검. 로컬이 2커밋 뒤처지고 Alembic이 깨져 있던 것 복구 | PR #4 |
 | Prompt 0 | `docs/AI_AUTOMATION_PLAN.md` 24개 항목 설계 | PR #5 |
 | Prompt 1 | Provider·Mock·Claude·Structured Output·`ai_generations`·일일 한도 | PR #5 |
-| Prompt 2 | 전자결재 AI 초안 API + 화면 | 이 PR |
-| Prompt 3 | 채용공고 AI 초안 + `PATCH /job-postings/{id}` 신설 | 이 PR |
+| Prompt 2 | 전자결재 AI 초안 API + 화면 | PR #7 이전 완료 |
+| Prompt 3 | 채용 요청·공고 정보 구체화와 AI Context 연동 | `32523cb` |
+| Prompt 4 | OpenAI 채용 포스터 2안 생성·비교·선택·확대·PNG 다운로드 | `32523cb` |
+| Prompt 5 | 전체 회귀 점검과 Feature Freeze 판정 | `24c9c84`, `b84b8fb` |
 
-**검증 상태**: ruff check/format 통과, pytest **155개** 통과, 프론트 lint/typecheck/build 통과.
+**검증 상태**: Ruff check·format 통과, pytest **201 passed**, Frontend lint·typecheck·production build 통과. GitHub Actions CI 성공.
 
-**운영 DB**: migration `20260812_0022` 적용 완료. 코드 head = DB current = `20260812_0022`.
+**운영 DB**: migration `20260813_0023` 적용 완료. 코드 head = DB current = `20260813_0023`.
 
 ## 이 기능이 무엇인가
 
@@ -102,17 +115,18 @@ DB에 없어 사용자 입력이 필요한 값: 근무 위치, 지원 마감일,
 
 ### Migration
 
-다음 번호는 **`20260812_0023`**, `down_revision = "20260812_0022"`. 다만 Prompt 3은 **migration이 필요 없을 가능성이 높습니다**(기존 칼럼만 사용).
+후속 채용 정보 구체화에서 **`20260813_0023`**, `down_revision = "20260812_0022"` migration을 추가했고 운영 DB까지 적용했습니다. `recruitment_requests`의 신규 6개 칼럼은 모두 nullable이라 기존 데이터와 호환됩니다.
 
 ## 비용 안전장치 — 인계 시 확인할 것
 
-Anthropic API는 **선불 크레딧**이라 AWS식 요금 폭탄이 구조적으로 불가능합니다. 단 조건이 하나 있습니다.
+Anthropic 텍스트 생성과 OpenAI 이미지 생성은 모두 호출 비용이 발생하므로 Console 한도와 애플리케이션 한도를 함께 유지합니다.
 
 ```
 □ Console: Auto-reload OFF      ← 이게 켜져 있으면 후불과 같아진다
 □ Console: Spend limit
 □ 코드: max_tokens 8000, timeout 15s, max_retries 2
 □ 앱: 사용자당 5회 / 전역 30회 (최근 24시간, 환경변수 조정 가능)
+□ 이미지: 일반 사용자당 2회 / 전역 5회 (최근 24시간, SUPER_ADMIN은 횟수 제한 제외)
 ```
 
 실지출은 앱에서 바로 확인됩니다.
@@ -130,6 +144,8 @@ FROM ai_generations WHERE created_at >= now() - interval '30 days';
 |---|---|
 | `app/domain/ai_provider.py` | `AIProvider` 프로토콜, `AIProviderResult`, `MockAIProvider` |
 | `app/domain/claude_provider.py` | 실제 Claude Provider (`anthropic` SDK) |
+| `app/domain/openai_image_provider.py` | 실제 OpenAI 이미지 Provider (`gpt-image-2`) |
+| `app/domain/job_poster_prompt.py` | 승인된 채용 정보 기반 포스터 프롬프트 조립 |
 | `app/domain/ai_prompts.py` | 시스템 프롬프트 (환각 방지 1차 방어선) |
 | `app/domain/ai_context.py` | Context Builder (순수 함수, 개인정보 차단 지점) |
 | `app/schemas/ai.py` | Structured Output + 요청·응답 스키마 |
@@ -138,7 +154,7 @@ FROM ai_generations WHERE created_at >= now() - interval '30 days';
 | `app/models/ai_generation.py` | `ai_generations` |
 | `app/api/ai.py` | AI 라우터 |
 | `app/scripts/try_ai_draft.py` | 실호출 수동 확인 도구(앱·DB 없이 Provider만 호출) |
-| `frontend/src/features/ai/` | API 모듈, 초안 패널 |
+| `frontend/src/features/ai/` | 공통 API 모듈, 전자결재 초안·채용 포스터 패널 |
 
 ## 알아둘 상태
 
@@ -149,12 +165,12 @@ FROM ai_generations WHERE created_at >= now() - interval '30 days';
 ## 남은 로드맵
 
 ```
-Prompt 5   Feature Freeze 판정 (P0/P1이 0개일 때만 YES)
-──────── Feature Freeze ────────
-Prompt 4   포스터 자동 생성 (SVG 템플릿 + 프론트 Canvas→PNG)
+Prompt 0~4 구현 완료
+Prompt 5   Feature Freeze 판정 완료 (P0 0건 · P1 0건)
+다음 결정  Render Auto-Deploy: On Commit → After CI Checks Pass
 ```
 
-포스터를 Freeze 밖으로 뺀 이유: SVG 템플릿 3종 + 한글 줄바꿈 + PNG 변환이 Prompt 2·3을 합친 것보다 크고, 포스터 하나 때문에 Freeze 전체가 밀립니다. 설계는 `AI_AUTOMATION_PLAN.md` §16·§17에 남겨 뒀습니다.
+초기 SVG 템플릿 계획 대신 OpenAI `gpt-image-2`로 포스터 2안을 만들고 사용자가 비교·선택·확대·다운로드하는 방식으로 구현했습니다. 생성 결과는 현재 페이지 메모리에만 유지되며 공고 첨부에는 자동 반영하지 않습니다.
 
 ## 검증 명령
 
@@ -162,8 +178,8 @@ Prompt 4   포스터 자동 생성 (SVG 템플릿 + 프론트 Canvas→PNG)
 cd backend
 .\.venv\Scripts\python.exe -m ruff check .
 .\.venv\Scripts\python.exe -m ruff format --check .
-.\.venv\Scripts\python.exe -m pytest -q          # 155 passed
-.\.venv\Scripts\python.exe -m alembic current    # 20260812_0022 (head)
+.\.venv\Scripts\python.exe -m pytest -q          # 201 passed
+.\.venv\Scripts\python.exe -m alembic current    # 20260813_0023 (head)
 
 cd ..\frontend
 npm run lint; npm run typecheck; npm run build
@@ -171,12 +187,12 @@ npm run lint; npm run typecheck; npm run build
 
 ---
 
-## 이어서 할 일 (2026-08-12 오후 중단 지점)
+## 2026-08-13 작업 상세 기록
 
 ### 0) 완료 — PR #7 머지
 
 Prompt 5 수동 검수에서 찾은 결함 6건과 개선 3건은 `d0dadd8`로 커밋해 PR #7로 머지했습니다.
-현재 `master`는 `2197fa3`이고 origin과 같습니다.
+당시 `master`는 `2197fa3`이었으며, 이후 2026-08-13 기능과 프리즈 검증은 `32523cb`~`b84b8fb`에 반영했습니다.
 
 ### 1) 기능 1 — 세션 자동 로그아웃 (보안) — **2026-08-13 완료**
 
@@ -223,7 +239,7 @@ Prompt 5 수동 검수에서 찾은 결함 6건과 개선 3건은 `d0dadd8`로 �
 
 라디오(하나만 선택)입니다. 신입+경력 동시 선택은 곧 경력무관이라 선택지가 겹칩니다.
 
-#### 완료된 백엔드 (미커밋)
+#### 완료된 백엔드
 
 **migration `20260813_0023`** — `recruitment_requests`에 칼럼 6개, 전부 nullable.
 
@@ -251,7 +267,7 @@ application_deadline  date          apply_method     varchar(50)
 검증: ruff 통과 · pytest **179 passed**(기존 162 + 신규 17).
 기존 테스트 27개가 `"Junior"` 같은 픽스처 값으로 실패해 코드값으로 고쳤습니다.
 
-#### 완료된 프론트엔드 (미커밋)
+#### 완료된 프론트엔드
 
 - `features/recruitment/recruitment-options.ts` *(신규)* — 선택지 목록. 백엔드
   `recruitment_options.py`와 값을 맞춥니다. **두 곳에 같은 목록이 있으므로 한쪽만 고치면
@@ -277,7 +293,7 @@ application_deadline  date          apply_method     varchar(50)
    생성한 업무 테스트 데이터는 삭제했습니다.
 3. UPDATELOG에 기능 2 항목을 기록했습니다.
 
-**원격 확인 완료**: 기능 백업 `32523cb`와 프리즈 확정 `24c9c84`를 `origin/master`에 푸시했고, `24c9c84`의 GitHub Actions CI와 Render 운영 스모크가 통과했습니다.
+**원격 확인 완료**: 기능 백업 `32523cb`, 프리즈 확정 `24c9c84`, 운영 검증 기록 `b84b8fb`를 `origin/master`에 푸시했습니다. 최신 `b84b8fb`의 GitHub Actions CI도 성공했습니다.
 
 ### 3) Prompt 5 재판정 → Feature Freeze
 
@@ -306,18 +322,26 @@ NEXT_PUBLIC_SESSION_TIMEOUT_MINUTES=2로 프론트 재시작
 
 ---
 
-## 현재 미커밋 상태 (2026-08-13)
+## 현재 Git 상태 (2026-08-13)
 
 ```
-기능 1  frontend/src/features/auth/session-timeout.ts  (신규)
-        auth-session-guard · login-form · portal-shell · supabase-browser · login/page
-        frontend/.env.example
-기능 2  backend/app/domain/recruitment_options.py      (신규)
-        backend/tests/test_recruitment_options.py      (신규)
-        migrations/versions/20260813_0023_*.py         (신규, 운영 적용 완료)
-        models/schemas/repositories/services · 테스트 픽스처 4개
-문서    README.md · UPDATELOG.md · 이 문서
+branch          master
+검증 기준        b84b8fb
+원격 상태        이 인계 문서 최신화 커밋까지 origin/master에 push
+기능 변경        모두 커밋·푸시 완료
 ```
 
-`frontend/next-env.d.ts`는 dev/build가 번갈아 바꾸는 생성 파일이라 커밋에서 빼면 됩니다.
-`docs/JIRA_UPDATE_2026-08-08.md`는 표 자동정렬만 된 상태로 계속 보류 중입니다.
+작업 폴더에는 의도적으로 제외한 아래 두 변경만 남아 있습니다.
+
+- `frontend/next-env.d.ts` — dev/build가 번갈아 바꾸는 생성 파일이므로 커밋 제외
+- `docs/JIRA_UPDATE_2026-08-08.md` — 표 자동정렬만 바뀐 보류 문서이므로 커밋 제외
+
+실제 `.env`와 OpenAI API Key는 커밋되지 않았습니다. E2E 전용 계정 두 개만 생성했으며 기존 관리자 계정은 변경하지 않았습니다.
+
+## 다음 작업 체크리스트
+
+1. 사용자 승인 시 Render Backend·Frontend의 Auto-Deploy를 각각 `After CI Checks Pass`로 변경
+2. 빈 문서 커밋 또는 안전한 문서 수정 커밋으로 `push → CI 성공 → Render 배포 시작` 순서 확인
+3. 배포 후 Backend `/health`, Frontend `/login`, Frontend API 프록시, CORS 재확인
+4. DB migration이 추가되는 후속 작업에서는 배포 전에 운영 DB에 `alembic upgrade head` 적용
+5. 프리즈 중 발견되는 P0/P1만 수정하고 P2/P3 개선 요청은 Jira 백로그로 이동
