@@ -25,10 +25,19 @@ Storage: 기존 Supabase Storage 비공개 버킷 그대로 사용
 
 | 항목 | 값 |
 |---|---|
+| 서비스 이름 | **`MS-FlowHub`** (계획 단계의 가칭 `ms-flowhub-backend`가 아닙니다) |
+| 서비스 URL | **`https://ms-flowhub.onrender.com`** |
 | Root Directory | `backend` |
 | Build Command | `pip install .` |
 | Start Command | `uvicorn app.main:app --host 0.0.0.0 --port $PORT` |
 | Health Check Path | `/health` |
+| Auto-Deploy | `After CI Checks Pass` (2026-08-13 전환) |
+| Build Filters | Included·Ignored 모두 비어 있음 |
+
+> **URL 주의.** 아래 환경변수 표의 `ms-flowhub-backend.onrender.com`은 계획 당시의 예시이고
+> **실재하지 않는 호스트**입니다. 그 주소로 요청하면 Render가 `x-render-routing: no-server`와
+> 함께 404를 돌려줍니다. 실제 백엔드는 위 `ms-flowhub.onrender.com`입니다.
+> (2026-08-13 확인: `/health` → `{"status":"ok","data_source":"supabase","service":"MS FlowHub"}`)
 
 ### 환경변수 (Render 대시보드에 등록)
 
@@ -45,16 +54,18 @@ Storage: 기존 Supabase Storage 비공개 버킷 그대로 사용
 
 | 항목 | 값 |
 |---|---|
+| 서비스 URL | **`https://ms-flowhub-frontend.onrender.com`** (실재 확인됨) |
 | Root Directory | `frontend` |
 | Build Command | `npm install && npm run build` |
 | Start Command | `npm run start -- -p $PORT` |
+| Auto-Deploy | `After CI Checks Pass` (2026-08-13 전환) |
 
 ### 환경변수
 
 | 변수 | 값 |
 |---|---|
 | `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | 기존 `frontend/.env.local`과 동일 |
-| `BACKEND_URL` | 백엔드 Render URL (예: `https://ms-flowhub-backend.onrender.com`) — `next.config.ts`의 `/api/*` rewrite 대상 |
+| `BACKEND_URL` | 백엔드 Render URL = **`https://ms-flowhub.onrender.com`** — `next.config.ts`의 `/api/*` rewrite 대상 |
 | `NEXT_PUBLIC_API_BASE_URL` | 비워둠 (Next.js 프록시를 그대로 사용) |
 
 ## 5. 배포 순서
@@ -76,4 +87,6 @@ Storage: 기존 Supabase Storage 비공개 버킷 그대로 사용
 ## 7. 알려진 제약
 
 - Render 무료 플랜은 일정 시간 요청이 없으면 서비스가 잠들고, 다음 요청 시 콜드스타트(수십 초)가 발생합니다. 배포 실패가 아니라 무료 플랜의 정상 동작입니다.
-- 자동 CI(GitHub Actions로 push마다 pytest/lint 실행)는 이번 배포 범위에 포함하지 않습니다. 필요하면 이후 별도 작업으로 진행합니다.
+- **백엔드가 잠든 동안 프론트엔드의 `/api/*` 프록시는 기다리지 않고 즉시 502를 반환합니다.** 로그인 화면은 200으로 뜨는데 데이터 조회만 실패하므로 장애로 오인하기 쉽습니다. 상세와 판별법은 [`TROUBLESHOOTING.md`](../TROUBLESHOOTING.md)의 "화면은 뜨는데 API만 502"를 보세요.
+- **문서만 바꾼 커밋은 두 서비스 모두 배포되지 않습니다.** Root Directory가 각각 `backend`·`frontend`이고, Render는 Root Directory 안에 변경이 없으면 auto-deploy를 건너뜁니다(Events에 `Deploy skipped`). Build Filter나 `[skip render]` 마커와는 무관한 별개 동작입니다.
+- 자동 CI는 [`ci.yml`](../.github/workflows/ci.yml)로 도입했고, 2026-08-13부터 두 서비스의 Auto-Deploy가 `After CI Checks Pass`입니다. E2E([`e2e.yml`](../.github/workflows/e2e.yml))는 수동 실행 전용이라 이 게이트에 포함되지 않습니다.

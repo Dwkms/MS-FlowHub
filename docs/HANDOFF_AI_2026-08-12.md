@@ -9,11 +9,10 @@
 
 ## ⚠ 지금 바로 이어서 할 일
 
-### 1) Render 배포 게이트 방식 결정
+### 1) Render 배포 게이트 — **전환 완료 (2026-08-13), 동작은 미검증**
 
-아직 Render 설정은 바꾸지 않았습니다. Backend와 Frontend 모두 `master` push 즉시 배포되는
-`Auto-Deploy: On Commit` 상태입니다. 권장안은 두 서비스의 Render Dashboard 설정을
-`Auto-Deploy: After CI Checks Pass`로 바꾸는 것입니다.
+Backend(`MS-FlowHub`)와 Frontend(`ms-flowhub-frontend`) 모두 `Auto-Deploy`를
+**`After CI Checks Pass`로 전환하고 저장을 확인했습니다.**
 
 - 목적: GitHub Actions의 Backend·Frontend CI가 모두 성공한 커밋만 운영 배포
 - 코드·DB·환경변수·서비스 URL 변경 없음
@@ -21,7 +20,40 @@
 - 부작용: CI 시간만큼 배포가 늦어지고, 한쪽 CI 실패가 Backend·Frontend 배포를 모두 막음
 - 주의: Alembic migration은 이 설정으로 자동화되지 않으므로 DB 변경 시 계속 먼저 수동 적용
 
-사용자 결정 전에는 Render 설정을 임의로 변경하지 않습니다.
+**다만 게이트가 실제로 동작하는 것은 아직 보지 못했습니다.** 전환 이후 `backend/`나 `frontend/`를
+건드린 커밋이 없어 게이트가 작동할 기회 자체가 없었습니다. 이유는 바로 아래 항목입니다.
+
+#### 문서만 바꾼 커밋은 애초에 배포되지 않습니다 — Root Directory
+
+두 서비스의 **Root Directory가 각각 `backend`·`frontend`** 입니다(Render 화면에서 명령어 앞에
+`backend/ $`, `frontend/ $` 접두로 표시됩니다). **Render는 Root Directory 안에 변경이 없으면
+auto-deploy를 건너뛰고**, Events에 `Deploy skipped for commit ...`을 남깁니다.
+
+2026-08-13 Events에서 확인한 실제 기록입니다.
+
+| 커밋 | `backend/` 변경 | 결과 |
+|---|---|---|
+| `32523cb` (코드 67파일) | 있음 | `Deploy live` |
+| `e389eec` (문서만, `[skip render]`) | 없음 | `Deploy skipped` |
+| `82d8a89` (문서만, 마커 없음) | 없음 | `Deploy skipped` |
+
+**Build Filters는 Included·Ignored 모두 비어 있습니다.** 경로 필터 때문이 아니라 Root Directory
+때문입니다. `[skip render]` 마커와도 무관한 별개 동작입니다.
+
+→ **문서 커밋으로는 게이트를 검증할 수 없습니다.** 마커를 붙이든 안 붙이든 결과가 같습니다.
+검증은 아래 "게이트 검증 방법"으로 이관했습니다.
+
+#### 게이트 검증 방법 — 다음 코드 배포 때
+
+프리즈 중에 검증용으로 코드를 억지로 건드리지 않습니다. **프리즈 이후 `backend/`나 `frontend/`를
+바꾸는 첫 실제 커밋을 push할 때** 아래 하나만 확인하면 됩니다.
+
+```
+Render 서비스 → Events 탭
+  Deploy started 시각이 GitHub CI 두 체크가 초록이 된 시각보다 뒤인가?
+```
+
+뒤면 게이트 정상입니다. 그때까지 이 항목의 상태는 **미검증**입니다.
 
 #### 이 게이트가 보증하는 범위
 
@@ -58,8 +90,17 @@ Frontend는 lint·typecheck·`next build`. `push: [master]`에 path 필터가 �
 | `After CI Checks Pass` | 상시 게이트 | 검증되지 않은 커밋은 배포하지 않는다 |
 | `[skip render]` | 커밋별 선택 | 이 커밋은 배포할 필요가 없다 (문서 변경 등) |
 
-**단, 게이트 검증용 커밋에는 절대 붙이면 안 됩니다.** 붙이면 배포가 시작되지 않는데, 그것이
-게이트 차단인지 마커 때문인지 구분할 수 없어 검증 자체가 무의미해집니다.
+**단, 게이트 검증용 커밋에는 붙이면 안 됩니다.** 붙이면 배포가 시작되지 않는데, 그것이 게이트
+차단인지 마커 때문인지 구분할 수 없기 때문입니다.
+
+배포가 건너뛰어지는 경로는 **세 가지**이고 Events에는 모두 똑같이 `Deploy skipped`로만 찍힙니다.
+원인을 구분하려면 아래 순서로 확인합니다.
+
+| 순서 | 확인할 것 | 해당하면 |
+|---|---|---|
+| 1 | 커밋이 Root Directory(`backend`·`frontend`) 안을 건드렸는가 | 안 건드렸으면 **여기서 끝** — 정상 skip |
+| 2 | 커밋 메시지에 `[skip render]`가 있는가 | 있으면 의도된 skip |
+| 3 | 1·2가 모두 아닌데 skip인가 | **그때가 게이트 이상** — "이상 시 복구 순서"로 |
 
 #### 이상 시 복구 순서
 
@@ -384,11 +425,13 @@ NEXT_PUBLIC_SESSION_TIMEOUT_MINUTES=2로 프론트 재시작
 ```
 branch          master
 코드 검증 기준   b84b8fb        (이후 커밋은 모두 문서 변경만)
-원격 상태        origin/master = e389eec  [skip render]로 배포 건너뜀
-미푸시           1건 — 이 문서의 배포 게이트 절차 추가
-                 Render 설정 전환 후 게이트 검증용으로 push할 커밋
+원격 상태        origin/master = 82d8a89  Root Directory 밖이라 Deploy skipped
+운영 실행 중     32523cb        마지막으로 실제 배포된 커밋 (2026-08-13 19:48)
 기능 변경        모두 커밋·푸시 완료
 ```
+
+**운영에 떠 있는 코드는 `32523cb`입니다.** 이후 커밋(`24c9c84`~`82d8a89`)은 전부 문서 변경이라
+Root Directory 밖이고, 배포되지 않은 것이 정상입니다. 코드와 운영은 어긋나 있지 않습니다.
 
 작업 폴더에는 의도적으로 제외한 아래 두 변경만 남아 있습니다.
 
@@ -399,20 +442,23 @@ branch          master
 
 ## 다음 작업 체크리스트
 
-Render 배포 게이트 전환 절차입니다. 배경과 판단 근거는 위 "1) Render 배포 게이트 방식 결정"을 보세요.
+### 완료 (2026-08-13)
 
-1. 전환 전 **현재 Render 설정값을 캡처하거나 기록** (Backend·Frontend 각각. 복구 기준점)
-2. Backend Auto-Deploy를 `After CI Checks Pass`로 변경
-3. Frontend도 동일하게 변경 — **두 서비스를 모두 바꾼 뒤에** 4번으로 갑니다. 한쪽만 바꾸고
-   push하면 검증이 성립하지 않고, 스키마·API 불일치가 오히려 더 잘 생깁니다
-4. 안전한 커밋을 **한 번만** push. migration도 코드 변경도 없는 것으로 고르고, 커밋 메시지에
-   **`[skip render]`를 넣지 않습니다** (붙이면 배포가 건너뛰어져 검증이 성립하지 않음)
-5. GitHub Actions CI가 **먼저** 성공하는지 확인
-6. 그 **후에야** Backend·Frontend 배포가 시작되는지 확인 (green 후 1~2분 내 시작, 10분 초과 시 이상)
-7. 배포 후 Backend `/health`, Frontend `/login`, Frontend API 프록시, CORS 재확인
-8. 이상 시 Manual Deploy → 원인 확인 → 재현되면 `On Commit` 복구 (위 "이상 시 복구 순서")
-9. DB migration이 추가되는 후속 작업에서는 배포 전에 운영 DB에 `alembic upgrade head` 적용
-10. 프리즈 중 발견되는 P0/P1만 수정하고 P2/P3 개선 요청은 Jira 백로그로 이동
+- [x] 전환 전 Render 설정값 기록 (두 서비스 모두 `On Commit`이었음)
+- [x] Backend `MS-FlowHub` Auto-Deploy → `After CI Checks Pass`
+- [x] Frontend `ms-flowhub-frontend` Auto-Deploy → `After CI Checks Pass`
+- [x] 운영 상태 확인 — Backend `/health` 200, Frontend `/login` 200, `/api/*` 프록시 401(미인증 정상)
+- [x] 실제 서비스 URL 확정 — [`DEPLOYMENT_PLAN.md`](DEPLOYMENT_PLAN.md) §3·§4에 반영
+
+### 남은 것
+
+1. **게이트 동작 검증** — 프리즈 이후 `backend/`·`frontend/`를 바꾸는 첫 커밋 배포 때,
+   Events의 `Deploy started`가 CI 성공 **이후**인지 확인. 그때까지 상태는 **미검증**
+   (검증용 코드 커밋을 프리즈 중에 억지로 만들지 않습니다)
+2. 배포가 `Deploy skipped`면 위 표의 **1 → 2 → 3 순서**로 원인부터 구분. 1·2에 해당하면 정상입니다
+3. 이상이 확인되면 Manual Deploy → 원인 확인 → 재현되면 `On Commit` 복구 (위 "이상 시 복구 순서")
+4. DB migration이 추가되는 후속 작업에서는 배포 전에 운영 DB에 `alembic upgrade head` 적용
+5. 프리즈 중 발견되는 P0/P1만 수정하고 P2/P3 개선 요청은 Jira 백로그로 이동
 
 ## 프리즈 이후 (지금 하지 않음)
 
