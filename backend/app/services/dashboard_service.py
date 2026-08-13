@@ -17,6 +17,8 @@ from app.security.identity import ActorContext
 _MODULE_ACCESS = {
     "EMPLOYEE": ["전자결재", "직원 매뉴얼"],
     "TEAM_ADMIN": ["전자결재", "ATS Lite", "직원·조직 관리", "직원 매뉴얼"],
+    # 파트장은 지원자(ATS) 정보를 다루지 않는다. 채용은 팀장·인사 소관이다.
+    "PART_ADMIN": ["전자결재", "직원·조직 관리", "직원 매뉴얼"],
     "HR_ADMIN": ["전자결재", "ATS Lite", "직원·조직 관리", "직원 매뉴얼"],
     "SUPER_ADMIN": ["전자결재", "ATS Lite", "직원·조직 관리", "직원 매뉴얼"],
 }

@@ -1,5 +1,5 @@
 export type ManualStatus = "DRAFT" | "PUBLISHED";
-export type ManualRole = "SUPER_ADMIN" | "HR_ADMIN" | "TEAM_ADMIN" | "EMPLOYEE";
+export type ManualRole = "SUPER_ADMIN" | "HR_ADMIN" | "TEAM_ADMIN" | "PART_ADMIN" | "EMPLOYEE";
 export type ManualAssetType = "IMAGE" | "PDF";
 
 export interface ManualCategory {

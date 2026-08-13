@@ -15,6 +15,7 @@ from app.domain.employee_status import (
     requires_reason,
     supports_daily_work_status,
 )
+from app.domain.org_scope import DEPARTMENT_SCOPED_ROLES, is_org_scoped_role, is_within_scope
 from app.domain.test_accounts import E2E_EMPLOYEE_ID_PREFIX, is_e2e_employee
 from app.models.auth import EmployeeAccount
 from app.models.organization import Department, Employee, Team
@@ -31,7 +32,7 @@ from app.schemas.employee import (
 )
 from app.security.authorization import can_view_private_status_reasons
 from app.security.identity import ActorContext
-from app.security.permissions import HR_ADMIN, SUPER_ADMIN, TEAM_ADMIN
+from app.security.permissions import HR_ADMIN, SUPER_ADMIN
 
 logger = logging.getLogger(__name__)
 
@@ -45,12 +46,15 @@ class EmployeeService:
         if not is_e2e_employee(actor.employee_id):
             filters["exclude_employee_id_prefix"] = E2E_EMPLOYEE_ID_PREFIX
         if actor.role not in {SUPER_ADMIN, HR_ADMIN, "ADMIN", "HR_MANAGER"}:
-            if actor.role == TEAM_ADMIN:
+            if is_org_scoped_role(actor.role):
                 manager = self._require_employee(actor.employee_id)
-                if manager.team_id:
+                if actor.role in DEPARTMENT_SCOPED_ROLES:
+                    filters["visible_department_id"] = manager.department_id
+                elif manager.team_id:
                     filters["visible_team_id"] = manager.team_id
                 else:
-                    filters["visible_department_id"] = manager.department_id
+                    # 파트가 지정되지 않은 파트장은 관리 대상이 없으므로 본인만 남긴다.
+                    filters["visible_employee_id"] = actor.employee_id
             else:
                 filters["visible_employee_id"] = actor.employee_id
         return self.repository.list_employee_page(**filters)
@@ -67,9 +71,9 @@ class EmployeeService:
         if item is None:
             raise HTTPException(status_code=404, detail="직원을 찾을 수 없습니다.")
         if viewer is not None and viewer.role not in {SUPER_ADMIN, HR_ADMIN, "ADMIN", "HR_MANAGER"}:
-            if viewer.role == TEAM_ADMIN:
+            if is_org_scoped_role(viewer.role):
                 viewer_employee = self._require_employee(viewer.employee_id)
-                if not self._is_visible_to_team_manager(viewer_employee, item):
+                if not is_within_scope(viewer.role, viewer_employee, item):
                     raise HTTPException(
                         status_code=403, detail="다른 팀 직원 조회 권한이 없습니다."
                     )
@@ -279,20 +283,14 @@ class EmployeeService:
     def _require_status_update_permission(self, actor: ActorContext, employee: Employee) -> None:
         if actor.employee_id == employee.id or actor.role in {SUPER_ADMIN, HR_ADMIN, "ADMIN"}:
             return
-        if actor.role == TEAM_ADMIN:
+        if is_org_scoped_role(actor.role):
             actor_employee = self._require_employee(actor.employee_id)
-            if self._is_visible_to_team_manager(actor_employee, employee):
+            if is_within_scope(actor.role, actor_employee, employee):
                 return
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="본인, 같은 팀 관리자 또는 권한 있는 관리자만 상태를 변경할 수 있습니다.",
         )
-
-    @staticmethod
-    def _is_visible_to_team_manager(manager: Employee, employee: Employee | EmployeeDetail) -> bool:
-        if manager.team_id:
-            return manager.team_id == employee.team_id
-        return manager.department_id == employee.department_id
 
     def _can_view_private_status_reasons(self, viewer_id: str | None) -> bool:
         viewer = self.repository.get_employee_model(viewer_id) if viewer_id else None

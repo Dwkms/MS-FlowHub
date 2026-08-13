@@ -79,27 +79,59 @@ def test_admin_can_view_private_reason_detail(client: TestClient) -> None:
     assert response.json()["daily_work_reason"]["private_note"] == "진단 상세"
 
 
-def test_team_admin_can_update_same_team_but_not_other_team(client: TestClient) -> None:
+def test_part_admin_can_update_own_part_but_not_other_part(client: TestClient) -> None:
     client.app.dependency_overrides[get_authenticated_actor] = lambda: ActorContext(
-        employee_id="emp-ms0003", role="TEAM_ADMIN", auth_user_id="auth-team-admin"
+        employee_id="emp-ms0003", role="PART_ADMIN", auth_user_id="auth-sw-part-admin"
     )
 
-    same_team = client.put(
+    same_part = client.put(
         "/api/v1/employees/emp-ms0004/attendance",
         json={"work_status": "WORKING"},
     )
-    other_team = client.put(
+    other_part = client.put(
         "/api/v1/employees/emp-ms0008/attendance",
         json={"work_status": "WORKING"},
     )
 
-    assert same_team.status_code == 200
-    assert other_team.status_code == 403
+    assert same_part.status_code == 200
+    assert other_part.status_code == 403
 
 
-def test_team_admin_can_list_only_own_team_members(client: TestClient) -> None:
+def test_team_admin_can_update_any_part_in_the_department(client: TestClient) -> None:
+    """팀장은 산하 파트를 가리지 않는다. 파트장이 막히는 DEV_HW도 처리할 수 있다."""
     client.app.dependency_overrides[get_authenticated_actor] = lambda: ActorContext(
-        employee_id="emp-ms0003", role="TEAM_ADMIN", auth_user_id="auth-team-admin"
+        employee_id="emp-ms0002", role="TEAM_ADMIN", auth_user_id="auth-dev-head"
+    )
+
+    sw_part = client.put(
+        "/api/v1/employees/emp-ms0004/attendance",
+        json={"work_status": "WORKING"},
+    )
+    hw_part = client.put(
+        "/api/v1/employees/emp-ms0008/attendance",
+        json={"work_status": "WORKING"},
+    )
+
+    assert sw_part.status_code == 200
+    assert hw_part.status_code == 200
+
+
+def test_team_admin_cannot_update_other_department(client: TestClient) -> None:
+    client.app.dependency_overrides[get_authenticated_actor] = lambda: ActorContext(
+        employee_id="emp-ms0002", role="TEAM_ADMIN", auth_user_id="auth-dev-head"
+    )
+
+    response = client.put(
+        "/api/v1/employees/emp-ms0013/attendance",
+        json={"work_status": "WORKING"},
+    )
+
+    assert response.status_code == 403
+
+
+def test_part_admin_can_list_only_own_part_members(client: TestClient) -> None:
+    client.app.dependency_overrides[get_authenticated_actor] = lambda: ActorContext(
+        employee_id="emp-ms0003", role="PART_ADMIN", auth_user_id="auth-sw-part-admin"
     )
 
     response = client.get("/api/v1/employees")

@@ -9,7 +9,7 @@ export type LegacyJobRole =
 
 // employee_accounts.role (actual RBAC role, only accurate for the signed-in currentEmployee —
 // see current-user-provider.tsx, which overrides this field with the value from /api/v1/auth/me)
-export type AuthRole = "SUPER_ADMIN" | "HR_ADMIN" | "TEAM_ADMIN" | "EMPLOYEE";
+export type AuthRole = "SUPER_ADMIN" | "HR_ADMIN" | "TEAM_ADMIN" | "PART_ADMIN" | "EMPLOYEE";
 
 export type Role = LegacyJobRole | AuthRole;
 

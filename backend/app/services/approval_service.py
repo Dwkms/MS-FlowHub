@@ -1,6 +1,7 @@
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
+from app.domain.org_scope import is_org_scoped_role, is_within_scope
 from app.domain.recruitment_policy import is_recruitment_approver
 from app.models.approval import ApprovalDocument
 from app.repositories.approval_repository import ApprovalRepository
@@ -14,7 +15,6 @@ from app.schemas.approval import (
     ApprovalUpdate,
 )
 from app.security.identity import ActorContext
-from app.security.permissions import TEAM_ADMIN
 from app.services.recruitment_service import RecruitmentService
 
 
@@ -198,16 +198,20 @@ class ApprovalService:
             )
         if actor.role in {"SUPER_ADMIN", "ADMIN"}:
             return
-        if actor.role == TEAM_ADMIN and self._is_same_team(actor.employee_id, document.author_id):
+        if is_org_scoped_role(actor.role) and self._is_within_manage_scope(
+            actor.role, actor.employee_id, document.author_id
+        ):
             return
         if actor.employee_id != document.approver_id:
             raise HTTPException(
                 status_code=403, detail="지정된 결재자 또는 관리자만 처리할 수 있습니다."
             )
 
-    def _is_same_team(self, first_employee_id: str, second_employee_id: str) -> bool:
-        first = self.organization.get_employee_model(first_employee_id)
-        second = self.organization.get_employee_model(second_employee_id)
-        if first is None or second is None:
+    def _is_within_manage_scope(
+        self, role: str, manager_employee_id: str, target_employee_id: str
+    ) -> bool:
+        manager = self.organization.get_employee_model(manager_employee_id)
+        target = self.organization.get_employee_model(target_employee_id)
+        if manager is None or target is None:
             return False
-        return first.team_id is not None and first.team_id == second.team_id
+        return is_within_scope(role, manager, target)

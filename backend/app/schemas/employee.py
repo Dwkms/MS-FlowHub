@@ -41,7 +41,7 @@ class EmployeeUpdate(BaseModel):
 
 
 class EmployeeRoleUpdate(BaseModel):
-    role: Literal["SUPER_ADMIN", "HR_ADMIN", "TEAM_ADMIN", "EMPLOYEE"]
+    role: Literal["SUPER_ADMIN", "HR_ADMIN", "TEAM_ADMIN", "PART_ADMIN", "EMPLOYEE"]
 
 
 class EmployeeManagerSummary(BaseModel):
