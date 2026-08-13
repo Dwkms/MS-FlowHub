@@ -135,3 +135,52 @@
 - 장점: 외부 접속정보 없이 실제 CRUD와 상태 유지 가능
 - 주의사항: SQLite는 로컬 개발 fallback이며 메인·배포 DB가 아니다. Supabase에는 Alembic을 먼저 적용한다.
 - 이후 재검토 조건: Supabase 개발 프로젝트 연결 완료
+
+## 파트장 권한 역할 PART_ADMIN 신설
+
+- 날짜: 2026-08-13
+- 상태: 설계 확정 · **구현은 Feature Freeze 해제 이후**
+- 배경: 조직은 팀장 → 파트장 → 팀원의 보고 체계다. 팀장은 자신의 팀 전체(산하 1팀·2팀 등 모든 파트)를, 파트장은 자기 파트 팀원만 관리해야 한다. 현재는 파트장에게 줄 역할이 `TEAM_ADMIN`밖에 없어 범위가 맞지 않는다.
+- 결정 내용: `PART_ADMIN`을 신설하고, 각 역할의 범위 기준을 **컬럼에 고정**한다.
+
+  | 역할 | 대상 | 범위 기준 | 관리 대상 |
+  |---|---|---|---|
+  | `SUPER_ADMIN` | 최고관리자 | 전체 | 전사 |
+  | `HR_ADMIN` | 인사담당 | 전체 | 전사 |
+  | `TEAM_ADMIN` | **팀장** | `department_id` **고정** | 부서 전체(산하 모든 파트) |
+  | `PART_ADMIN` | **파트장** | `team_id` **고정** | 자기 파트 팀원만 |
+  | `EMPLOYEE` | 사원 | 본인 | 본인 |
+
+  `PART_ADMIN`의 세부 권한은 `TEAM_ADMIN`과 같되 범위만 파트로 좁힌다. **비공개 근태 사유 열람은 두 역할 모두 불가**를 유지한다(`PRIVATE_REASON_VIEWER_ROLES` 미포함).
+
+- 영향을 받는 영역
+  - `security/permissions.py` — 상수 추가
+  - `schemas/employee.py`, `schemas/manual.py` — `Literal` 역할 목록 추가
+  - `services/employee_service.py` — 목록·상세·상태변경 3개 분기
+  - `services/approval_service.py` — `_is_same_team`을 역할별 분기로 교체
+  - `services/dashboard_service.py` — `_MODULE_ACCESS` 항목 추가
+  - `api/dependencies.py` — `require_roles` 대상 갱신
+  - `scripts/seed_auth_accounts.py`, `scripts/seed_manuals.py` — 역할 배정과 매뉴얼 권한 설명
+  - **DB migration 불필요** — `employees.role`이 `String(30)`이라 값만 추가하면 된다
+
+- 장점
+  - 역할 이름과 관리 범위가 1:1로 대응해 보고 체계가 시스템에 그대로 드러난다.
+  - 현재의 암묵적 분기가 사라진다. 지금은 `TEAM_ADMIN`이 `team_id`가 있으면 파트 범위, 없으면 부서 범위로 **같은 역할이 두 가지로 동작**한다(`employee_service.list`). 범위가 nullable 컬럼에 좌우되지 않게 된다.
+  - 기존에 발견된 불일치도 함께 해소된다. `approval_service._is_same_team`은 `team_id`가 `NULL`이면 항상 `False`이므로, **부서 단위로 동작하던 `TEAM_ADMIN`(팀장)은 직원 목록은 다 보이는데 결재는 한 건도 처리할 수 없었다.**
+
+- 주의사항
+  - **기존 `TEAM_ADMIN` 5명(`MS0002`·`MS0012`·`MS0015`·`MS0035`·`MS0045`)을 먼저 재분류해야 한다.** 로직을 부서 고정으로 바꾸면 `team_id`를 가진 보유자는 권한이 파트에서 부서로 **확대**된다. 실제 직책에 따라 팀장은 `TEAM_ADMIN` 유지, 파트장은 `PART_ADMIN`으로 전환한 뒤에 로직을 바꾼다.
+  - 용어 충돌에 주의한다. DB의 `teams` 테이블은 [`DATA_MODEL.md`](DATA_MODEL.md) 기준 **부서 산하 파트**(`DEV_SW`/`DEV_HW`/`DEV_QA`)를 뜻한다. 따라서 `PART_ADMIN`은 `teams.id`로, `TEAM_ADMIN`은 `departments.id`로 범위를 잡는다.
+  - 지원자(ATS) 접근 범위는 현행 유지가 기본이다. 등록·수정·단계변경은 `SUPER_ADMIN`·`HR_ADMIN` 전용이고, `PART_ADMIN`에게는 조회 권한도 열지 않는 쪽을 우선 검토한다.
+- 이후 재검토 조건: 파트가 3계층 이상으로 깊어지거나, 결재선을 조직 계층에서 자동 산출하게 될 때
+
+## 대시보드 운영 데이터 정책
+
+- 날짜: 2026-08-13
+- 상태: 채택
+- 배경: 대시보드의 평균 결재 처리시간·지원자 전형단계 분포 같은 지표는 건수가 쌓여야 의미가 생긴다. 도입 초기에는 실데이터가 적어 비어 보인다. 검증·시연용 업무 데이터를 운영에 넣을지 결정이 필요했다.
+- 결정 내용: **운영 DB에는 가짜 업무 데이터를 넣지 않는다.** 대시보드는 실데이터만으로 동작하며, 비어 보이는 것은 도입 초기의 정상 상태로 본다. 시연이 필요하면 기존 E2E 계정 격리 방식(`E2E_EMPLOYEE_ID_PREFIX`·`is_e2e_employee`)과 동일하게 접두어로 표식하고 지표 집계에서 제외하며, **배포 단계에서는 제외한다.**
+- 영향을 받는 영역: `services/dashboard_service.py`, 운영 데이터 운영 지침
+- 장점: 실제 업무 기록과 시연용 기록이 섞이지 않는다. 지표 신뢰도를 유지한다.
+- 주의사항: 시연 데이터를 만들 경우 접두어 표식과 집계 제외를 **함께** 적용해야 한다. 한쪽만 하면 통계가 오염된다.
+- 이후 재검토 조건: 실사용 누적으로도 지표가 유의미해지지 않을 때
