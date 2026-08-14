@@ -1,5 +1,5 @@
 import { apiGet, apiRequest } from "@/lib/api-client";
-import type { AttendanceChangeHistoryItem, Department, EmployeeDetail, EmployeePage, OrganizationNode } from "@/types/employee";
+import type { AttendanceChangeHistoryItem, Department, EmployeeDetail, EmployeePage } from "@/types/employee";
 
 export type EmployeeFilters = {
   page: number;
