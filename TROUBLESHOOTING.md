@@ -23,6 +23,7 @@
 - [화면은 뜨는데 API만 502 (운영)](#화면은-뜨는데-api만-502-운영)
 - [master에 반영했는데 운영에 배포되지 않음](#master에-반영했는데-운영에-배포되지-않음)
 - [검증이 실패했는데 커밋·push가 그대로 나감](#검증이-실패했는데-커밋push가-그대로-나감)
+- [alembic 실행 시 ImportError: cannot import name '<model>'](#alembic-실행-시-importerror-cannot-import-name-model)
 
 ## 화면은 뜨는데 API만 502 (운영)
 
@@ -115,6 +116,50 @@ pytest -q > /tmp/pt.txt 2>&1; echo "exit=$?"; tail -2 /tmp/pt.txt
 ### 결과적으로 확인된 것
 
 이 사고 덕분에 배포 게이트의 **차단 동작이 실증됐습니다.** CI가 실패한 `9a7864b`는 배포되지 않았고, 수정본 `dda951e`만 Live가 됐습니다.
+
+## alembic 실행 시 ImportError: cannot import name '<model>'
+
+`alembic upgrade head`가 마이그레이션을 시작하기도 전에 죽습니다.
+
+```
+File "backend\migrations\env.py", line 8, in <module>
+    from app.models import approval, auth, manual, notification, organization, recruitment
+ImportError: cannot import name 'notification' from 'app.models'
+```
+
+### 원인
+
+**모델 파일을 지웠는데 `backend/migrations/env.py`의 import를 안 고친 것입니다.**
+
+`env.py`는 autogenerate가 `Base.metadata`를 채우도록 모든 모델 모듈을 한 줄로 import합니다.
+이 줄은 `# noqa: F401`이 붙어 있어 **Ruff가 미사용 import로 잡아주지 않습니다.** 그래서
+`ruff check`·`pytest`가 전부 통과해도 alembic만 따로 깨집니다.
+
+2026-08-14 알림 기능 제거 때 실제로 겪었습니다. 코드·테스트·배포까지 다 통과한 뒤
+migration 적용 단계에서야 드러났습니다.
+
+### 판별
+
+모델을 지웠으면 `env.py`의 import 목록과 실제 모델 파일을 대조합니다.
+
+```bash
+grep -n "from app.models import" backend/migrations/env.py
+ls backend/app/models/
+```
+
+`alembic current`가 가장 확실합니다. env.py를 그대로 불러오므로 import가 깨져 있으면 여기서 바로 터집니다.
+
+### 해결
+
+`env.py`의 import 목록에서 지운 모델을 빼면 됩니다.
+
+**모델을 삭제할 때 함께 볼 곳** — 셋 다 `# noqa`가 붙어 Ruff에 안 걸립니다.
+
+| 파일 | 역할 |
+|---|---|
+| `backend/app/models/__init__.py` | 모델 패키지 export |
+| `backend/migrations/env.py` | autogenerate용 메타데이터 수집 |
+| `backend/tests/conftest.py` | 테스트 DB 테이블 생성 |
 
 ## 채용 요청 작성이 500으로 끝남
 
