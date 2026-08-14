@@ -2,7 +2,7 @@
 
 > 상태값의 **의미와 전이 규칙**은 [`DOMAIN.md`](DOMAIN.md), 계층 구조는 [`ARCHITECTURE.md`](ARCHITECTURE.md).
 > 이 문서는 테이블·컬럼·관계만 다룹니다.
-> 2026-08-14 확인: 18개 테이블과 migration `20260814_0024`까지 실제 모델과 일치합니다.
+> 2026-08-14 확인: 업무 테이블 18개가 실제 모델과 일치하고, 운영 DB는 migration `20260814_0024`입니다.
 
 ## 1. 문서 개요
 
@@ -30,8 +30,8 @@
 ## 3. 현재 데이터베이스 요약
 
 - 운영 DB는 **Supabase PostgreSQL 전용**입니다. SQLite 등 다른 런타임 DB는 사용하지 않습니다.
-- 현재 Alembic head는 `20260812_0022_ai_generations.py`이며, 총 22개 migration이 적용되어 있습니다.
-- 스키마는 `public` 한 곳에 총 **18개 테이블**(`alembic_version` 포함)로 구성됩니다.
+- 현재 Alembic head는 `20260814_0024_drop_notifications.py`입니다.
+- 스키마는 `public` 한 곳이며 **업무 테이블 18개 + `alembic_version` 1개 = 19개**입니다. (2026-08-14 운영 DB 실측)
 - 프론트엔드는 Supabase 업무 테이블에 직접 접근하지 않고, 항상 FastAPI 백엔드를 거칩니다.
 - DB 레벨 `CHECK` 제약이 걸린 상태값은 `approval_documents.status`, `recruitment_requests.status`, `applicants.stage` 3곳뿐이며, 그 외 상태값(근태 상태, 직원 재직 상태, 매뉴얼 상태 등)은 애플리케이션 레이어(Pydantic `Literal`, `app/domain/employee_status.py`)에서 검증합니다.
 
@@ -91,7 +91,6 @@ erDiagram
     DEPARTMENTS ||--o{ RECRUITMENT_REQUESTS : "requests"
     EMPLOYEES ||--o{ RECRUITMENT_REQUESTS : "requests / approves"
     RECRUITMENT_REQUESTS ||--o| JOB_POSTINGS : "creates"
-    EMPLOYEES ||--o{ NOTIFICATIONS : "receives"
     JOB_POSTINGS ||--o{ APPLICANTS : "receives"
     EMPLOYEES ||--o{ APPLICANTS : "registers"
     APPLICANTS ||--o{ APPLICANT_STAGE_HISTORIES : "logs"
