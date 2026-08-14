@@ -1,5 +1,22 @@
 "use client";
 
+/**
+ * 직원·조직 관리 화면.
+ *
+ * 이 파일에서 가장 조심할 곳은 아래 `canEditSelected`입니다. **화면에 편집 버튼을
+ * 보일지 말지**를 정할 뿐이고, 실제 차단은 서버가 다시 합니다. 여기 조건을 느슨하게
+ * 해도 API가 403을 돌려주므로 데이터가 새지는 않지만, 반대로 여기만 고치고 서버를
+ * 안 고치면 사용자는 버튼을 눌렀다가 오류를 보게 됩니다.
+ *
+ * 목록에 **누가 보이는지는 서버가 정합니다.** 프론트에서 거르지 않습니다. 파트장이
+ * 로그인하면 서버가 이미 자기 파트 직원만 담아 보냅니다
+ * (백엔드 `app/domain/org_scope.py`).
+ *
+ * 조직도는 API가 아니라 정적 PNG를 씁니다. `GET /employees/organization`이 있는데도
+ * 이미지를 쓰는 이유는 계층을 그리는 화면을 따로 만들지 않았기 때문입니다.
+ * 후속 과제로 `docs/ROADMAP.md`에 남겨 뒀습니다.
+ */
+
 import Image from "next/image";
 import { type FormEvent, useEffect, useState } from "react";
 
@@ -162,6 +179,12 @@ export function EmployeeManagement() {
       setAttendanceHistory(items);
     }).catch(() => setError("직원 상세 정보를 불러오지 못했습니다."));
   };
+  // 편집 권한 판정 — 서버의 app/domain/org_scope.py와 같은 규칙을 씁니다.
+  //   관리자          전사
+  //   팀장            같은 부서면 가능
+  //   파트장          같은 파트면 가능 (파트가 없으면 불가)
+  //   본인            자기 정보는 언제나 가능
+  // 규칙을 바꿀 때는 서버도 함께 고쳐야 화면과 판정이 어긋나지 않습니다.
   const canEditSelected = Boolean(selected && (
     ["SUPER_ADMIN", "HR_ADMIN"].includes(currentEmployee.role)
     // 팀장은 부서 전체, 파트장은 자기 파트만. 범위 기준을 역할에 고정해

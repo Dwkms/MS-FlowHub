@@ -1,5 +1,21 @@
 "use client";
 
+/**
+ * 로그인하지 않은 사용자를 로그인 화면으로 돌려보내는 문지기.
+ *
+ * 페이지마다 인증 검사를 넣으면 새 페이지를 만들 때 빠뜨리기 쉽습니다. 레이아웃에서
+ * 한 번 감싸 모든 화면에 적용합니다. `/login`과 `/change-password`만 예외입니다.
+ *
+ * 로그인 화면으로 보내는 경로가 **두 개**라 주의가 필요합니다.
+ *   1. Supabase의 `onAuthStateChange` — 토큰이 만료되거나 로그아웃했을 때
+ *   2. `useSessionTimeout` — 창을 닫아둔 시간이 기준을 넘었을 때
+ *
+ * 둘 중 어느 쪽이 먼저 동작할지 알 수 없어서, 자리 비움으로 끊긴 경우를 `timedOutRef`에
+ * 미리 적어 둡니다. 그래야 두 경로 모두 `/login?reason=timeout`으로 가고 사용자가
+ * "왜 로그아웃됐지"를 알 수 있습니다. `useState`가 아니라 `useRef`인 이유는 이 값이
+ * 화면을 다시 그릴 필요가 없는 정보이기 때문입니다.
+ */
+
 import { usePathname, useRouter } from "next/navigation";
 import { type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 
