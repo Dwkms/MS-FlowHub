@@ -14,14 +14,20 @@ from app.db.session import SessionLocal
 from app.models.auth import EmployeeAccount
 from app.models.organization import Employee
 
+# 직책과 역할을 1:1로 맞춘다. 팀장은 부서 전체(TEAM_ADMIN), 파트장은 자기 파트만
+# (PART_ADMIN) 관리한다. 범위 판정은 app/domain/org_scope.py에 있다.
 ROLE_BY_EMPLOYEE_NO = {
-    "MS0001": "SUPER_ADMIN",
-    "MS0025": "HR_ADMIN",
-    "MS0002": "TEAM_ADMIN",
-    "MS0015": "TEAM_ADMIN",
-    "MS0035": "TEAM_ADMIN",
-    "MS0045": "TEAM_ADMIN",
-    "MS0012": "TEAM_ADMIN",
+    "MS0001": "SUPER_ADMIN",  # 김민성 대표이사
+    "MS0025": "HR_ADMIN",  # 이현정 인사팀장
+    # 팀장 — 소속 부서 전체
+    "MS0002": "TEAM_ADMIN",  # 박준혁 개발팀장
+    "MS0015": "TEAM_ADMIN",  # 강수아 마케팅팀장
+    "MS0035": "TEAM_ADMIN",  # 박서준 기획팀장
+    "MS0045": "TEAM_ADMIN",  # 김태윤 CS팀장
+    # 파트장 — 자기 파트만
+    "MS0003": "PART_ADMIN",  # 이서진 SW파트장
+    "MS0008": "PART_ADMIN",  # 김도윤 HW파트장
+    "MS0012": "PART_ADMIN",  # 최다은 QA파트장
 }
 
 
