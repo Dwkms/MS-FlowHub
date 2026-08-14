@@ -181,3 +181,14 @@ class TestDraftContextPrefersDatabase:
         context = self._generation_input(client, posting_id, {"work_location": "서울 본사"})
 
         assert context["work_location"] == "서울 본사"
+
+
+def test_part_leader_can_be_selected_as_approver() -> None:
+    """파트장은 팀원의 상급자이므로 결재자로 지정될 수 있어야 한다."""
+    from app.domain.recruitment_policy import is_recruitment_approver
+
+    assert is_recruitment_approver("파트장") is True
+    assert is_recruitment_approver("팀장") is True
+    assert is_recruitment_approver("대표이사") is True
+    assert is_recruitment_approver("선임") is False
+    assert is_recruitment_approver("사원") is False

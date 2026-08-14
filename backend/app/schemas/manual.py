@@ -5,7 +5,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 ManualStatus = Literal["DRAFT", "PUBLISHED"]
 ManualAssetType = Literal["IMAGE", "PDF"]
-ManualRole = Literal["SUPER_ADMIN", "HR_ADMIN", "TEAM_ADMIN", "EMPLOYEE"]
+ManualRole = Literal["SUPER_ADMIN", "HR_ADMIN", "TEAM_ADMIN", "PART_ADMIN", "EMPLOYEE"]
 
 
 class ManualBaseModel(BaseModel):

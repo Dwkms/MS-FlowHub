@@ -159,7 +159,7 @@ export function ApprovalForm() {
                 </option>
               ))}
             </select>
-            <small className="file-help">팀장급 이상만 결재자로 지정할 수 있습니다.</small>
+            <small className="file-help">파트장급 이상만 결재자로 지정할 수 있습니다.</small>
           </label>
           <ApprovalDraftPanel
             documentType={documentType}

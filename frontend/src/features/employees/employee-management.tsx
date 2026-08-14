@@ -164,12 +164,16 @@ export function EmployeeManagement() {
   };
   const canEditSelected = Boolean(selected && (
     ["SUPER_ADMIN", "HR_ADMIN"].includes(currentEmployee.role)
+    // 팀장은 부서 전체, 파트장은 자기 파트만. 범위 기준을 역할에 고정해
+    // 백엔드 app/domain/org_scope.py와 같은 규칙을 쓴다.
     || (
       currentEmployee.role === "TEAM_ADMIN"
-      && (
-        (currentEmployee.team_code != null && currentEmployee.team_code === selected.team_code)
-        || (currentEmployee.team_code == null && currentEmployee.department_id === selected.department_id)
-      )
+      && currentEmployee.department_id === selected.department_id
+    )
+    || (
+      currentEmployee.role === "PART_ADMIN"
+      && currentEmployee.team_code != null
+      && currentEmployee.team_code === selected.team_code
     )
     || currentEmployee.id === selected.id
   ));

@@ -72,9 +72,9 @@ def test_department_manager_can_list_entire_department(client: TestClient) -> No
     }
 
 
-def test_part_manager_can_list_only_own_part(client: TestClient) -> None:
+def test_part_admin_can_list_only_own_part(client: TestClient) -> None:
     client.app.dependency_overrides[get_authenticated_actor] = lambda: ActorContext(
-        employee_id="emp-ms0047", role="TEAM_ADMIN", auth_user_id="auth-qa-manager"
+        employee_id="emp-ms0047", role="PART_ADMIN", auth_user_id="auth-qa-manager"
     )
 
     response = client.get("/api/v1/employees?page_size=100")
@@ -84,13 +84,36 @@ def test_part_manager_can_list_only_own_part(client: TestClient) -> None:
     assert {item["team_code"] for item in response.json()["items"]} == {"DEV_QA"}
 
 
-def test_other_team_managers_can_list_only_their_teams(client: TestClient) -> None:
-    manager_scopes = (
+def test_part_admins_are_confined_to_their_own_part(client: TestClient) -> None:
+    part_scopes = (
         ("emp-ms0012", "MKT_1", 5),
         ("emp-ms0032", "PLAN_1", 5),
         ("emp-ms0042", "CS_1", 5),
     )
-    for employee_id, team_code, expected_total in manager_scopes:
+    for employee_id, team_code, expected_total in part_scopes:
+        client.app.dependency_overrides[get_authenticated_actor] = lambda employee_id=employee_id: (
+            ActorContext(
+                employee_id=employee_id,
+                role="PART_ADMIN",
+                auth_user_id=f"auth-{employee_id}",
+            )
+        )
+
+        response = client.get("/api/v1/employees?page_size=100")
+
+        assert response.status_code == 200
+        assert response.json()["total"] == expected_total
+        assert {item["team_code"] for item in response.json()["items"]} == {team_code}
+
+
+def test_team_admin_lists_the_whole_department_across_parts(client: TestClient) -> None:
+    """팀장은 산하 모든 파트를 본다. 파트장(`PART_ADMIN`)과 갈리는 지점이다."""
+    department_scopes = (
+        # (팀장 사번, 부서 코드, 부서 인원, 부서에 속한 파트 코드)
+        ("emp-ms0012", "MKT", 10, {"MKT_1", "MKT_2"}),
+        ("emp-ms0032", "PLAN", 10, {"PLAN_1", "PLAN_2"}),
+    )
+    for employee_id, department_code, expected_total, team_codes in department_scopes:
         client.app.dependency_overrides[get_authenticated_actor] = lambda employee_id=employee_id: (
             ActorContext(
                 employee_id=employee_id,
@@ -103,7 +126,41 @@ def test_other_team_managers_can_list_only_their_teams(client: TestClient) -> No
 
         assert response.status_code == 200
         assert response.json()["total"] == expected_total
-        assert {item["team_code"] for item in response.json()["items"]} == {team_code}
+        assert {item["department_code"] for item in response.json()["items"]} == {department_code}
+        assert {item["team_code"] for item in response.json()["items"]} == team_codes
+
+
+def test_team_admin_without_part_still_sees_the_department(client: TestClient) -> None:
+    """`team_id`가 비어 있는 팀장도 부서 전체를 본다.
+
+    범위 기준이 역할에 고정돼 있으므로 `team_id` 유무가 결과를 바꾸지 않는다.
+    """
+    client.app.dependency_overrides[get_authenticated_actor] = lambda: ActorContext(
+        employee_id="emp-ms0002", role="TEAM_ADMIN", auth_user_id="auth-dev-head"
+    )
+
+    response = client.get("/api/v1/employees?page_size=100")
+
+    assert response.status_code == 200
+    assert {item["department_code"] for item in response.json()["items"]} == {"DEV"}
+    assert {item["team_code"] for item in response.json()["items"]} == {
+        None,
+        "DEV_SW",
+        "DEV_HW",
+        "DEV_QA",
+    }
+
+
+def test_part_admin_without_part_sees_only_self(client: TestClient) -> None:
+    """파트가 지정되지 않은 파트장은 부서 전체로 넓어지지 않는다."""
+    client.app.dependency_overrides[get_authenticated_actor] = lambda: ActorContext(
+        employee_id="emp-ms0002", role="PART_ADMIN", auth_user_id="auth-dev-head"
+    )
+
+    response = client.get("/api/v1/employees?page_size=100")
+
+    assert response.status_code == 200
+    assert [item["id"] for item in response.json()["items"]] == ["emp-ms0002"]
 
 
 def test_dashboard_reflects_selected_employee_access(client: TestClient) -> None:

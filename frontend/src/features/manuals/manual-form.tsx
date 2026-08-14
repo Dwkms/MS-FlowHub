@@ -8,7 +8,7 @@ import { createManual, deleteManual, getManual, listManualCategories, updateManu
 import type { ManualAssetInput, ManualCategory, ManualInput, ManualRole, ManualStatus } from "@/types/manual";
 
 const roles: { value: ManualRole; label: string }[] = [
-  { value: "SUPER_ADMIN", label: "최고 관리자" }, { value: "HR_ADMIN", label: "인사 관리자" }, { value: "TEAM_ADMIN", label: "팀 관리자" }, { value: "EMPLOYEE", label: "직원" },
+  { value: "SUPER_ADMIN", label: "최고 관리자" }, { value: "HR_ADMIN", label: "인사 관리자" }, { value: "TEAM_ADMIN", label: "팀 관리자" }, { value: "PART_ADMIN", label: "파트 관리자" }, { value: "EMPLOYEE", label: "직원" },
 ];
 const initialInput: ManualInput = { category_id: "", title: "", summary: "", content: "", target_roles: roles.map((role) => role.value), is_pinned: false, status: "PUBLISHED", assets: [] };
 

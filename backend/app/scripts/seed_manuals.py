@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 from app.db.session import SessionLocal
 from app.models.manual import Manual, ManualAsset, ManualCategory
 
-ALL_ROLES = ["SUPER_ADMIN", "HR_ADMIN", "TEAM_ADMIN", "EMPLOYEE"]
+ALL_ROLES = ["SUPER_ADMIN", "HR_ADMIN", "TEAM_ADMIN", "PART_ADMIN", "EMPLOYEE"]
 CATEGORIES = [
     ("manual-category-account", "로그인·계정", "로그인, 비밀번호, 세션 사용 안내", 1),
     ("manual-category-dashboard", "업무 홈 대시보드", "업무 현황과 바로가기 안내", 2),

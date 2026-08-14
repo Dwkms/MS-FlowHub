@@ -27,6 +27,7 @@ from app.security.identity import ActorContext
 from app.security.permissions import (
     EMPLOYEE,
     HR_ADMIN,
+    PART_ADMIN,
     SUPER_ADMIN,
     TEAM_ADMIN,
     require_roles,
@@ -103,7 +104,7 @@ def require_employee_management_permission(actor: AuthenticatedActor) -> ActorCo
 
 
 def require_approval_permission(actor: AuthenticatedActor) -> ActorContext:
-    require_roles(actor, SUPER_ADMIN, HR_ADMIN, TEAM_ADMIN, EMPLOYEE)
+    require_roles(actor, SUPER_ADMIN, HR_ADMIN, TEAM_ADMIN, PART_ADMIN, EMPLOYEE)
     return actor
 
 

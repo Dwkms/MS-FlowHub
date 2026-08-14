@@ -62,7 +62,7 @@ def test_general_employee_cannot_be_selected_as_approver(client: TestClient) -> 
     )
 
     assert response.status_code == 422
-    assert response.json()["detail"] == "결재자는 팀장급 이상만 지정할 수 있습니다."
+    assert response.json()["detail"] == "결재자는 파트장급 이상만 지정할 수 있습니다."
 
 
 def test_draft_cannot_change_approver_to_general_employee(client: TestClient) -> None:
@@ -201,6 +201,61 @@ def test_team_admin_can_approve_same_team_document(client: TestClient) -> None:
 
     assert submitted.status_code == 200
     assert response.status_code == 200
+
+
+def test_team_admin_without_team_can_approve_department_document(client: TestClient) -> None:
+    """`team_id`가 비어 있는 팀장도 같은 부서 문서를 처리할 수 있어야 한다.
+
+    이전에는 관리자 경로가 `team_id` 일치만 확인해서, `team_id`가 없는 팀장은
+    지정 결재자로 걸린 문서 외에는 한 건도 처리할 수 없었다.
+    """
+    set_authenticated_actor(client, "emp-sales")
+    created = client.post(
+        "/api/v1/approvals",
+        json={
+            "title": "Sales laptop request",
+            "document_type": "GENERAL",
+            "content": "Request a laptop for the sales team.",
+            "department_id": "dept-sales",
+            "approver_id": "emp-head",
+        },
+    )
+    assert created.status_code == 201
+    draft = created.json()
+    submitted = client.post(f"/api/v1/approvals/{draft['id']}/submit", json={})
+
+    set_authenticated_actor(client, "emp-sales-head", role="TEAM_ADMIN")
+    response = client.post(f"/api/v1/approvals/{draft['id']}/approve", json={})
+
+    assert submitted.status_code == 200
+    assert response.status_code == 200
+
+
+def test_team_admin_cannot_approve_other_department_document(client: TestClient) -> None:
+    draft = create_draft(client, approver_id="emp-hr")
+    submitted = client.post(f"/api/v1/approvals/{draft['id']}/submit", json={})
+    set_authenticated_actor(client, "emp-sales-head", role="TEAM_ADMIN")
+
+    response = client.post(f"/api/v1/approvals/{draft['id']}/approve", json={})
+
+    assert submitted.status_code == 200
+    assert response.status_code == 403
+
+
+def test_part_admin_can_approve_only_within_own_part(client: TestClient) -> None:
+    """파트장은 같은 파트 문서만 처리한다. 부서가 같아도 파트가 다르면 막힌다."""
+    same_part = create_draft(client, approver_id="emp-hr")
+    client.post(f"/api/v1/approvals/{same_part['id']}/submit", json={})
+    set_authenticated_actor(client, "emp-product-head", role="PART_ADMIN")
+    allowed = client.post(f"/api/v1/approvals/{same_part['id']}/approve", json={})
+
+    other_part = create_draft(client, approver_id="emp-hr")
+    client.post(f"/api/v1/approvals/{other_part['id']}/submit", json={})
+    set_authenticated_actor(client, "emp-sales-head", role="PART_ADMIN")
+    denied = client.post(f"/api/v1/approvals/{other_part['id']}/approve", json={})
+
+    assert allowed.status_code == 200
+    assert denied.status_code == 403
 
 
 def test_team_admin_can_reject_assigned_document(client: TestClient) -> None:
