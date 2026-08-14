@@ -24,6 +24,7 @@
 - [master에 반영했는데 운영에 배포되지 않음](#master에-반영했는데-운영에-배포되지-않음)
 - [검증이 실패했는데 커밋·push가 그대로 나감](#검증이-실패했는데-커밋push가-그대로-나감)
 - [alembic 실행 시 ImportError: cannot import name '<model>'](#alembic-실행-시-importerror-cannot-import-name-model)
+- [E2E 종료 후 테스트 계정이 지워지지 않음](#e2e-종료-후-테스트-계정이-지워지지-않음)
 
 ## 화면은 뜨는데 API만 502 (운영)
 
@@ -160,6 +161,77 @@ ls backend/app/models/
 | `backend/app/models/__init__.py` | 모델 패키지 export |
 | `backend/migrations/env.py` | autogenerate용 메타데이터 수집 |
 | `backend/tests/conftest.py` | 테스트 DB 테이블 생성 |
+
+## E2E 종료 후 테스트 계정이 지워지지 않음
+
+`npm run test:e2e`가 테스트는 전부 통과하는데 마지막 정리에서 실패합니다.
+
+```
+psycopg.errors.ForeignKeyViolation: update or delete on table "approval_documents"
+violates foreign key constraint "recruitment_requests_approval_document_id_fkey"
+Error: app.scripts.cleanup_test_auth_accounts 실행에 실패했습니다.
+```
+
+정리가 멈췄으므로 **E2E 계정이 운영 DB에 그대로 남습니다.**
+
+### 원인
+
+**E2E 계정으로 화면을 수동 조작하면 업무 데이터가 생깁니다.**
+
+E2E 계정은 자동 테스트용이지만, 사람이 그 계정으로 로그인해 채용 요청을 만들면 결재 문서·
+채용 요청·공고·지원자·AI 기록이 그 계정 이름으로 남습니다. 직원을 참조하는 FK는 대부분
+`RESTRICT`라, 그 데이터가 있는 한 계정을 지울 수 없습니다.
+
+2026-08-14에 겪은 실제 상황입니다. 참조가 6개 테이블에 걸쳐 23건 있었습니다.
+
+```
+approval_histories.actor_id        9건
+ai_generations.created_by_id       6건
+approval_documents.author_id       3건
+approval_documents.approver_id     2건
+employee_accounts.employee_id      2건   (CASCADE)
+recruitment_requests.requester_id  1건
+```
+
+작성자 한 곳만 바꿔서는 해결되지 않습니다. 다음 FK에서 다시 막힙니다.
+
+### 판별
+
+계정을 지우기 전에 참조를 세어 봅니다.
+
+```powershell
+cd backend
+.\.venv\Scripts\python.exe -m app.scripts.cleanup_test_auth_accounts --e2e-only
+```
+
+현재 스크립트는 **연쇄 삭제로 밀어붙이지 않고** 어떤 테이블에 몇 건이 남았는지 출력하고
+중단합니다. 출력된 목록이 곧 처리해야 할 대상입니다.
+
+### 해결
+
+업무 데이터가 시연에 필요한지 먼저 판단합니다.
+
+**보존할 경우** — 해당 레코드의 작성자를 실제 직원으로 옮깁니다. 옮길 곳은 업무 흐름상
+자연스러운 사람이어야 합니다. 백엔드 개발자 채용 요청이면 개발팀장이 요청하고 대표이사가
+결재하는 형태가 맞습니다.
+
+**주의**: 결재자와 같은 사람으로 옮기면 안 됩니다. 이 프로젝트는 "작성자와 결재자는 같을 수
+없다"와 "본인 문서 자가승인 금지"를 업무 규칙으로 막고 있어서, 코드가 막는 상태를 데이터로
+만들어 두면 나중에 읽는 사람이 규칙을 오해합니다.
+
+이관은 **단일 트랜잭션**으로 묶고 마지막에 참조가 0건인지 확인한 뒤 커밋합니다. 하나라도
+남으면 전체를 롤백해야 합니다. 절반만 바뀐 상태가 가장 나쁩니다.
+
+**버릴 경우** — 연결된 공고·지원자까지 함께 사라진다는 점을 확인하고 지웁니다. 대시보드
+ATS 지표가 그 데이터로 계산되므로 지우면 0이 됩니다.
+
+### 예방
+
+**E2E 계정으로 수동 검증을 하지 마세요.** 화면을 손으로 확인할 때는 실제 직원 계정을 씁니다.
+E2E 계정은 자동 테스트가 만들고 지우는 용도입니다.
+
+`E2E 결재 `로 시작하는 문서만 자동 삭제 대상입니다. 그 밖의 제목을 가진 문서는 사람이 만든
+것으로 보고 스크립트가 건드리지 않습니다.
 
 ## 채용 요청 작성이 500으로 끝남
 
