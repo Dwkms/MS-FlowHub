@@ -103,7 +103,7 @@ class JobPostingUpdate(RecruitmentBaseModel):
 
     `status`를 **일부러 받지 않는다.** 이 API는 AI 초안을 공고에 반영하는 데도 쓰이므로,
     상태 필드를 열어두면 AI 흐름이 공고를 게시 상태로 바꾸는 경로가 생긴다. 게시 판단은
-    사람이 별도 경로로 한다(docs/AI_AUTOMATION_PLAN.md 18장).
+    사람이 별도 경로로 한다(docs/archive/AI_AUTOMATION_PLAN.md 18장).
     """
 
     title: str | None = Field(default=None, min_length=1, max_length=200)

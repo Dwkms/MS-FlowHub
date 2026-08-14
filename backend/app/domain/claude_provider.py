@@ -1,7 +1,7 @@
 """Anthropic Claude Provider.
 
 공식 SDK를 쓴다. HTTP를 직접 부르지 않는 이유는 Structured Output 스키마 정리·검증과
-재시도를 SDK가 이미 제공하기 때문이다(docs/AI_AUTOMATION_PLAN.md 10장).
+재시도를 SDK가 이미 제공하기 때문이다(docs/archive/AI_AUTOMATION_PLAN.md 10장).
 
 이 모듈은 `anthropic`을 import하므로, Mock 경로가 SDK에 의존하지 않도록
 `app/api/dependencies.py`에서 **실제 Provider가 필요할 때만** 지연 import한다.

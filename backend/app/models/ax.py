@@ -11,7 +11,7 @@ class AxChatLog(Base):
 
     `employee_id`를 저장하지 않는다(익명). 품질 개선에는 누가 물었는지가 필요 없고,
     46명 규모 조직에서 "누가 병가 관련 질문을 했는지"가 남으면 그 자체로 민감 정보가 된다.
-    설계 근거는 docs/AX_FAQ_CHATBOT_PLAN.md 7장 참조.
+    설계 근거는 docs/archive/AX_FAQ_CHATBOT_PLAN.md 7장 참조.
     """
 
     __tablename__ = "ax_chat_logs"

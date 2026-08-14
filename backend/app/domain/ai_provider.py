@@ -2,7 +2,7 @@
 
 Provider는 업무 모델을 모른다. 정리된 Context와 출력 스키마만 받아 원시 문자열을
 돌려주는 역할만 한다. DB 조회·권한 판단·기록은 Service의 몫이다.
-설계 근거는 docs/AI_AUTOMATION_PLAN.md 4장·10장 참조.
+설계 근거는 docs/archive/AI_AUTOMATION_PLAN.md 4장·10장 참조.
 """
 
 import json

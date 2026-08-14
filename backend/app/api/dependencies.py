@@ -1,3 +1,26 @@
+"""FastAPI 의존성 — Router가 필요로 하는 것을 조립해서 넘겨줍니다.
+
+여기 있는 함수들은 Router의 인자에 `Depends(...)`로 걸립니다. FastAPI가 요청마다
+자동으로 실행해 그 결과를 Router에 넣어줍니다. Router 안에서 직접 만들지 않는 이유는
+테스트에서 통째로 바꿔치기하기 위해서입니다
+(`client.app.dependency_overrides[get_authenticated_actor] = ...`).
+
+크게 세 종류입니다.
+
+1. **인증** — `get_current_auth_user` → `get_authenticated_actor`
+   Bearer 토큰을 검증해 `auth_user_id`를 얻고, `employee_accounts`를 조회해
+   `ActorContext(employee_id, role)`를 만듭니다. 여기서 만들어진 role이 이후 모든
+   권한 판정의 기준입니다.
+
+2. **역할 검사** — `require_super_admin`, `require_hr_admin` 등
+   역할만 보고 통과·차단을 정합니다. "어느 직원까지 볼 수 있는가" 같은 범위 판정은
+   여기서 하지 않고 Service가 합니다. 대상이 정해지기 전이라 판단할 수 없기 때문입니다.
+
+3. **Service 조립** — `get_dashboard_service` 등
+   Repository들을 만들어 Service에 넣어 돌려줍니다. Service가 자기 Repository를 직접
+   만들면 테스트에서 DB를 갈아끼울 수 없습니다.
+"""
+
 from functools import lru_cache
 from typing import Annotated
 

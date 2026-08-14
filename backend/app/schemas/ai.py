@@ -1,7 +1,7 @@
 """생성형 AI Structured Output 스키마.
 
 AI의 자유 텍스트를 그대로 믿지 않는다. 여기 정의한 스키마를 통과하지 못한 응답은
-성공으로 처리하지 않는다(docs/AI_AUTOMATION_PLAN.md 12장).
+성공으로 처리하지 않는다(docs/archive/AI_AUTOMATION_PLAN.md 12장).
 
 길이 상한은 장식이 아니다. `title`은 `ApprovalDocument.title`·`JobPosting.title`이
 `String(200)`이라 여기서 막지 않으면 DB 저장 시점에 터진다.
@@ -134,7 +134,7 @@ class ApprovalDraftResponse(BaseModel):
     """실패도 200으로 내려간다. 초안 생성은 부가 기능이라 실패해도 직접 작성하면 된다.
 
     `is_sample`은 Mock Provider 결과임을 UI에 알린다. 샘플을 실제 LLM 결과로
-    오인하는 것을 막는다(docs/AI_AUTOMATION_PLAN.md 15장).
+    오인하는 것을 막는다(docs/archive/AI_AUTOMATION_PLAN.md 15장).
     """
 
     generation_id: str

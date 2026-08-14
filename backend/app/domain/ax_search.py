@@ -2,7 +2,7 @@
 
 DB·HTTP에 의존하지 않는다. v2에서 임베딩 기반 검색으로 교체할 때 이 모듈의
 `DocumentSearcher` 구현만 갈아끼우면 API와 응답 형식은 그대로 둘 수 있다.
-설계 근거는 docs/AX_FAQ_CHATBOT_PLAN.md 4장 참조.
+설계 근거는 docs/archive/AX_FAQ_CHATBOT_PLAN.md 4장 참조.
 """
 
 import math

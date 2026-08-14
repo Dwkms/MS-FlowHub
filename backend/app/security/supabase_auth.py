@@ -1,3 +1,19 @@
+"""Supabase access token을 검증해 사용자 ID를 얻습니다.
+
+프론트엔드는 Supabase Auth로 직접 로그인하고 받은 token을 `Authorization: Bearer`로
+보냅니다. 백엔드는 그 token이 **진짜 Supabase가 발급한 것인지** 스스로 확인해야 합니다.
+확인 없이 믿으면 아무나 토큰을 만들어 보낼 수 있습니다.
+
+검증 경로가 두 개인 이유:
+
+1. **JWKS 검증(기본)** — Supabase의 공개키를 받아 서명을 로컬에서 검증합니다.
+   네트워크 왕복이 없어 빠르고, 공개키는 `lru_cache`로 재사용합니다.
+2. **Supabase API 조회(대체)** — 1번이 실패하면 Supabase에 직접 물어봅니다.
+   키 교체 직후처럼 캐시된 공개키가 낡았을 때를 대비한 경로입니다.
+
+2번이 있다고 검증이 느슨해지는 것은 아닙니다. 두 경로 모두 실패하면 401입니다.
+"""
+
 import json
 import logging
 from functools import lru_cache

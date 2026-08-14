@@ -1,3 +1,9 @@
+"""로그인한 사용자 자신의 정보와 접근 가능 모듈을 돌려줍니다.
+
+토큰 검증은 여기가 아니라 `app/security/supabase_auth.py`가 합니다.
+이 Service는 이미 인증된 사람의 정보를 조립하는 일만 합니다.
+"""
+
 from datetime import UTC, datetime
 
 from fastapi import HTTPException

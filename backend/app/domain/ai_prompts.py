@@ -2,7 +2,7 @@
 
 AI의 역할은 "사실 생성"이 아니라 "주어진 사실의 문장화"다. 이 파일의 문구는 그 경계를
 지키게 하는 1차 방어선이고, 2차는 Context에서 값을 아예 빼는 것, 3차는 스키마 검증이다
-(docs/AI_AUTOMATION_PLAN.md 9장).
+(docs/archive/AI_AUTOMATION_PLAN.md 9장).
 """
 
 from app.domain.ai_provider import APPROVAL_DRAFT, JOB_POSTING_DRAFT

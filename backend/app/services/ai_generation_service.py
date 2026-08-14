@@ -3,7 +3,7 @@
 한도 확인 → Provider 호출 → 스키마 검증 → 기록 순서로 진행한다. **업무 테이블에는
 쓰지 않는다.** 이 서비스가 건드리는 테이블은 `ai_generations` 하나뿐이고, 그래서
 AI가 실패하든 성공하든 전자결재·채용 상태가 변할 수 없다
-(docs/AI_AUTOMATION_PLAN.md 18장).
+(docs/archive/AI_AUTOMATION_PLAN.md 18장).
 """
 
 from dataclasses import dataclass

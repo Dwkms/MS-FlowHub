@@ -2,7 +2,7 @@
 
 두 룰 모두 자유 추론이 아니라 좁은 명시적 조건만 쓴다. 애매하면 발동시키지 않고
 일반 검색으로 넘긴다. 과잉 발동으로 답할 수 있는 질문까지 막는 쪽이 더 나쁘기 때문이다.
-설계 근거는 docs/AX_FAQ_CHATBOT_PLAN.md 3장 참조.
+설계 근거는 docs/archive/AX_FAQ_CHATBOT_PLAN.md 3장 참조.
 """
 
 CONFIRMED = "CONFIRMED"

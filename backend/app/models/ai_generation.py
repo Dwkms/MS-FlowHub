@@ -18,7 +18,7 @@ class AiGeneration(Base):
     재실행은 기존 행을 덮어쓰지 않고 새 행을 만든다.
 
     `input_tokens`/`output_tokens`는 비용 추적용이다. Console을 열지 않고도 쿼리 하나로
-    실지출을 계산해 이상 급증을 조기에 발견한다(docs/AI_AUTOMATION_PLAN.md 13장·19장).
+    실지출을 계산해 이상 급증을 조기에 발견한다(docs/archive/AI_AUTOMATION_PLAN.md 13장·19장).
     """
 
     __tablename__ = "ai_generations"

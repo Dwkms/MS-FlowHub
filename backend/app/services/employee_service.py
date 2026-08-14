@@ -1,3 +1,19 @@
+"""직원 조회·수정과 근태 상태 업무 규칙.
+
+**이 파일에서 가장 중요한 것은 "누가 누구를 볼 수 있는가"입니다.**
+
+목록·상세·근태 변경 세 경로가 모두 같은 판정을 씁니다
+(`app/domain/org_scope.py`의 `is_within_scope`). 세 곳에 각자 조건문을 쓰면 한 곳만
+고쳤을 때 "목록에는 보이는데 상세는 403"처럼 어긋납니다.
+
+**비공개 사유는 저장은 되고 응답에서 지웁니다.** 권한 없는 사람이 조회하면 DB에서 읽은 뒤
+`model_copy`로 해당 필드만 비웁니다. 처음부터 조회하지 않는 방법도 있지만, 그러면 권한별로
+쿼리를 따로 만들어야 해서 조회 로직이 두 벌이 됩니다.
+
+**직원 삭제는 물리 삭제가 아닙니다.** 결재 이력과 근태 기록이 직원을 참조하므로
+`employment_status`만 바꾸고 레코드는 남깁니다.
+"""
+
 import logging
 from collections.abc import Sequence
 from datetime import UTC, date, datetime, time
