@@ -287,6 +287,7 @@ MS FlowHub/
 
 ## 관련 문서
 
+문서 전체 안내는 [docs/README.md](./docs/README.md)에 있습니다.
 AI 에이전트로 작업한다면 [AGENTS.md](./AGENTS.md)의 Context Map부터 보세요.
 
 - [기능 기획 기록](./docs/PLAN.md) — 무엇을 왜 만들었는지 (시간순)
