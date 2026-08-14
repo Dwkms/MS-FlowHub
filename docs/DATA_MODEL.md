@@ -128,7 +128,7 @@ erDiagram
 
 **주요 상태값** (DB `CHECK` 아님, 애플리케이션 검증)
 - `employees.employment_status`: `ACTIVE`, `ON_LEAVE`, `SCHEDULED`, `RESIGNED`
-- `employee_accounts.role`: `SUPER_ADMIN`, `HR_ADMIN`, `TEAM_ADMIN`, `EMPLOYEE`
+- `employee_accounts.role`: `SUPER_ADMIN`, `HR_ADMIN`, `TEAM_ADMIN`, `PART_ADMIN`, `EMPLOYEE`
 - `employees.employment_type`: 문자열 컬럼이며 현재 기본값 `REGULAR`만 사용, 별도 enum 제약 없음
 
 **조직 운영 기준**
@@ -136,7 +136,7 @@ erDiagram
 - 개발팀은 SW개발팀, HW개발팀, QA팀으로 구성한다. QA팀의 테스트·품질 업무는 개발팀 내에서 운영한다.
 - 마케팅팀·인사팀·기획팀은 각각 1팀과 2팀으로, CS팀은 인원 규모에 맞춰 CS1팀 하나로 운영한다.
 - 기존 독립 QA팀은 CS팀으로 전환해 고객 문의·장애 접수·VOC 운영을 담당한다.
-- `TEAM_ADMIN`은 `team_id`가 있으면 해당 파트, `team_id`가 없으면 소속 부서 범위의 직원 정보를 조회하고 근태 상태를 관리한다.
+- `TEAM_ADMIN`(팀장)은 소속 **부서 전체**, `PART_ADMIN`(파트장)은 **자기 파트만** 조회·관리한다. 범위 기준은 `app/domain/org_scope.py`에 역할별로 고정돼 있다.
 
 **삭제 및 이력 보존 정책**
 - 직원 삭제는 물리 삭제가 아니라 `employment_status=INACTIVE` 전환으로 처리(레코드 보존).

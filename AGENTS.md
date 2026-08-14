@@ -7,8 +7,8 @@
 
 ## 현재 상태
 
-**Feature Freeze 중입니다.** 신규 기능을 추가하지 않고 회귀 결함만 고칩니다.
-프리즈 이후로 미룬 작업과 도메인별 구현 상태는 [`docs/CURRENT_STATE.md`](docs/CURRENT_STATE.md).
+Feature Freeze는 2026-08-13에 해제됐습니다.
+도메인별 구현 상태와 다음 순서는 [`docs/CURRENT_STATE.md`](docs/CURRENT_STATE.md)를 보세요.
 
 ## Context Map
 

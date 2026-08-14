@@ -11,13 +11,13 @@
 
 | 컬럼 | 값 | 쓰이는 곳 |
 |---|---|---|
-| **`employee_accounts.role`** | `SUPER_ADMIN` · `HR_ADMIN` · `TEAM_ADMIN` · `EMPLOYEE` | **권한의 단일 출처.** `get_authenticated_actor`가 이 값으로 `ActorContext`를 만든다 |
+| **`employee_accounts.role`** | `SUPER_ADMIN` · `HR_ADMIN` · `TEAM_ADMIN` · `PART_ADMIN` · `EMPLOYEE` | **권한의 단일 출처.** `get_authenticated_actor`가 이 값으로 `ActorContext`를 만든다 |
 | `employees.role` | `ADMIN` · `HR_MANAGER` · `DEPARTMENT_HEAD` · `SALES_REP` · `EMPLOYEE` | Seed(`organization_repository._role_for`)와 테스트 픽스처가 채우는 별개 값 |
 
 그래서 Service 코드의 권한 검사에 `{SUPER_ADMIN, HR_ADMIN, "ADMIN", "HR_MANAGER"}`처럼
 **두 어휘가 섞여 나옵니다.** 두 벌 모두를 방어적으로 받는 것이지 오타가 아닙니다.
 
-`PATCH /employees/{id}/role`이 받는 `Literal`은 `employee_accounts.role`의 4개뿐입니다.
+`PATCH /employees/{id}/role`이 받는 `Literal`은 `employee_accounts.role`의 5개뿐입니다.
 
 > **확인 필요**: 두 어휘를 하나로 통합할지 결정되지 않았습니다. 새 권한 분기를 추가할 때는
 > 반드시 `ActorContext.role`(= `employee_accounts.role`)을 기준으로 하세요.
@@ -28,17 +28,22 @@
 |---|---|
 | `SUPER_ADMIN` | 전사. 직원·조직·역할 변경, 모든 결재 처리, 매뉴얼 관리 |
 | `HR_ADMIN` | 전사 직원·조직·근태. 비공개 사유 열람 가능 |
-| `TEAM_ADMIN` | 본인 `team_id`가 있으면 같은 파트, 없으면 소속 부서 |
+| `TEAM_ADMIN` (팀장) | **소속 부서 전체.** 산하 파트를 가리지 않는다 |
+| `PART_ADMIN` (파트장) | **자기 파트만.** 파트가 지정되지 않으면 본인만 (부서로 넓어지지 않음) |
 | `EMPLOYEE` | 본인만 |
+
+범위 기준은 역할에 고정돼 있습니다(`domain/org_scope.py`). 관리자의 `team_id`가 채워졌는지에
+따라 의미가 달라지지 않습니다.
 
 **비공개 근태 사유**(`employment_status_private_note`, `daily_work_reason.private_note`)는
 `SUPER_ADMIN`·`HR_ADMIN`(및 레거시 `ADMIN`·`HR_MANAGER`)만 볼 수 있습니다.
-`TEAM_ADMIN`은 볼 수 없습니다 — `domain/employee_status.py:PRIVATE_REASON_VIEWER_ROLES`.
+`TEAM_ADMIN`·`PART_ADMIN`은 볼 수 없습니다 — `domain/employee_status.py:PRIVATE_REASON_VIEWER_ROLES`.
 
-> **변경 예정**: `TEAM_ADMIN`이 `team_id` 유무에 따라 파트/부서 두 범위로 동작하는 현재 방식을
-> 팀장(부서 고정)·파트장(`PART_ADMIN`, 파트 고정)으로 나누기로 했습니다.
-> 결정 근거는 [`DECISIONS.md`](DECISIONS.md)의 "파트장 권한 역할 PART_ADMIN 신설",
-> 적용 시점은 프리즈 해제 이후입니다.
+**결재자 자격**: 파트장급 이상만 결재자로 지정할 수 있습니다
+(`domain/recruitment_policy.py`). 파트장이 팀원의 상급자이고 팀장에게 보고하는 구조를 따릅니다.
+같은 정책이 프론트 `lib/approver-policy.ts`에도 있어 한쪽만 고치면 화면과 서버 판정이 어긋납니다.
+
+> 설계 근거는 [`DECISIONS.md`](DECISIONS.md)의 "파트장 권한 역할 PART_ADMIN 신설"에 있습니다.
 
 ## 전자결재
 
@@ -51,12 +56,12 @@
 | 작성자 = 인증 주체 | 요청 본문의 작성자 값을 믿지 않고 `ActorContext`에서 가져온다 |
 | 수정 | `DRAFT` 상태에서 **작성자만** |
 | 상신 | `DRAFT` 상태에서 **작성자만** |
-| 결재자 자격 | **팀장급 이상만** 지정 가능 (`domain/recruitment_policy.py`) |
+| 결재자 자격 | **파트장급 이상만** 지정 가능 (`domain/recruitment_policy.py`) |
 | 작성자 ≠ 결재자 | 같으면 생성·수정 단계에서 막는다 |
 | 본인 문서 자가승인 금지 | 작성자는 승인·반려할 수 없다. 단, `SUPER_ADMIN`/`ADMIN`이 채용 요청 문서일 때만 예외 |
 | 기안 부서 | 관리자가 아니면 본인 소속 부서로만 기안 |
 | 삭제 | 관리자만 |
-| 처리 권한 | 지정 결재자 · 관리자 · 같은 범위의 `TEAM_ADMIN` |
+| 처리 권한 | 지정 결재자 · 관리자 · 관리 범위 안의 `TEAM_ADMIN`(부서)·`PART_ADMIN`(파트) |
 | 이력 | 모든 상태 변경을 `approval_histories`에 남긴다 |
 
 ## 채용
@@ -86,7 +91,7 @@ Applicant(지원자)
 - `HIRED`와 `REJECTED`는 종료 단계이며 이전 단계로 되돌릴 수 없습니다.
 - `REJECTED`로 바꿀 때는 메모가 필수입니다.
 - 등록·수정·삭제·단계 변경은 `SUPER_ADMIN`·`HR_ADMIN`만, `TEAM_ADMIN`은 본인 부서 공고의
-  지원자 조회만 가능합니다.
+  지원자 조회만 가능합니다. `PART_ADMIN`에게는 지원자 접근을 열지 않았습니다.
 - 같은 공고에 같은 이메일은 중복 등록할 수 없습니다.
 
 ## 직원·조직과 근태
