@@ -36,17 +36,17 @@ Supabase PostgreSQL  (Alembic으로 스키마 관리)
 
 ## Backend 계층
 
-| 디렉터리 | 책임 | 파일 수 |
-|---|---|---|
-| `app/api/` | Router, 의존성 주입, 응답 반환. 업무 규칙 없음 | 11 |
-| `app/services/` | 업무 규칙, 상태 전이, 트랜잭션 | 10 |
-| `app/repositories/` | SQLAlchemy 조회·저장 | 9 |
-| `app/models/` | SQLAlchemy ORM 모델 | 9 |
-| `app/schemas/` | Pydantic 요청·응답 스키마 | 9 |
-| `app/domain/` | **순수 규칙·상수·AI Provider.** DB·HTTP에 의존하지 않음 | 13 |
-| `app/security/` | 토큰 검증, `ActorContext`, 역할 상수 | 4 |
-| `app/core/`, `app/db/` | 설정(`pydantic-settings`), 엔진·세션 | 3 / 3 |
-| `app/scripts/` | Seed와 운영 보조 스크립트 | 13 |
+| 디렉터리 | 책임 |
+|---|---|
+| `app/api/` | Router, 의존성 주입, 응답 반환. 업무 규칙 없음 |
+| `app/services/` | 업무 규칙, 상태 전이, 트랜잭션 |
+| `app/repositories/` | SQLAlchemy 조회·저장 |
+| `app/models/` | SQLAlchemy ORM 모델 |
+| `app/schemas/` | Pydantic 요청·응답 스키마 |
+| `app/domain/` | **순수 규칙·상수·AI Provider.** DB·HTTP에 의존하지 않음 |
+| `app/security/` | 토큰 검증, `ActorContext`, 역할 상수 |
+| `app/core/`, `app/db/` | 설정(`pydantic-settings`), 엔진·세션 |
+| `app/scripts/` | Seed와 운영 보조 스크립트 |
 
 `app/domain/`은 README의 구조도에 빠져 있던 계층입니다. 여기에 판단 규칙을 모아 두고
 Service가 가져다 씁니다 — 예: `employee_status.py`(근태 상태·비공개 사유 열람 역할),
@@ -67,7 +67,7 @@ ORM 모델과 Pydantic 스키마는 분리합니다. 하나의 업무가 여러 
 | `src/lib/` | `api-client.ts`(공통 호출), `supabase-browser.ts`(로그인), `approver-policy.ts` |
 | `src/types/` | 백엔드 스키마에 대응하는 타입 |
 
-**스타일**: `src/app/globals.css` 867줄의 시맨틱 클래스(`.status-detail-panel` 등)와
+**스타일**: `src/app/globals.css`의 시맨틱 클래스(`.status-detail-panel` 등)와
 `:root` CSS 변수가 실질적인 스타일 시스템입니다. Tailwind v4가 설치돼 있고 `globals.css`
 첫 줄에서 `@import "tailwindcss"`를 하지만 **유틸리티 클래스는 사실상 쓰지 않습니다.**
 새 UI도 기존 시맨틱 클래스 방식을 따르세요.

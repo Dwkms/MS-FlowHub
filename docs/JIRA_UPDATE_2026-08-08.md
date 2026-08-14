@@ -54,17 +54,17 @@
 3. **신규 후속 작업** 3건을 생성한다. 이 중 `branch protection`과 `Pre-Deploy Command`는 **프리즈 해제 이후** 착수 항목으로 표시한다.
 4. 각 이슈에 검증 결과를 기록한다.
 
-### 기록할 검증 결과 (2026-08-13 기준)
+### 기록할 검증 결과 (2026-08-14 기준)
 
 ```
 Backend    Ruff check · Ruff format check 통과
-           pytest 201 passed
-운영 DB    Alembic 20260813_0023 (code head = DB current)
+           pytest 208 passed
+운영 DB    Alembic 20260814_0024 (code head = DB current) · 업무 테이블 18개
 Frontend   lint · typecheck · production build 통과
 CI         GitHub Actions backend·frontend 성공
+배포 게이트 CI 성공 -> 배포 / CI 실패 -> 차단 양방향 실증 완료
 운영 확인   Backend /health 200, Frontend /login 200,
-           Frontend /api/* 프록시 401(미인증 정상 응답)
-운영 배포   32523cb — 이후 커밋은 모두 문서 변경이라 배포 대상 아님
+           Frontend /api/* 프록시 401(미인증 정상 응답), CORS 정상
 ```
 
 > Playwright E2E는 `workflow_dispatch` 전용(수동)입니다. 2026-08-08의 "14개 통과"는 당시 기록이며,
