@@ -65,72 +65,40 @@ mindmap
 
 ## 진행 일정
 
+완료 여부는 아래 "지금 하는 일" 표를 보세요.
+
 ```mermaid
 %%{init: {
   "theme": "base",
   "themeVariables": {
     "fontFamily": "Pretendard, Noto Sans KR, sans-serif",
     "fontSize": "15px",
-    "doneTaskBkgColor": "#7fc79a",
-    "doneTaskBorderColor": "#3f8a5c",
-    "activeTaskBkgColor": "#6aa9e9",
-    "activeTaskBorderColor": "#2f67c8",
-    "taskBkgColor": "#cfd8e6",
-    "taskBorderColor": "#8fa6c9",
-    "taskTextColor": "#172033",
-    "taskTextDarkColor": "#172033",
-    "taskTextLightColor": "#172033",
-    "taskTextOutsideColor": "#94a3b8",
-    "sectionBkgColor": "transparent",
-    "altSectionBkgColor": "transparent",
-    "gridColor": "#6b7688"
-  },
-  "gantt": {
-    "useWidth": 1200,
-    "barHeight": 26,
-    "barGap": 10,
-    "topPadding": 60,
-    "leftPadding": 130,
-    "gridLineStartPadding": 40,
-    "fontSize": 14,
-    "sectionFontSize": 16,
-    "numberSectionStyles": 5
+    "cScale0": "#dfe8f5", "cScaleLabel0": "#172033",
+    "cScale1": "#e2eddc", "cScaleLabel1": "#172033",
+    "cScale2": "#f6e9d9", "cScaleLabel2": "#172033",
+    "cScale3": "#ece1f2", "cScaleLabel3": "#172033",
+    "cScale4": "#dfeef1", "cScaleLabel4": "#172033"
   }
 }}%%
-gantt
-    title MS FlowHub 개발 일정
-    dateFormat YYYY-MM-DD
-    axisFormat %m/%d
-    todayMarker off
-
+timeline
+    title MS FlowHub 개발 일정 (2026)
     section 기반
-    프로젝트 기획        :done, p1, 2026-07-30, 2d
-    조직·직원·근태       :done, p2, 2026-08-01, 3d
-
+        07-30 : 프로젝트 기획
+        08-01 : 조직·직원·근태
     section 핵심 기능
-    전자결재 엔진        :done, p3, 2026-08-04, 3d
-    Render 배포          :done, p4, 2026-08-05, 2d
-    매뉴얼·FAQ           :done, p5, 2026-08-07, 1d
-    ATS 지원자 관리      :done, p6, 2026-08-07, 3d
-    관리자 대시보드      :done, p7, 2026-08-08, 1d
-
+        08-04 : 전자결재 엔진
+        08-05 : Render 배포
+        08-07 : 직원 매뉴얼·FAQ : ATS 지원자 관리
+        08-08 : 관리자 대시보드 : GitHub Actions CI
     section 자동화
-    CI 구성              :done, p8, 2026-08-08, 1d
-    AX 직원 도우미       :done, p9, 2026-08-09, 2d
-    생성형 AI 초안       :done, p10, 2026-08-12, 1d
-    채용 구체화·포스터    :done, p11, 2026-08-13, 1d
-    세션 자동 로그아웃    :done, p12, 2026-08-13, 1d
-
+        08-09 : AX 직원 도우미
+        08-12 : 생성형 AI 초안
+        08-13 : 채용 구체화·AI 포스터 : 세션 자동 로그아웃
     section 안정화
-    Feature Freeze       :done, p13, 2026-08-13, 1d
-    배포 게이트          :done, p14, 2026-08-13, 2d
-    권한 체계 재설계      :done, p15, 2026-08-14, 1d
-    데드코드·문서 정리    :active, p16, 2026-08-14, 2d
-
+        08-13 : Feature Freeze
+        08-14 : 배포 게이트 검증 : 권한 체계 재설계 : 데드코드·문서 정리
     section 제출 준비
-    코드 주석 보강       :p17, 2026-08-15, 1d
-    README 재구성        :p18, 2026-08-16, 1d
-    Jira 최종정리        :p19, 2026-08-17, 1d
+        08-15 : 코드 주석 보강 : README 재구성 : Jira 최종정리
 ```
 
 ## 지금 하는 일 — 포트폴리오 제출 준비
