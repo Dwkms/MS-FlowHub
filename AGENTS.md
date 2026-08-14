@@ -44,6 +44,9 @@ Feature Freeze는 2026-08-13에 해제됐습니다.
 - **비밀값을 코드에 쓰지 않습니다.** `SUPABASE_SECRET_KEY`·`DATABASE_URL`·AI 키를 `NEXT_PUBLIC_*`에
   절대 넣지 않습니다.
 - **검증 없이 완료 보고하지 않습니다.** 실행하지 못한 검증은 이유를 밝힙니다.
+- **오류를 겪으면 그 자리에서 [`TROUBLESHOOTING.md`](TROUBLESHOOTING.md)에 남깁니다.**
+  증상 → 원인 → 판별 → 해결 순서로 적습니다. 나중에 몰아서 정리하지 않습니다.
+  작업 중이던 다른 문서에 적어 두면 다음 사람이 찾지 못합니다.
 
 세부 규칙과 검증 명령은 [`docs/CODING_RULES.md`](docs/CODING_RULES.md)에 있습니다.
 

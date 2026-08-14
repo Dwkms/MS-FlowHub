@@ -82,6 +82,10 @@ npm run lint; npm run typecheck; npm run build
 
 작업 성격에 따라 해당 문서만 갱신합니다. 같은 내용을 여러 문서에 복사하지 않습니다.
 
+오류는 **겪은 그 자리에서** `TROUBLESHOOTING.md`에 적습니다. 증상 → 원인 → 판별 → 해결
+순서로 쓰고, 작업 중이던 다른 문서에 적어 두지 않습니다. 나중에 같은 증상을 만난 사람이
+찾는 곳은 `TROUBLESHOOTING.md` 한 곳입니다.
+
 | 바뀐 것 | 갱신할 문서 |
 |---|---|
 | 무엇을 했는지(이력) | `UPDATELOG.md` — 최신 날짜가 위 |
@@ -90,5 +94,5 @@ npm run lint; npm run typecheck; npm run build
 | API | [`API_SPEC.md`](API_SPEC.md) |
 | 업무 규칙 | [`DOMAIN.md`](DOMAIN.md) |
 | 구조·배포 | [`ARCHITECTURE.md`](ARCHITECTURE.md) |
-| 되풀이되는 오류와 해결 | `TROUBLESHOOTING.md` |
+| 겪은 오류와 해결 | `TROUBLESHOOTING.md` — 루트의 별도 파일입니다. README 안이 아닙니다 |
 | 설계 판단의 근거 | [`DECISIONS.md`](DECISIONS.md) |
