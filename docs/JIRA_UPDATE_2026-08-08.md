@@ -1,9 +1,11 @@
 # Jira 업데이트 정리 — 2026-08-08
 
-> 마지막 갱신: **2026-08-13** · 기준 커밋 `21c591a` (코드 검증 기준 `b84b8fb`)
+> 마지막 갱신: **2026-08-14** · Jira 최종정리 완료
 >
 > 아래 항목을 기존 Jira 에픽에 완료 또는 후속 작업으로 반영합니다.
 > 프로젝트별 이슈 키·담당자는 Jira 보드의 기존 값을 유지합니다.
+
+2026-08-14 Jira 내보내기 CSV 기준으로 **72개(에픽 7개·작업 65개)**의 키·이슈 유형·상위 항목·요약·상태·시작일·기한이 가져오기 원본과 일치합니다. 작업 65개는 모두 지정한 에픽에 연결됐고 누락·중복 이슈는 없습니다. 담당자 72건은 비어 있는 상태로 최종정리를 완료했습니다.
 
 ## 완료 처리 — 2026-08-08 기준
 
@@ -33,32 +35,32 @@
 | --- | --- | --- | --- |
 | GitHub Actions CI 결과 확인 | 높음 | **완료 (08-13)** | `ci.yml` 상시 운영 중. `b84b8fb`의 backend·frontend CI 성공 확인 |
 | Render 배포 게이트 결정 | 중간 | **완료 (08-13)** | `After CI Checks Pass`로 확정·적용. 동작 검증은 아래 신규 항목으로 분리 |
-| 대시보드 운영 데이터 정책 결정 | 중간 | 미결 | 실데이터가 적은 상태를 유지할지, 검증용 업무 데이터를 추가할지 결정 |
-| 파트장 TEAM_ADMIN 권한 부여 여부 결정 | 중간 | 미결 | SW·HW·CS 파트장의 실제 로그인 계정과 권한 부여 범위를 확정 |
-| 알림 및 공통 오류 응답 형식 | 낮음 | 미결 | 알림 조회/읽음 처리와 API 표준 오류 응답 형식 설계 |
+| 대시보드 운영 데이터 정책 결정 | 중간 | **완료 (08-13)** | 운영 DB에는 가짜 업무 데이터를 넣지 않고 실데이터만 사용하기로 확정 |
+| 파트장 권한 체계 결정 | 중간 | **완료 (08-14)** | `PART_ADMIN`을 신설하고 SW·HW·QA 파트장에게 운영 역할 부여 |
+| 공통 오류 응답 형식 | 낮음 | 미결 | 알림은 08-14에 제거. API 표준 오류 응답 형식은 별도 후속 작업으로 유지 |
 | ATS·Storage Playwright E2E 확대 | 낮음 | 미결 | 지원자 관리와 파일 업로드/조회 흐름의 브라우저 회귀 테스트 추가 |
 
 ## 신규 후속 작업 — 2026-08-13 발생
 
 | 제목 | 우선순위 | 설명 |
 | --- | --- | --- |
-| Render 배포 게이트 동작 검증 | 중간 | 게이트는 적용됐으나 **아직 작동한 적이 없습니다.** Root Directory가 `backend`·`frontend`라 문서만 바꾼 커밋은 Render가 auto-deploy를 건너뜁니다. 프리즈 이후 `backend/`·`frontend/`를 바꾸는 첫 배포에서 Events의 `Deploy started`가 CI 성공 이후인지 확인 |
-| GitHub branch protection 적용 | 중간 | `master` 직접 push 금지 + PR 필수 CI. Render 게이트가 하류 방어라면 이쪽이 상위 보호. **프리즈 중에는 적용하지 않습니다** — P0 핫픽스 대응이 느려짐 |
+| Render 배포 게이트 동작 검증 | 중간 | **완료 (08-14).** CI 실패 커밋은 차단되고 수정본만 배포되는 양방향 동작 확인 |
+| GitHub branch protection 적용 | 중간 | `master` 직접 push 금지 + PR 필수 CI. Feature Freeze는 해제됐으며 아직 적용하지 않음 |
 | Pre-Deploy Command로 migration 자동화 검토 | 낮음 | 현재 두 서비스 모두 Pre-Deploy Command가 비어 있어 Alembic이 수동입니다. `alembic upgrade head` 자동화는 실패 시 운영 DB가 중간 상태로 남을 수 있어 프리즈 이후 별도 판단 |
 
 
 ## Jira 반영 순서
 
 1. **완료 처리** 두 표의 항목을 기존 에픽의 완료 이슈 또는 하위 작업으로 반영한다.
-2. **후속 작업 — 현재 상태** 표에서 `완료 (08-13)` 2건을 종료 처리하고, 미결 4건은 우선순위를 유지한 채 남긴다.
-3. **신규 후속 작업** 3건을 생성한다. 이 중 `branch protection`과 `Pre-Deploy Command`는 **프리즈 해제 이후** 착수 항목으로 표시한다.
+2. 운영 데이터 정책·파트장 권한·배포 게이트 검증은 완료 처리하고, 공통 오류 응답 형식과 ATS·Storage E2E는 후속 작업으로 남긴다.
+3. `branch protection`과 `Pre-Deploy Command`는 미착수 후속 작업으로 유지한다.
 4. 각 이슈에 검증 결과를 기록한다.
 
 ### 기록할 검증 결과 (2026-08-14 기준)
 
 ```
 Backend    Ruff check · Ruff format check 통과
-           pytest 208 passed
+           pytest 209 passed
 운영 DB    Alembic 20260814_0024 (code head = DB current) · 업무 테이블 18개
 Frontend   lint · typecheck · production build 통과
 CI         GitHub Actions backend·frontend 성공

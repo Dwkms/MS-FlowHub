@@ -11,7 +11,7 @@
 |---|---|
 | P0 · P1 결함 | 0건 · 0건 |
 | Feature Freeze | **해제됨** (2026-08-13). 판정 당시 READY: YES |
-| 자동 검증 | Backend pytest **208 passed** · Ruff 통과 / Frontend lint·typecheck·build 통과 |
+| 자동 검증 | Backend pytest **209 passed** · Ruff 통과 / Frontend lint·typecheck·build 통과 |
 | 운영 DB | Alembic `20260814_0024` (code head = DB current) · 업무 테이블 18개 |
 | 운영 확인 | Backend `/health` 200 · Frontend `/login` 200 · `/api/*` 프록시 401(미인증 정상) |
 
@@ -58,13 +58,13 @@ Render 무료 플랜 특성입니다. 화면은 뜨는데 데이터만 안 나�
 
 ## 다음 순서
 
-**1. 문서 통합** — 기획 문서 7개(약 1,700줄)를 `docs/PLAN.md` 하나로 재구성하고
-로드맵을 1개로 합칩니다. 포트폴리오 제출 시 "어느 파일에 무엇이 왜 있는지" 설명 가능하게 만드는 작업입니다.
+**1. 문서 통합 — 완료** — 기획 문서를 `docs/PLAN.md` 하나로 재구성하고
+로드맵을 1개로 합쳤습니다(`6d9f4e4`).
 
-**2. 핵심 코드 주석 보강** — Service·`domain/`·`security/`와 프론트 기능 진입점에
-"왜 이렇게 했는지"를 남깁니다.
+**2. 핵심 코드 주석 보강 — 완료** — Service·`domain/`·`security/`와 프론트 기능 진입점에
+"왜 이렇게 했는지"를 남겼습니다(`d380553`, `ff6886f`).
 
-**3. README 재구성** — 프로젝트 구성 요약 중심으로 줄이고 상세는 docs로 보냅니다.
+**3. README 재구성 — 완료** — 프로젝트 구성 요약 중심으로 줄이고 상세는 docs로 보냈습니다(`dc1eafa`).
 
 **4. GitHub branch protection** — master 직접 push 금지 + PR 필수 CI
 
@@ -72,7 +72,8 @@ Render 무료 플랜 특성입니다. 화면은 뜨는데 데이터만 안 나�
 
 **6.** 공통 오류 응답 형식, ATS·Storage E2E 확대, 위 "화면이 없는 기능"의 UI
 
-**7.** 위 정리가 끝난 뒤 Jira 최종정리
+**7. Jira 최종정리 — 완료** — 72개 이슈(에픽 7개·작업 65개)의 구조와 일정을
+Jira 최종 내보내기 CSV로 대조했습니다. 담당자는 비어 있는 상태로 마감했습니다.
 
 ### 완료된 항목 (2026-08-14)
 

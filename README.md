@@ -151,7 +151,7 @@ cd ..\frontend
 npm run lint; npm run typecheck; npm run build
 ```
 
-Backend 회귀 테스트 208건. Playwright E2E(`npm run test:e2e`)는 실제 Supabase에 접속하므로
+Backend 회귀 테스트 209건. Playwright E2E(`npm run test:e2e`)는 실제 Supabase에 접속하므로
 **수동 실행 전용**이며 CI에서 자동 실행하지 않습니다.
 
 ## 문서

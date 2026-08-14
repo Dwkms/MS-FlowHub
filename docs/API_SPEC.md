@@ -37,7 +37,7 @@
 | DELETE | `/employees/{id}` | 관리자 | 비활성화 |
 | PUT | `/employees/{id}/attendance` | 본인 또는 관리 범위 | 일일 근무 상태 |
 | PATCH | `/employees/{id}/employment-status-reason` | 관리자 | 재직 상태 사유 |
-| GET | `/organization` | 로그인 | 조직도 |
+| GET | `/employees/organization` | 로그인 | 조직도 |
 
 역할별 관리 범위는 [`DOMAIN.md`](DOMAIN.md#관리-범위)를 보세요.
 

@@ -1,6 +1,6 @@
 # 배포 기획 (Render)
 
-> 상태: 착수 전 기획 문서입니다. 2026-08-06 배포 작업의 체크리스트로 사용합니다. 실제 배포가 끝나면 이 문서 대신 README의 실행 방법을 기준으로 삼고, 이 문서는 `docs/archive`로 옮깁니다.
+> 상태: 2026-08-06 배포 완료 후 실제 Render 운영 설정과 주의사항을 함께 기록합니다.
 
 ## 1. 배포 구조 결정
 
@@ -8,7 +8,7 @@
 
 ```
 Render
- ├─ ms-flowhub-backend  (FastAPI, Python Web Service)
+ ├─ MS-FlowHub          (FastAPI, Python Web Service)
  └─ ms-flowhub-frontend (Next.js, Node Web Service)
 DB: 기존 Supabase PostgreSQL 그대로 사용 (별도 이전 없음)
 Storage: 기존 Supabase Storage 비공개 버킷 그대로 사용
@@ -17,7 +17,7 @@ Storage: 기존 Supabase Storage 비공개 버킷 그대로 사용
 ## 2. 사전 확인 (이미 해결된 배포 리스크)
 
 - 채용 포스터 파일이 로컬 디스크가 아니라 Supabase Storage에 저장되도록 이미 전환했습니다. Render의 파일시스템은 재배포 시 초기화되므로, 이 전환이 없었다면 배포 후 첨부 파일이 사라지는 문제가 있었을 것입니다. → **해결됨**
-- 현재 Supabase Alembic head(`20260805_0015`)가 이미 적용되어 있어, 배포 당일 별도 migration 없이 시작할 수 있습니다.
+- 2026-08-14 기준 Supabase Alembic head는 `20260814_0024`이며 code head와 운영 DB current가 같습니다.
 - `app/main.py`에 모듈 레벨 `app = create_app()`이 있어 `uvicorn app.main:app`으로 바로 실행할 수 있습니다.
 - `frontend/package.json`에 `start` 스크립트(`next start`)가 이미 있어 별도 설정 없이 실행할 수 있습니다.
 

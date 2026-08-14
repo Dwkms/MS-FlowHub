@@ -25,6 +25,11 @@
 - [검증이 실패했는데 커밋·push가 그대로 나감](#검증이-실패했는데-커밋push가-그대로-나감)
 - [alembic 실행 시 ImportError: cannot import name '<model>'](#alembic-실행-시-importerror-cannot-import-name-model)
 - [E2E 종료 후 테스트 계정이 지워지지 않음](#e2e-종료-후-테스트-계정이-지워지지-않음)
+- [문서 링크 검사에서 Join-Path가 빈 경로로 실패](#문서-링크-검사에서-join-path가-빈-경로로-실패)
+- [PowerShell 검색 문자열의 Markdown 백틱 때문에 파서 오류](#powershell-검색-문자열의-markdown-백틱-때문에-파서-오류)
+- [샌드박스에서 Alembic current가 Permission denied로 실패](#샌드박스에서-alembic-current가-permission-denied로-실패)
+- [저장소 루트에서 Alembic을 실행하면 migrations 경로를 찾지 못함](#저장소-루트에서-alembic을-실행하면-migrations-경로를-찾지-못함)
+- [PowerShell 다중 속성 정렬의 잘못된 매개 변수 구문](#powershell-다중-속성-정렬의-잘못된-매개-변수-구문)
 
 ## 화면은 뜨는데 API만 502 (운영)
 
@@ -454,3 +459,114 @@ cd backend
 도우미 상태를 `AxAssistantProvider`로 분리해 `AuthSessionGuard` **바깥**(`app/layout.tsx`)에 두었습니다. 세션 가드는 보안 로직이라 변경하지 않았습니다.
 
 전역에 떠 있으면서 화면 전환에도 살아남아야 하는 UI를 새로 추가할 때는 같은 위치에 두어야 합니다.
+
+## 문서 링크 검사에서 Join-Path가 빈 경로로 실패
+
+### 증상
+
+루트의 `README.md`·`UPDATELOG.md`처럼 디렉터리 부분이 없는 상대경로를 대상으로 Markdown 링크를
+검사할 때, PowerShell `Join-Path`가 `Path` 인수의 빈 문자열을 거부하며 검사가 중단됩니다.
+
+### 원인
+
+`Split-Path -Parent README.md`의 결과는 빈 문자열입니다. 이를 그대로 `Join-Path`의 기준 경로로
+넘겼기 때문입니다. `docs/*.md`처럼 상위 디렉터리가 있는 파일에서는 발생하지 않습니다.
+
+### 판별
+
+오류 메시지에 `Join-Path: 'Path' 매개 변수가 빈 문자열`이 표시되고 대상 파일이 저장소 루트의
+Markdown인지 확인합니다. 프로젝트의 Markdown 링크나 애플리케이션 코드 오류는 아닙니다.
+
+### 해결
+
+`Split-Path -Parent` 결과가 비어 있으면 현재 작업 폴더를 기준 경로로 사용합니다. 진단 스크립트는
+루트 파일과 하위 폴더 파일을 구분해 기준 경로를 정한 뒤 다시 실행합니다.
+
+## PowerShell 검색 문자열의 Markdown 백틱 때문에 파서 오류
+
+### 증상
+
+PowerShell에서 `rg` 검색식을 큰따옴표로 감싸고 그 안에 Markdown 인라인 코드의 백틱을 넣으면
+`문자열에 " 종결자가 없습니다`라는 파서 오류로 명령이 실행되지 않습니다.
+
+### 원인
+
+백틱은 PowerShell의 이스케이프 문자입니다. Markdown의 백틱까지 검색하려고 큰따옴표 문자열 안에
+그대로 넣으면 뒤따르는 문자를 이스케이프해 문자열 경계가 깨질 수 있습니다.
+
+### 판별
+
+애플리케이션 실행 전 PowerShell 파서 단계에서 실패하고, 명령 문자열에 큰따옴표와 백틱이 함께
+있는지 확인합니다. `rg`나 검색 대상 파일의 오류는 아닙니다.
+
+### 해결
+
+검색에 백틱이 꼭 필요하지 않다면 제거합니다. 필요하면 작은따옴표 문자열을 쓰거나 백틱을 명시적으로
+이스케이프합니다. 이번 문서 점검은 백틱 없는 검색어로 다시 실행했습니다.
+
+## 샌드박스에서 Alembic current가 Permission denied로 실패
+
+### 증상
+
+`python -m alembic current`가 Supabase pooler의 5432 포트에 연결할 때
+`psycopg.OperationalError`와 Windows 소켓 오류 `10013 Permission denied`로 실패합니다.
+
+### 원인
+
+DB나 migration 오류가 아니라 실행 샌드박스가 외부 PostgreSQL 연결을 차단한 경우입니다.
+같은 명령을 네트워크 접근이 허용된 환경에서 실행하면 정상 연결됩니다.
+
+### 판별
+
+Ruff와 pytest는 통과하지만 Alembic의 최초 DB 연결에서만 `10013`이 발생하는지 확인합니다.
+네트워크 접근을 허용해 같은 명령을 다시 실행했을 때 revision이 출력되면 샌드박스 제한입니다.
+
+### 해결
+
+외부 DB 조회가 필요한 검증 명령만 네트워크 접근 승인을 받아 다시 실행합니다. 2026-08-14 재실행에서는
+`20260814_0024 (head)`가 출력되어 code head와 운영 DB current가 일치함을 확인했습니다.
+
+## 저장소 루트에서 Alembic을 실행하면 migrations 경로를 찾지 못함
+
+### 증상
+
+저장소 루트에서 `python -m alembic -c backend/alembic.ini heads`를 실행하면
+`FAILED: Path doesn't exist: migrations`가 출력됩니다.
+
+### 원인
+
+`backend/alembic.ini`의 migration 경로가 `migrations`라는 상대경로입니다. 설정 파일만 지정하고
+작업 폴더를 루트에 두면 Alembic이 루트의 `migrations`를 찾습니다.
+
+### 판별
+
+`backend/migrations`는 실제로 존재하고, `backend`에서 같은 명령을 실행했을 때 revision이 정상
+출력되는지 확인합니다. migration 파일 누락이 아니라 실행 위치 문제입니다.
+
+### 해결
+
+문서의 검증 명령처럼 먼저 `cd backend`한 뒤 `python -m alembic heads` 또는
+`python -m alembic current`를 실행합니다. 올바른 작업 폴더에서 code head는
+`20260814_0024 (head)`로 확인됐습니다.
+
+## PowerShell 다중 속성 정렬의 잘못된 매개 변수 구문
+
+### 증상
+
+CSV 그룹 집계를 `Sort-Object Count -Descending, Name`으로 정렬하려 하면
+`매개 변수 목록에 인수가 없습니다`라는 파서 오류가 발생합니다.
+
+### 원인
+
+`-Descending`은 쉼표로 다음 속성을 이어 쓰는 위치 매개 변수 구문과 함께 사용할 수 없습니다.
+속성마다 정렬 방향을 지정하려면 계산된 속성 해시 테이블을 사용해야 합니다.
+
+### 판별
+
+CSV를 읽기 전 PowerShell 파서 단계에서 실패하고 오류 위치가 `-Descending, Name`의 쉼표를
+가리키는지 확인합니다. CSV 내용이나 인코딩 문제는 아닙니다.
+
+### 해결
+
+`Sort-Object -Property @{Expression='Count';Descending=$true},
+@{Expression='Name';Descending=$false}` 형식으로 속성별 방향을 지정해 다시 실행합니다.

@@ -49,6 +49,11 @@
 - 위 두 사고를 [`TROUBLESHOOTING.md`](TROUBLESHOOTING.md)에 증상·원인·판별·해결로 기록하고, 재발 방지 규칙을 `AGENTS.md`에 넣었습니다.
 - **`AGENTS.md`와 `CLAUDE.md`를 동일 내용으로 공유**했습니다. Codex는 `AGENTS.md`를, Claude Code는 `CLAUDE.md`를 자동으로 읽는데 `CLAUDE.md`가 포인터뿐이라 자동으로 도달하는 규칙이 0줄이었습니다.
 - 오류 기록 규칙을 실제 파일 구조에 맞췄습니다. 구버전에서 문제 해결이 README 안에 있던 시절의 규칙이 남아 있었습니다.
+- 기획 문서를 `docs/PLAN.md`로 통합하고 문서 안내와 로드맵을 정리했습니다(`6d9f4e4`, `1fb59c3`).
+- 핵심 Backend Service·도메인·보안 코드와 Frontend 공통 인프라·권한 판정부에 구현 이유를 설명하는 주석을 보강했습니다(`d380553`, `ff6886f`).
+- 루트 README를 프로젝트 구성 요약 중심으로 재구성하고 상세 설명은 역할별 docs로 연결했습니다(`dc1eafa`).
+- 전체 검증에서 코드·문서 불일치를 정정한 뒤, E2E 테스트 계정 정리가 업무 데이터를 삭제하지 않도록 보호 로직과 회귀 테스트를 추가했습니다. Backend Ruff check·format과 pytest **209건**, Frontend lint·typecheck·production build가 통과했고 Alembic code head와 운영 DB current는 `20260814_0024`로 일치합니다(`a556860`, `f851ccb`).
+- Jira 최종 내보내기 CSV를 가져오기 원본과 대조해 72개 이슈(에픽 7개·작업 65개)의 키·상위 에픽·요약·상태·일정이 모두 일치하고 누락·중복이 없음을 확인했습니다. 담당자는 72건 모두 비어 있는 상태로 Jira 최종정리를 완료했습니다.
 
 ## 2026-08-13 · 배포 게이트 전환과 Context 구조 정비
 
