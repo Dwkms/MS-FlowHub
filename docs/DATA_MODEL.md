@@ -2,7 +2,7 @@
 
 > 상태값의 **의미와 전이 규칙**은 [`DOMAIN.md`](DOMAIN.md), 계층 구조는 [`ARCHITECTURE.md`](ARCHITECTURE.md).
 > 이 문서는 테이블·컬럼·관계만 다룹니다.
-> 2026-08-13 확인: 19개 테이블과 migration `20260813_0023`까지 실제 모델과 일치합니다.
+> 2026-08-14 확인: 18개 테이블과 migration `20260814_0024`까지 실제 모델과 일치합니다.
 
 ## 1. 문서 개요
 
@@ -31,7 +31,7 @@
 
 - 운영 DB는 **Supabase PostgreSQL 전용**입니다. SQLite 등 다른 런타임 DB는 사용하지 않습니다.
 - 현재 Alembic head는 `20260812_0022_ai_generations.py`이며, 총 22개 migration이 적용되어 있습니다.
-- 스키마는 `public` 한 곳에 총 **19개 테이블**(`alembic_version` 포함)로 구성됩니다.
+- 스키마는 `public` 한 곳에 총 **18개 테이블**(`alembic_version` 포함)로 구성됩니다.
 - 프론트엔드는 Supabase 업무 테이블에 직접 접근하지 않고, 항상 FastAPI 백엔드를 거칩니다.
 - DB 레벨 `CHECK` 제약이 걸린 상태값은 `approval_documents.status`, `recruitment_requests.status`, `applicants.stage` 3곳뿐이며, 그 외 상태값(근태 상태, 직원 재직 상태, 매뉴얼 상태 등)은 애플리케이션 레이어(Pydantic `Literal`, `app/domain/employee_status.py`)에서 검증합니다.
 
@@ -42,7 +42,7 @@
 | 조직·직원·인증 | 4 | `departments`, `teams`, `employees`, `employee_accounts` | 구현됨 |
 | 근태 관리 | 2 | `attendance_records`, `attendance_change_histories` | 구현됨 |
 | 전자결재 | 2 | `approval_documents`, `approval_histories` | 구현됨 |
-| 채용 요청·채용공고 | 3 | `recruitment_requests`, `job_postings`, `notifications` | 구현됨 |
+| 채용 요청·채용공고 | 2 | `recruitment_requests`, `job_postings` | 구현됨 |
 | ATS 지원자 관리 | 2 | `applicants`, `applicant_stage_histories` | 구현됨 |
 | 직원 매뉴얼 | 4 | `manual_categories`, `manuals`, `manual_assets`, `manual_faqs` | 구현됨 |
 | AX 직원 도우미 | 1 | `ax_chat_logs` | 구현됨 |
@@ -63,7 +63,6 @@
 | `approval_histories` | 전자결재 | 결재 처리 이력 | `approval_document_id` → `approval_documents.id`, `actor_id` → `employees.id` |
 | `recruitment_requests` | 채용 요청·채용공고 | 채용 요청 | `request_department_id` → `departments.id`, `requester_id`/`approver_id` → `employees.id`, `approval_document_id` → `approval_documents.id` |
 | `job_postings` | 채용 요청·채용공고 | 승인된 요청으로 생성된 채용공고 | `recruitment_request_id` → `recruitment_requests.id` |
-| `notifications` | 채용 요청·채용공고 | 채용 요청 처리에 따른 인앱 알림 | `recipient_id` → `employees.id` |
 | `applicants` | ATS 지원자 관리 | 채용공고별 지원자 | `job_posting_id` → `job_postings.id`, `created_by_id` → `employees.id` |
 | `applicant_stage_histories` | ATS 지원자 관리 | 지원자 전형 단계 변경 이력 | `applicant_id` → `applicants.id`, `actor_id` → `employees.id` |
 | `manual_categories` | 직원 매뉴얼 | 매뉴얼 카테고리 | - |
@@ -197,21 +196,19 @@ erDiagram
 
 ## 10. 채용 요청·채용공고
 
-**기능 요약**: 부서의 채용 요청을 작성해 전자결재로 승인받으면 채용공고가 생성되고, 요청 처리 결과에 따라 관련자에게 인앱 알림을 남깁니다.
+**기능 요약**: 부서의 채용 요청을 작성해 전자결재로 승인받으면 채용공고가 생성되고, 채용공고가 생성됩니다.
 
-**사용 테이블**: `recruitment_requests`, `job_postings`, `notifications`
+**사용 테이블**: `recruitment_requests`, `job_postings`
 
 **테이블별 역할**
 - `recruitment_requests`: 요청 부서·요청자·결재자, 직무·인원·고용 형태·경력 코드/최소 연수·학력·근무지·급여·모집 마감일·지원 방법·채용 사유, 채용 포스터 메타데이터(`poster_original_name`, `poster_stored_name`, `poster_content_type`, `poster_size`), 연결된 결재 문서. `experience_years_min`, `education_level`, `work_location`, `salary`, `application_deadline`, `apply_method`는 기존 데이터 호환을 위해 nullable입니다.
 - `job_postings`: 승인된 요청 1건당 생성되는 채용공고 초안(제목·본문).
-- `notifications`: 요청 상신·승인·반려에 따라 생성·삭제되는 인앱 알림 레코드.
 
 **핵심 관계**
 - `departments` 1:N `recruitment_requests`
 - `employees` 1:N `recruitment_requests`(요청자, 결재자 각각)
 - `recruitment_requests` 1:0..1 `approval_documents`
 - `recruitment_requests` 1:0..1 `job_postings`
-- `employees` 1:N `notifications`
 
 **핵심 제약조건**
 - `recruitment_requests.status` DB `CHECK`: `DRAFT`, `PENDING_APPROVAL`, `APPROVED`, `REJECTED`, `POSTING_CREATED`
@@ -224,7 +221,7 @@ erDiagram
 - `job_postings.status`는 현재 생성 시 `DRAFT`로 고정되며, 별도 상태 전이 API는 아직 없습니다.
 
 **삭제 및 이력 보존 정책**
-- 채용 요청 삭제는 관리자(`SUPER_ADMIN`, `ADMIN`) 전용이며, 연결된 채용공고·알림을 함께 정리한 뒤 요청을 삭제합니다.
+- 채용 요청 삭제는 관리자(`SUPER_ADMIN`, `ADMIN`) 전용이며, 연결된 채용공고를 함께 정리한 뒤 요청을 삭제합니다.
 - 채용 포스터 원본 파일은 Supabase Storage 비공개 버킷(`recruitment-posters`)에 있으며, 요청 삭제·포스터 교체 시 이전 파일도 함께 제거합니다. 다운로드는 항상 백엔드 API를 거쳐 권한을 검증한 뒤 응답합니다.
 
 ## 11. ATS 지원자 관리
@@ -341,7 +338,7 @@ AI 초안 생성 1건을 남깁니다. **업무 테이블이 아닙니다.** 이
 - **이력서 파일 첨부, 외부 공개 지원 페이지, 이메일 발송, 면접 일정 관리**: ATS 지원자 관리 MVP 범위에서 의도적으로 제외했습니다.
 - **AI 자동 평가/생성 이력**: 채용·매뉴얼 등에서 AI 결과를 저장하는 공통 테이블은 아직 만들지 않았습니다. 도입 시 업무별로 나누기보다 공통 테이블 하나로 시작하는 방향을 검토합니다.
 - **다일 휴가 기간 관리**: 현재 `attendance_records`는 하루 단위 상태만 관리합니다. 여러 날에 걸친 휴가를 별도 기간 단위로 관리하는 확장은 일별 근태 기록과 독립적으로 설계해, 기간이 나중에 정정되어도 과거 일별 기록이 보존되도록 하는 것을 전제로 검토합니다.
-- **알림 조회·읽음 처리**: `notifications` 테이블과 데이터는 이미 쌓이고 있지만, 조회·읽음 처리 API와 화면은 아직 구현하지 않았습니다.
+- **알림**: 인앱 알림 기능은 2026-08-14에 제거했습니다(migration `20260814_0024`). 조회·읽음 API 없이 데이터만 쌓이고 있었고 화면의 종 아이콘도 비활성이었습니다. 사내 메일 시스템 도입 시 다시 설계합니다.
 
 과거에 검토했던 더 상세한 초안(테이블 컬럼 후보, 관계 설계 근거 등)은 [`docs/archive/DATA_MODEL_LEGACY.md`](./archive/DATA_MODEL_LEGACY.md)에 보존되어 있습니다.
 

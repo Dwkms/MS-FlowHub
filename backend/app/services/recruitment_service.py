@@ -14,7 +14,6 @@ from app.domain.recruitment_policy import (
 from app.models.approval import ApprovalDocument
 from app.models.recruitment import Applicant, JobPosting, RecruitmentRequest
 from app.repositories.approval_repository import ApprovalRepository
-from app.repositories.notification_repository import NotificationRepository
 from app.repositories.organization_repository import OrganizationRepository
 from app.repositories.recruitment_repository import RecruitmentRepository
 from app.schemas.recruitment import (
@@ -47,13 +46,11 @@ class RecruitmentService:
         recruitment_repository: RecruitmentRepository,
         approval_repository: ApprovalRepository,
         organization_repository: OrganizationRepository,
-        notification_repository: NotificationRepository,
     ) -> None:
         self.session = session
         self.recruitment = recruitment_repository
         self.approvals = approval_repository
         self.organization = organization_repository
-        self.notifications = notification_repository
 
     def list_requests(self, actor: ActorContext) -> list[RecruitmentRequestResponse]:
         visible_employee_id = None if actor.role in _FULL_ACCESS_ROLES else actor.employee_id
@@ -170,21 +167,12 @@ class RecruitmentService:
         poster_stored_name = request.poster_stored_name
         posting = self.recruitment.get_posting_by_request(request.id)
 
-        self.notifications.delete_related(
-            related_type="RECRUITMENT_REQUEST",
-            related_id=request.id,
-        )
         if posting is not None:
-            self.notifications.delete_related(related_type="JOB_POSTING", related_id=posting.id)
             self.recruitment.delete_posting(posting)
         self.recruitment.delete_request(request)
         self.session.flush()
 
         if approval_document_id is not None:
-            self.notifications.delete_related(
-                related_type="APPROVAL_DOCUMENT",
-                related_id=approval_document_id,
-            )
             document = self.approvals.get(approval_document_id)
             if document is not None:
                 self.approvals.delete(document)
@@ -213,12 +201,6 @@ class RecruitmentService:
         self.approvals.mark_submitted(document, actor.employee_id, payload.comment)
         request.approval_document_id = document.id
         request.status = "PENDING_APPROVAL"
-        self.notifications.create(
-            recipient_id=request.approver_id,
-            message=f"{request.position_title} 채용 요청 결재가 도착했습니다.",
-            related_type="APPROVAL_DOCUMENT",
-            related_id=document.id,
-        )
         self.session.commit()
         self.session.refresh(request)
         return self.recruitment.to_request_response(request)
@@ -235,27 +217,12 @@ class RecruitmentService:
 
         if target_status == "APPROVED":
             request.status = "APPROVED"
-            posting = self._create_posting(request)
+            self._create_posting(request)
             request.status = "POSTING_CREATED"
-            approval_message = (
-                f"{request.position_title} 채용 요청이 승인되어 채용공고 초안이 생성되었습니다."
-            )
-            self.notifications.create(
-                recipient_id=request.requester_id,
-                message=approval_message,
-                related_type="JOB_POSTING",
-                related_id=posting.id,
-            )
             return
 
         if target_status == "REJECTED":
             request.status = "REJECTED"
-            self.notifications.create(
-                recipient_id=request.requester_id,
-                message=f"{request.position_title} 채용 요청이 반려되었습니다.",
-                related_type="RECRUITMENT_REQUEST",
-                related_id=request.id,
-            )
             return
         raise RuntimeError("지원하지 않는 채용 요청 결재 결과입니다.")
 

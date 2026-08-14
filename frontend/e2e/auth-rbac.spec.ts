@@ -106,7 +106,7 @@ test.describe("테스트 전용 인증 계정", () => {
     await page.getByRole("button", { name: "조직도 보기" }).click();
     const chart = page.getByRole("img", { name: "MS FlowHub 조직도" });
     await expect(chart).toBeVisible();
-    await expect(chart).toHaveAttribute("src", /organization-chart-20260808-v3\.png/);
+    await expect(chart).toHaveAttribute("src", /organization-chart.png/);
     await expect
       .poll(() => chart.evaluate((image: HTMLImageElement) => image.naturalWidth))
       .toBeGreaterThan(0);

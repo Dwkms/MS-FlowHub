@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { type ReactNode, useState } from "react";
 
-import { BellIcon, FlowMark } from "@/components/icons";
+import { FlowMark } from "@/components/icons";
 import { clearLastSeenAt } from "@/features/auth/session-timeout";
 import { AxAssistant } from "@/features/ax/ax-assistant";
 import { useCurrentUser } from "@/features/current-user/current-user-provider";
@@ -49,15 +49,6 @@ export function PortalShell({ children }: { children: ReactNode }) {
         <header className="topbar">
           <span className={apiConnected ? "connection ok" : "connection"}><i />{apiConnected ? "Backend API 연결됨" : "Backend 연결 필요"}</span>
           <div className="top-actions">
-            <button
-              aria-label="알림 기능은 사내 메일 시스템 도입 후 제공 예정입니다"
-              className="icon-button notification-disabled"
-              disabled
-              title="사내 메일 시스템 도입 후 제공 예정"
-              type="button"
-            >
-              <BellIcon />
-            </button>
             <div className="authenticated-user"><span className="avatar">{currentEmployee.name.slice(0, 1)}</span><span><small>현재 사용자</small><b>{currentEmployee.name}</b></span></div>
           </div>
         </header>

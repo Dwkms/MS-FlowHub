@@ -131,6 +131,4 @@ Applicant(지원자)
 ## 확인 필요
 
 - `CANCELLED` 결재 상태로 전이시키는 경로가 코드에서 확인되지 않습니다. 스키마에만 있습니다.
-- 알림(`notifications`)은 채용 요청 처리 시 생성되지만, 조회·읽음 처리 흐름은
-  현재 코드에서 확인되지 않았습니다.
 - `employees.role`과 `employee_accounts.role`의 통합 여부가 정해지지 않았습니다.

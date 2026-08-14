@@ -66,7 +66,6 @@ ORM 모델과 Pydantic 스키마는 분리합니다. 하나의 업무가 여러 
 | `src/components/` | 공통 UI (`portal-shell.tsx`, `icons.tsx`) |
 | `src/lib/` | `api-client.ts`(공통 호출), `supabase-browser.ts`(로그인), `approver-policy.ts` |
 | `src/types/` | 백엔드 스키마에 대응하는 타입 |
-| `src/storage/` | **비어 있음.** 아래 "확인 필요" 참고 |
 
 **스타일**: `src/app/globals.css` 867줄의 시맨틱 클래스(`.status-detail-panel` 등)와
 `:root` CSS 변수가 실질적인 스타일 시스템입니다. Tailwind v4가 설치돼 있고 `globals.css`
@@ -101,7 +100,7 @@ Render Web Service 2개. 상세와 주의사항은 [`DEPLOYMENT_PLAN.md`](DEPLOY
 
 ## 확인 필요
 
-- `src/storage/`가 빈 디렉터리입니다. `AGENTS.md`에는 "`localStorage`는 별도 storage 레이어를
-  사용한다"는 규칙이 있지만, 실제로는 `features/auth/session-timeout.ts`와
+- storage 레이어 규칙만 있고 구현이 없습니다. `localStorage`를 별도 레이어로 감싼다는 규칙이
+  있었지만 그런 디렉터리는 저장소에 없고, `features/auth/session-timeout.ts`와
   `features/ax/ax-assistant-provider.tsx`가 `window.localStorage`를 직접 호출합니다.
   규칙을 되살릴지, 규칙을 현실에 맞출지 정해지지 않았습니다.

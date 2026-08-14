@@ -6,7 +6,6 @@ from app.models import (  # noqa: F401
     auth,
     ax,
     manual,
-    notification,
     organization,
     recruitment,
 )

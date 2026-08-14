@@ -31,16 +31,6 @@ export function createApproval(
   });
 }
 
-export function updateApproval(
-  documentId: string,
-  input: Partial<ApprovalCreateInput>,
-): Promise<ApprovalDocument> {
-  return apiRequest<ApprovalDocument>(`/api/v1/approvals/${documentId}`, {
-    method: "PATCH",
-    body: input,
-  });
-}
-
 export function deleteApproval(documentId: string): Promise<void> {
   return apiDelete(`/api/v1/approvals/${documentId}`);
 }

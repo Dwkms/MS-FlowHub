@@ -46,4 +46,3 @@ export const updateEmploymentStatusReason = (
     { method: "PATCH", body: payload },
   );
 export const getEmployeeDepartments = () => apiGet<Department[]>("/api/v1/departments");
-export const getOrganization = () => apiGet<OrganizationNode>("/api/v1/employees/organization");

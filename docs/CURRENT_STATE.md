@@ -29,7 +29,7 @@
 | AX 직원 도우미 | **완료** | 매뉴얼·FAQ 기반 응답. RAG·벡터 DB 없음 |
 | 생성형 AI 초안 | **완료** | 전자결재·채용공고 초안(`claude-opus-5`), 실호출 검증 |
 | AI 채용 포스터 | **완료** | OpenAI `gpt-image-2` 2안 생성·비교·선택·PNG 다운로드 |
-| 알림 | **부분 구현** | `notifications` 테이블에 채용 처리 알림이 쌓이지만 **조회·읽음 API가 없습니다** |
+| 알림 | **제거됨** | 2026-08-14에 코드와 `notifications` 테이블을 함께 삭제했습니다 |
 | CI | **완료** | `ci.yml`이 master push·PR마다 Backend·Frontend 검사 |
 | 배포 게이트 | **적용됨 · 동작 미검증** | 아래 참고 |
 
@@ -44,9 +44,15 @@
 Render 무료 플랜 특성입니다. 화면은 뜨는데 데이터만 안 나와 장애로 오인하기 쉽습니다.
 판별법은 [`../TROUBLESHOOTING.md`](../TROUBLESHOOTING.md)의 "화면은 뜨는데 API만 502".
 
-**`frontend/src/storage/`가 빈 디렉터리입니다.**
-`localStorage`를 storage 레이어로 감싸는 규칙이 있었지만 실제로는 두 파일이 직접 호출합니다.
+**storage 레이어 규칙만 있고 구현이 없습니다.**
+`localStorage`를 별도 레이어로 감싸는 규칙이 있었지만 구현된 적이 없고,
+`features/auth/session-timeout.ts`와 `features/ax/ax-assistant-provider.tsx`가 직접 호출합니다.
 규칙을 되살릴지 현실에 맞출지 정해지지 않았습니다.
+
+**API는 있는데 화면이 없는 기능이 있습니다.**
+결재 문서 수정(`PATCH /approvals/{id}`), 공고 수정(`PATCH /job-postings/{id}`),
+역할 변경(`PATCH /employees/{id}/role`), 조직도 조회(`GET /employees/organization`)가
+여기 해당합니다. 조직도는 화면이 API 대신 정적 PNG를 씁니다.
 
 **Playwright E2E는 수동 실행 전용입니다.**
 실제 Supabase에 접속하므로 CI에서 자동 실행하지 않습니다. 프론트에는 단위 테스트가 없습니다.
@@ -74,7 +80,7 @@ MS0045는 구버전 QA팀장에서 CS부서로 이동하는 과정에서 권한 
 **2. 배포 게이트 동작 검증** — 이번 배포가 첫 코드 배포입니다.
 **3. GitHub branch protection** — master 직접 push 금지 + PR 필수 CI
 **4. Pre-Deploy Command로 migration 자동화 검토**
-**5.** 알림 조회·읽음 API, 공통 오류 응답 형식, ATS·Storage E2E 확대
+**5.** 공통 오류 응답 형식, ATS·Storage E2E 확대, 위 "화면이 없는 기능"의 UI
 **6.** 리팩토링·데드코드 정리 후 Jira 최종정리
 
 Jira 반영 대상은 [`JIRA_UPDATE_2026-08-08.md`](JIRA_UPDATE_2026-08-08.md)에 정리돼 있습니다.

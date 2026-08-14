@@ -14,13 +14,11 @@ from app.domain.image_ai_provider import (
     DisabledImageAIProvider,
     ImageAIProvider,
 )
-from app.models.organization import Employee
 from app.repositories.ai_generation_repository import AiGenerationRepository
 from app.repositories.approval_repository import ApprovalRepository
 from app.repositories.auth_repository import AuthRepository
 from app.repositories.ax_repository import AxRepository
 from app.repositories.manual_repository import ManualRepository
-from app.repositories.notification_repository import NotificationRepository
 from app.repositories.organization_repository import OrganizationRepository
 from app.repositories.recruitment_repository import RecruitmentRepository
 from app.security.identity import ActorContext
@@ -72,17 +70,6 @@ def get_authenticated_actor(
 AuthenticatedActor = Annotated[ActorContext, Depends(get_authenticated_actor)]
 
 
-def require_authenticated_user(actor: AuthenticatedActor) -> ActorContext:
-    return actor
-
-
-def get_current_employee(actor: AuthenticatedActor, session: DatabaseSession) -> Employee:
-    employee = session.get(Employee, actor.employee_id)
-    if employee is None:
-        raise HTTPException(status_code=403, detail="Authenticated employee was not found.")
-    return employee
-
-
 def require_super_admin(actor: AuthenticatedActor) -> ActorContext:
     require_roles(actor, SUPER_ADMIN)
     return actor
@@ -90,11 +77,6 @@ def require_super_admin(actor: AuthenticatedActor) -> ActorContext:
 
 def require_hr_admin(actor: AuthenticatedActor) -> ActorContext:
     require_roles(actor, SUPER_ADMIN, HR_ADMIN)
-    return actor
-
-
-def require_team_admin(actor: AuthenticatedActor) -> ActorContext:
-    require_roles(actor, SUPER_ADMIN, TEAM_ADMIN)
     return actor
 
 
@@ -267,5 +249,4 @@ def _build_recruitment_service(session: Session) -> RecruitmentService:
         recruitment_repository=RecruitmentRepository(session),
         approval_repository=ApprovalRepository(session),
         organization_repository=OrganizationRepository(session),
-        notification_repository=NotificationRepository(session),
     )

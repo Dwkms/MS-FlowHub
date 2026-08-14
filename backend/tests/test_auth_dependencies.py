@@ -6,7 +6,6 @@ from app.api.dependencies import (
     require_employee_management_permission,
     require_hr_admin,
     require_super_admin,
-    require_team_admin,
 )
 from app.security.identity import ActorContext
 
@@ -20,7 +19,6 @@ def actor(role: str) -> ActorContext:
     [
         (require_super_admin, "SUPER_ADMIN"),
         (require_hr_admin, "HR_ADMIN"),
-        (require_team_admin, "TEAM_ADMIN"),
         (require_employee_management_permission, "HR_ADMIN"),
         (require_approval_permission, "EMPLOYEE"),
     ],
@@ -34,7 +32,6 @@ def test_role_dependency_allows_expected_role(dependency, allowed_role):
     [
         (require_super_admin, "HR_ADMIN"),
         (require_hr_admin, "TEAM_ADMIN"),
-        (require_team_admin, "EMPLOYEE"),
         (require_employee_management_permission, "TEAM_ADMIN"),
     ],
 )

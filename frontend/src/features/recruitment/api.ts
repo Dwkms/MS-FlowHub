@@ -56,17 +56,6 @@ export function listJobPostings(): Promise<JobPosting[]> {
   return apiGet("/api/v1/job-postings");
 }
 
-/** 공고 제목·본문 수정. `status`는 서버가 받지 않으므로 게시 상태는 바뀌지 않는다. */
-export function updateJobPosting(
-  postingId: string,
-  payload: { title?: string; content?: string },
-): Promise<JobPosting> {
-  return apiRequest<JobPosting>(`/api/v1/job-postings/${postingId}`, {
-    method: "PATCH",
-    body: payload,
-  });
-}
-
 export function listApplicants(filters?: {
   jobPostingId?: string;
   stage?: ApplicantStage;

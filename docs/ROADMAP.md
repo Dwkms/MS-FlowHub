@@ -27,7 +27,6 @@
 
 우선순위가 확정되지 않은 항목입니다.
 
-- 알림 조회·읽음 API — 테이블은 있고 API가 없습니다
 - 공통 오류 응답 형식 정리
 - ATS·Storage Playwright E2E 확대
 - 데드 코드·덤프 파일 정리 (빈 `frontend/src/storage/`, 역할 값 어휘 이중화, `docs/archive/` 재정리)

@@ -250,6 +250,6 @@ export function EmployeeManagement() {
         {historyOpen && <AttendanceHistoryPanel items={attendanceHistory} />}
       </section>
     </div>}
-    {chartOpen && <div className="modal-backdrop chart-backdrop" onClick={() => setChartOpen(false)}><section className="organization-chart-modal" onClick={(event) => event.stopPropagation()}><div className="organization-chart-heading"><div><span className="section-kicker">ORGANIZATION CHART</span><h2>MS FlowHub 조직도</h2></div><button className="modal-close" onClick={() => setChartOpen(false)} aria-label="닫기">×</button></div><Image src="/organization-chart-20260808-v3.png" alt="MS FlowHub 조직도" width={1680} height={943} priority /></section></div>}
+    {chartOpen && <div className="modal-backdrop chart-backdrop" onClick={() => setChartOpen(false)}><section className="organization-chart-modal" onClick={(event) => event.stopPropagation()}><div className="organization-chart-heading"><div><span className="section-kicker">ORGANIZATION CHART</span><h2>MS FlowHub 조직도</h2></div><button className="modal-close" onClick={() => setChartOpen(false)} aria-label="닫기">×</button></div><Image src="/organization-chart.png" alt="MS FlowHub 조직도" width={1680} height={943} priority /></section></div>}
   </section>;
 }

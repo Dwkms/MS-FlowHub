@@ -13,7 +13,7 @@ from app.db.session import get_db_session
 from app.domain.ai_provider import MockAIProvider
 from app.domain.image_ai_provider import ImageAIProviderResult
 from app.main import create_app
-from app.models import approval, auth, manual, notification, organization, recruitment  # noqa: F401
+from app.models import approval, auth, manual, organization, recruitment  # noqa: F401
 from app.models.auth import EmployeeAccount
 from app.models.organization import Department, Employee, Team
 from app.repositories.organization_repository import OrganizationRepository
