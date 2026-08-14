@@ -35,4 +35,4 @@
 ## 범위 밖
 
 실제 이메일 발송, PDF 분석·OCR, RAG·벡터 DB, n8n, 다단계 결재, WebSocket 실시간 알림,
-Docker, 모바일 앱, 자동 채용 결정. 배경은 [`PROJECT_SPEC.md`](PROJECT_SPEC.md).
+Docker, 모바일 앱, 자동 채용 결정. 배경은 [`PLAN.md`](PLAN.md#1-프로젝트-배경과-범위--2026-07-30).

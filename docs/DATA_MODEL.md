@@ -322,7 +322,7 @@ AI 초안 생성 1건을 남깁니다. **업무 테이블이 아닙니다.** 이
 - `created_by_id`와 `created_at`으로 최근 24시간 호출 수를 세어 일일 한도(사용자당·전역)를 강제합니다. 별도 테이블이 필요 없습니다.
 - 개인정보는 `source_input`에 담지 않습니다. Context Builder가 이름·직급·부서·팀만 통과시키고 이메일·사번·근태 사유는 제외합니다.
 
-상세 설계는 [`AI_AUTOMATION_PLAN.md`](AI_AUTOMATION_PLAN.md)를 참고합니다.
+상세 설계는 [`archive/AI_AUTOMATION_PLAN.md`](archive/AI_AUTOMATION_PLAN.md)를 참고합니다.
 
 ## 14. 공통 데이터 규칙
 

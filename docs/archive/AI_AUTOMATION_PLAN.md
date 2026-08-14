@@ -617,7 +617,7 @@ if repository.count_today(created_by_id=actor.employee_id) >= USER_DAILY_LIMIT:
 | 내용 | `ai_generations` 테이블(`input_tokens`·`output_tokens` 포함) + 인덱스 3개 |
 | `downgrade` | `drop_index` ×3 → `drop_table` |
 
-**운영 DB 적용은 수동이다.** Render Build Command가 `pip install .`뿐이라 배포가 migration을 실행하지 않는다([DEPLOYMENT_PLAN.md](DEPLOYMENT_PLAN.md)). 배포 전에 Supabase에 `alembic upgrade head`를 직접 적용하지 않으면 운영에서 없는 테이블을 조회해 500이 난다. **Prompt 1 완료 조건에 포함한다.**
+**운영 DB 적용은 수동이다.** Render Build Command가 `pip install .`뿐이라 배포가 migration을 실행하지 않는다([DEPLOYMENT_PLAN.md](../DEPLOYMENT_PLAN.md)). 배포 전에 Supabase에 `alembic upgrade head`를 직접 적용하지 않으면 운영에서 없는 테이블을 조회해 500이 난다. **Prompt 1 완료 조건에 포함한다.**
 
 `JobPosting` 수정 API(§14)는 **migration이 필요 없다**. 기존 칼럼만 쓴다.
 

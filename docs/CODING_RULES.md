@@ -42,7 +42,7 @@
 - AI 결과를 업무 결정으로 자동 반영하지 않습니다. 상태를 바꾸지 않습니다.
 - AI 실패가 핵심 업무 저장을 실패시키지 않게 합니다 (`200 + success:false` 패턴).
 - Context에 없는 값은 키 자체를 만들지 않습니다. `None`을 넣으면 AI가 지어냅니다.
-- 자세한 제약은 [`AI_DESIGN.md`](AI_DESIGN.md)와 [`AI_AUTOMATION_PLAN.md`](AI_AUTOMATION_PLAN.md).
+- 자세한 제약은 [`AI_DESIGN.md`](AI_DESIGN.md)와 [`PLAN.md`](PLAN.md#10-생성형-ai-초안-생성--2026-08-12).
 
 ## Frontend
 
@@ -96,4 +96,5 @@ npm run lint; npm run typecheck; npm run build
 | 구조·배포 | [`ARCHITECTURE.md`](ARCHITECTURE.md) |
 | 겪은 오류와 해결 | `TROUBLESHOOTING.md` — 루트의 별도 파일입니다. README 안이 아닙니다 |
 | 설계 판단의 근거 | [`DECISIONS.md`](DECISIONS.md) |
+| 새 기능을 만든 이유·결과 | [`PLAN.md`](PLAN.md) — 시간순, 절 단위로 추가 |
 | 에이전트가 항상 지킬 규칙 | `AGENTS.md`와 `CLAUDE.md` **양쪽 모두**. 두 파일은 내용이 같아야 합니다 |

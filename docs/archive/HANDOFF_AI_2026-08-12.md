@@ -448,7 +448,7 @@ Root Directory 밖이고, 배포되지 않은 것이 정상입니다. 코드와 
 - [x] Backend `MS-FlowHub` Auto-Deploy → `After CI Checks Pass`
 - [x] Frontend `ms-flowhub-frontend` Auto-Deploy → `After CI Checks Pass`
 - [x] 운영 상태 확인 — Backend `/health` 200, Frontend `/login` 200, `/api/*` 프록시 401(미인증 정상)
-- [x] 실제 서비스 URL 확정 — [`DEPLOYMENT_PLAN.md`](DEPLOYMENT_PLAN.md) §3·§4에 반영
+- [x] 실제 서비스 URL 확정 — [`DEPLOYMENT_PLAN.md`](../DEPLOYMENT_PLAN.md) §3·§4에 반영
 
 ### 남은 것
 

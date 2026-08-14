@@ -88,7 +88,7 @@ MS FlowHub는 직원·조직 관리, 근태 상태, 전자결재, 채용 요청�
 - 답변 카드에서 근거 매뉴얼을 새 탭으로 열거나 관련 업무 화면으로 이동
 - 패널·버튼을 끌어 옮길 수 있고 위치는 브라우저에 저장 (대화 내용은 저장하지 않음)
 - 질문 로그는 익명으로 남기며, 상위 후보 3개를 함께 기록해 매칭 실패 원인을 분석
-- 기획·측정 근거: [`docs/AX_FAQ_CHATBOT_PLAN.md`](docs/AX_FAQ_CHATBOT_PLAN.md)
+- 기획·측정 근거: [`docs/PLAN.md`](docs/PLAN.md#9-ax-직원-도우미--2026-08-09--08-10)
 
 ### 생성형 AI 초안·채용 포스터
 
@@ -103,7 +103,7 @@ MS FlowHub는 직원·조직 관리, 근태 상태, 전자결재, 채용 요청�
 - 생성 이미지는 화면에서 확인하고 PNG로 내려받을 수 있습니다. 확인 전용 응답이므로 기존 첨부 포스터나 공고를 자동으로 덮어쓰지 않습니다.
 - 생성 시안은 현재 화면 메모리에만 유지되므로 메뉴를 벗어나면 사라집니다. 보관할 시안은 화면을 나가기 전에 선택해 다운로드합니다.
 - 이미지 생성은 `IMAGE_AI_PROVIDER=openai`일 때만 활성화되고, 일반 계정에는 최근 24시간 기준 사용자당 2회·전역 5회의 별도 기본 한도를 적용합니다. `SUPER_ADMIN` 호출은 두 한도와 일반 계정의 전역 집계에서 제외합니다.
-- 설계 근거: [`docs/AI_AUTOMATION_PLAN.md`](docs/AI_AUTOMATION_PLAN.md)
+- 설계 근거: [`docs/PLAN.md`](docs/PLAN.md#10-생성형-ai-초안-생성--2026-08-12)
 
 ## 기술 구성
 
@@ -289,6 +289,7 @@ MS FlowHub/
 
 AI 에이전트로 작업한다면 [AGENTS.md](./AGENTS.md)의 Context Map부터 보세요.
 
+- [기능 기획 기록](./docs/PLAN.md) — 무엇을 왜 만들었는지 (시간순)
 - [현재 구현 상태](./docs/CURRENT_STATE.md) — 무엇이 되고 무엇이 안 되는지
 - [시스템 구조](./docs/ARCHITECTURE.md) — 요청 흐름, 계층, 배포
 - [업무 도메인과 규칙](./docs/DOMAIN.md) — 권한, 상태 전이
@@ -296,14 +297,12 @@ AI 에이전트로 작업한다면 [AGENTS.md](./AGENTS.md)의 Context Map부터
 - [API](./docs/API_SPEC.md)
 - [코드 작성 규칙](./docs/CODING_RULES.md)
 - [기능 로드맵](./docs/ROADMAP.md)
-- [프로젝트 명세](./docs/PROJECT_SPEC.md)
 - [설계 결정 기록](./docs/DECISIONS.md)
 - [배포 기획 (Render)](./docs/DEPLOYMENT_PLAN.md)
-- [CI 구성·E2E 확장 기획](./docs/CI_E2E_PLAN.md)
 - [AI 설계와 구현 기준](./docs/AI_DESIGN.md)
 - [업데이트 로그](./UPDATELOG.md)
 
-과거 기획·스냅샷 문서(구현 요약, 사용자 흐름 초안, 프로토타입 체크리스트, ATS MVP 착수 전 기획)는 [docs/archive](./docs/archive)에 보존되어 있습니다.
+초기 기획 원문과 인계 문서는 [docs/archive](./docs/archive/README.md)에 보존되어 있습니다. 무엇이 어디로 요약됐는지는 그 폴더의 안내 문서에 정리돼 있습니다.
 
 ## 문제 해결
 

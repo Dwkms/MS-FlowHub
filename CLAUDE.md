@@ -17,12 +17,13 @@
 | 하려는 일 | 먼저 볼 문서 |
 |---|---|
 | 무엇이 되고 무엇이 안 되는지 | [`docs/CURRENT_STATE.md`](docs/CURRENT_STATE.md) |
+| 이 **기능**을 왜 만들었는지 | [`docs/PLAN.md`](docs/PLAN.md) — 기능별·시간순 |
 | 시스템 구조·인증 흐름·배포 | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) |
 | 업무 규칙·권한·상태 전이 | [`docs/DOMAIN.md`](docs/DOMAIN.md) |
 | 테이블·컬럼·관계 | [`docs/DATA_MODEL.md`](docs/DATA_MODEL.md) |
 | 엔드포인트 확인·추가 | [`docs/API_SPEC.md`](docs/API_SPEC.md) |
 | 코드 작성 규칙·검증 명령 | [`docs/CODING_RULES.md`](docs/CODING_RULES.md) |
-| 왜 이렇게 만들었는지 | [`docs/DECISIONS.md`](docs/DECISIONS.md) |
+| 이 **구조·기술**을 왜 골랐는지 | [`docs/DECISIONS.md`](docs/DECISIONS.md) — 설계 결정 기록 |
 | 배포·Render 설정 | [`docs/DEPLOYMENT_PLAN.md`](docs/DEPLOYMENT_PLAN.md) |
 | AI 기능 제약 | [`docs/AI_DESIGN.md`](docs/AI_DESIGN.md) |
 | 겪은 오류와 해결 | [`TROUBLESHOOTING.md`](TROUBLESHOOTING.md) |

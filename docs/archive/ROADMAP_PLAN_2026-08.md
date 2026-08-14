@@ -83,7 +83,7 @@
 | CI/CD·운영 배포 기본 구성 | QA·배포·문서화 | 높음 | 2026-08-06 | 2026-08-06 | 3~5시간 |
 | 공통 오류 응답 형식 | QA·배포·문서화 | 낮음 | 미정 | 미정 | AX 자동화 이후 검토 |
 
-ATS 지원자 관리 MVP는 완료됐다. 착수 전 세부 범위·권한 기획은 [archive/ATS_APPLICANT_MVP_PLAN.md](./archive/ATS_APPLICANT_MVP_PLAN.md), 실제 구현 기준은 [DATA_MODEL.md](./DATA_MODEL.md)를 참고한다.
+ATS 지원자 관리 MVP는 완료됐다. 착수 전 세부 범위·권한 기획은 [archive/ATS_APPLICANT_MVP_PLAN.md](./ATS_APPLICANT_MVP_PLAN.md), 실제 구현 기준은 [DATA_MODEL.md](../DATA_MODEL.md)를 참고한다.
 
 ## 현재 상태 요약 (2026-08-01)
 
