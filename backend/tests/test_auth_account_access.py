@@ -75,6 +75,7 @@ def test_selected_auth_sync_creates_qa_part_accounts(client: TestClient) -> None
         ).all()
 
     assert len(accounts) == 3
-    assert {account.role for account in accounts} == {"TEAM_ADMIN", "EMPLOYEE"}
+    assert {account.role for account in accounts} == {"PART_ADMIN", "EMPLOYEE"}
+    # QA파트장은 자기 파트만 관리하므로 팀장용 TEAM_ADMIN이 아니라 PART_ADMIN이다.
     qa_part_lead = next(account for account in accounts if account.employee_id == "emp-ms0047")
-    assert qa_part_lead.role == "TEAM_ADMIN"
+    assert qa_part_lead.role == "PART_ADMIN"
