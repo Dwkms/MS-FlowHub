@@ -70,20 +70,20 @@ mindmap
   "theme": "base",
   "themeVariables": {
     "fontFamily": "Pretendard, Noto Sans KR, sans-serif",
-    "fontSize": "14px",
+    "fontSize": "15px",
     "doneTaskBkgColor": "#7fc79a",
     "doneTaskBorderColor": "#3f8a5c",
-    "activeTaskBkgColor": "#f2c94c",
-    "activeTaskBorderColor": "#c08a10",
-    "taskBkgColor": "#dfe8f5",
+    "activeTaskBkgColor": "#6aa9e9",
+    "activeTaskBorderColor": "#2f67c8",
+    "taskBkgColor": "#cfd8e6",
     "taskBorderColor": "#8fa6c9",
     "taskTextColor": "#172033",
     "taskTextDarkColor": "#172033",
     "taskTextLightColor": "#172033",
-    "taskTextOutsideColor": "#8a93a3",
-    "gridColor": "#5a6272",
-    "sectionBkgColor": "#00000000",
-    "altSectionBkgColor": "#8a93a31a"
+    "taskTextOutsideColor": "#94a3b8",
+    "sectionBkgColor": "transparent",
+    "altSectionBkgColor": "transparent",
+    "gridColor": "#6b7688"
   },
   "gantt": {
     "useWidth": 1200,
@@ -92,8 +92,8 @@ mindmap
     "topPadding": 60,
     "leftPadding": 130,
     "gridLineStartPadding": 40,
-    "fontSize": 13,
-    "sectionFontSize": 15,
+    "fontSize": 14,
+    "sectionFontSize": 16,
     "numberSectionStyles": 5
   }
 }}%%
