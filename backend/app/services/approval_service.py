@@ -177,7 +177,7 @@ class ApprovalService:
     def _require_manager_level_approver(position: str) -> None:
         if not is_recruitment_approver(position):
             raise HTTPException(
-                status_code=422, detail="결재자는 팀장급 이상만 지정할 수 있습니다."
+                status_code=422, detail="결재자는 파트장급 이상만 지정할 수 있습니다."
             )
 
     @staticmethod

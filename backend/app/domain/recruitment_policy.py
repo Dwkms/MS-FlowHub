@@ -1,4 +1,4 @@
-RECRUITMENT_APPROVER_POSITION_KEYWORDS = ("팀장", "부장", "이사", "대표")
+RECRUITMENT_APPROVER_POSITION_KEYWORDS = ("파트장", "팀장", "부장", "이사", "대표")
 NON_REQUESTABLE_DEPARTMENT_CODES = frozenset({"EXEC"})
 
 

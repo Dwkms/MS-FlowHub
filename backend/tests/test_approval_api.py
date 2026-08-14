@@ -62,7 +62,7 @@ def test_general_employee_cannot_be_selected_as_approver(client: TestClient) -> 
     )
 
     assert response.status_code == 422
-    assert response.json()["detail"] == "결재자는 팀장급 이상만 지정할 수 있습니다."
+    assert response.json()["detail"] == "결재자는 파트장급 이상만 지정할 수 있습니다."
 
 
 def test_draft_cannot_change_approver_to_general_employee(client: TestClient) -> None:

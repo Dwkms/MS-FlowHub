@@ -89,7 +89,7 @@ class RecruitmentService:
         }
         if not is_recruitment_approver(approver.position) and not is_super_admin_self_approver:
             raise HTTPException(
-                status_code=422, detail="채용 요청 결재자는 팀장급 이상만 지정할 수 있습니다."
+                status_code=422, detail="채용 요청 결재자는 파트장급 이상만 지정할 수 있습니다."
             )
         if approver.id == requester.id and not is_super_admin_self_approver:
             raise HTTPException(status_code=400, detail="요청자와 결재자는 같을 수 없습니다.")
