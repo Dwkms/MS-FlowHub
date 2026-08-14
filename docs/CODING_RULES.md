@@ -96,3 +96,4 @@ npm run lint; npm run typecheck; npm run build
 | 구조·배포 | [`ARCHITECTURE.md`](ARCHITECTURE.md) |
 | 겪은 오류와 해결 | `TROUBLESHOOTING.md` — 루트의 별도 파일입니다. README 안이 아닙니다 |
 | 설계 판단의 근거 | [`DECISIONS.md`](DECISIONS.md) |
+| 에이전트가 항상 지킬 규칙 | `AGENTS.md`와 `CLAUDE.md` **양쪽 모두**. 두 파일은 내용이 같아야 합니다 |
