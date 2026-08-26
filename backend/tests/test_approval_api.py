@@ -290,3 +290,33 @@ def test_unassigned_approver_cannot_approve_document(client: TestClient) -> None
 
     assert submitted.status_code == 200
     assert response.status_code == 403
+
+
+def test_author_and_approver_can_read_document_detail(client: TestClient) -> None:
+    draft = create_draft(client)
+
+    author_response = client.get(f"/api/v1/approvals/{draft['id']}")
+    assert author_response.status_code == 200
+
+    set_authenticated_actor(client, "emp-hr")
+    approver_response = client.get(f"/api/v1/approvals/{draft['id']}")
+    assert approver_response.status_code == 200
+
+
+def test_unrelated_employee_cannot_read_document_detail(client: TestClient) -> None:
+    draft = create_draft(client)
+    set_authenticated_actor(client, "emp-sales")
+
+    response = client.get(f"/api/v1/approvals/{draft['id']}")
+
+    assert response.status_code == 403
+    assert response.json()["detail"] == "본인 문서 또는 관리 범위의 문서만 조회할 수 있습니다."
+
+
+def test_document_detail_requires_authentication(client: TestClient) -> None:
+    draft = create_draft(client)
+    client.app.dependency_overrides.pop(get_authenticated_actor, None)
+
+    response = client.get(f"/api/v1/approvals/{draft['id']}")
+
+    assert response.status_code == 401

@@ -27,7 +27,9 @@ DashboardServiceDependency = Annotated[DashboardService, Depends(get_dashboard_s
 
 
 @api_router.get("/departments", response_model=list[DepartmentResponse], tags=["Departments"])
-def list_departments(service: DashboardServiceDependency) -> list[DepartmentResponse]:
+def list_departments(
+    service: DashboardServiceDependency, _: AuthenticatedActor
+) -> list[DepartmentResponse]:
     return service.list_departments()
 
 

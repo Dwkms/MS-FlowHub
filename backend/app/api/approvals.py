@@ -33,8 +33,10 @@ def list_approvals(
 
 
 @router.get("/{document_id}", response_model=ApprovalResponse)
-def get_approval(document_id: str, service: ApprovalServiceDependency) -> ApprovalResponse:
-    return service.get(document_id)
+def get_approval(
+    document_id: str, service: ApprovalServiceDependency, actor: AuthenticatedActor
+) -> ApprovalResponse:
+    return service.get(document_id, actor)
 
 
 @router.post("", response_model=ApprovalResponse, status_code=status.HTTP_201_CREATED)

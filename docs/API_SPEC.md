@@ -46,7 +46,7 @@
 | Method | Path | 설명 |
 |---|---|---|
 | GET | `/approvals` | 목록. 관리자가 아니면 본인 관련 문서만 |
-| GET | `/approvals/{id}` | 상세와 이력 |
+| GET | `/approvals/{id}` | 상세와 이력. 목록과 같은 열람 범위 |
 | POST | `/approvals` | 작성 (`DRAFT`) |
 | PATCH | `/approvals/{id}` | 수정. `DRAFT` + 작성자만 |
 | DELETE | `/approvals/{id}` | 삭제. 관리자만 |

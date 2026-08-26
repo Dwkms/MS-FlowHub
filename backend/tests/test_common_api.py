@@ -48,6 +48,10 @@ def test_list_employees_returns_paginated_organization_seed(client: TestClient) 
 
 
 def test_list_departments_returns_organization_departments(client: TestClient) -> None:
+    client.app.dependency_overrides[get_authenticated_actor] = lambda: ActorContext(
+        employee_id="emp-ms0003", role="EMPLOYEE", auth_user_id="auth-employee"
+    )
+
     response = client.get("/api/v1/departments")
 
     assert response.status_code == 200
@@ -200,5 +204,11 @@ def test_dashboard_hides_organization_analytics_from_employee(client: TestClient
 
 def test_dashboard_requires_bearer_auth(client: TestClient) -> None:
     response = client.get("/api/v1/dashboard")
+
+    assert response.status_code == 401
+
+
+def test_list_departments_requires_authentication(client: TestClient) -> None:
+    response = client.get("/api/v1/departments")
 
     assert response.status_code == 401

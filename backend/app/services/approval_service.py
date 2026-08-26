@@ -59,8 +59,10 @@ class ApprovalService:
             status=status_filter,
         )
 
-    def get(self, document_id: str) -> ApprovalResponse:
-        return self.approvals.to_response(self._get_document(document_id))
+    def get(self, document_id: str, actor: ActorContext) -> ApprovalResponse:
+        document = self._get_document(document_id)
+        self._require_view_permission(document, actor)
+        return self.approvals.to_response(document)
 
     def create(self, payload: ApprovalCreate, actor: ActorContext) -> ApprovalResponse:
         author = self._require_employee(actor.employee_id)
@@ -202,6 +204,25 @@ class ApprovalService:
     def _require_status(document: ApprovalDocument, expected: str, message: str) -> None:
         if document.status != expected:
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=message)
+
+    def _require_view_permission(self, document: ApprovalDocument, actor: ActorContext) -> None:
+        """`list`와 같은 범위를 상세 조회에도 적용합니다.
+
+        목록은 관리자가 아니면 본인이 기안했거나 결재자로 지정된 문서만 돌려줍니다.
+        상세만 열려 있으면 문서 ID를 아는 사람이 남의 결재문서를 그대로 읽을 수 있습니다.
+        결재 처리와 마찬가지로 관리 범위 안 직원의 문서는 팀장·파트장도 볼 수 있습니다.
+        """
+        if actor.role in {"SUPER_ADMIN", "ADMIN"}:
+            return
+        if actor.employee_id in {document.author_id, document.approver_id}:
+            return
+        if is_org_scoped_role(actor.role) and self._is_within_manage_scope(
+            actor.role, actor.employee_id, document.author_id
+        ):
+            return
+        raise HTTPException(
+            status_code=403, detail="본인 문서 또는 관리 범위의 문서만 조회할 수 있습니다."
+        )
 
     def _require_decision_permission(self, document: ApprovalDocument, actor: ActorContext) -> None:
         self._require_status(document, "PENDING", "결재 대기 문서만 처리할 수 있습니다.")
